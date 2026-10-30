@@ -1,0 +1,47 @@
+[
+  {
+    "stage": "Ideas",
+    "proposals": [
+      {
+        "name": "Example idea",
+        "gitlab-url": "https://repo.getmonero.org/monero-project/ccs-proposals/-/merge_requests/1",
+        "author": "example",
+        "date": "October 20, 2026"
+      }
+    ]
+  },
+  {
+    "stage": "Funding Required",
+    "proposals": [
+      {
+        "name": "Example funding &amp; fees",
+        "gitlab-url": "https://repo.getmonero.org/monero-project/ccs-proposals/-/merge_requests/2",
+        "local-url": "/proposals/example-funding.html",
+        "author": "example",
+        "date": "October 10, 2026",
+        "donate-address": "888tNkZrPN6JsEgekjMnABU4TBzc2Dt29EPAvkRxbANsAnjyPbb3iQ1YBRk1UXcdRsiKc9dhwMVgN5S9cQUiyoogDavup3H",
+        "contributions": 3,
+        "percentage": 40,
+        "amount": 25,
+        "amount-funded": 10
+      }
+    ]
+  },
+  {
+    "stage": "Work in Progress",
+    "proposals": [
+      {
+        "name": "Example work in progress",
+        "gitlab-url": "https://repo.getmonero.org/monero-project/ccs-proposals/-/merge_requests/3",
+        "local-url": "/proposals/example-progress.html",
+        "author": "example",
+        "date": "September 1, 2026",
+        "contributions": 12,
+        "percentage": 100,
+        "milestones-completed": 1,
+        "amount": 60,
+        "amount-funded": 60
+      }
+    ]
+  }
+]

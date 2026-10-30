@@ -6,11 +6,12 @@
     "node": ">=22.x"
   },
   "scripts": {
-    "dev": "astro dev",
+    "dev": "CCS_DATA_ROOT=example-data astro dev",
     "build": "astro build",
+    "build:example": "CCS_DATA_ROOT=example-data astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "check": "astro check",
+    "check": "CCS_DATA_ROOT=example-data astro check",
     "lint": "eslint .",
     "lint:css": "stylelint \"src/**/*.{css,astro}\"",
     "lint:fix": "eslint . --fix",
