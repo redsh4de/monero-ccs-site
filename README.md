@@ -1,48 +1,19 @@
-# Astro Starter Kit: Basics
+# Monero CCS site
 
-```sh
-deno create astro@latest -- --template basics
-```
+The frontend for the Monero Community Crowdfunding System, built with
+[Astro](https://astro.build) to match the new getmonero.org. It builds to static files
+with no client-side JavaScript.
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+## Development
 
-## 🚀 Project Structure
+Requires Node 22 or later and pnpm.
 
-Inside of your Astro project, you'll see the following folders and files:
-
-```text
-/
-├── public/
-│   └── favicon.svg
-├── src
-│   ├── assets
-│   │   └── astro.svg
-│   ├── components
-│   │   └── Welcome.astro
-│   ├── layouts
-│   │   └── Layout.astro
-│   └── pages
-│       └── index.astro
-└── package.json
-```
-
-To learn more about the folder structure of an Astro project, refer to
-[our guide on project structure](https://docs.astro.build/en/basics/project-structure/).
-
-## 🧞 Commands
-
-All commands are run from the root of the project, from a terminal:
-
-| Command                    | Action                                           |
-| :------------------------- | :----------------------------------------------- |
-| `deno install`             | Installs dependencies                            |
-| `deno run dev`             | Starts local dev server at `localhost:4321`      |
-| `deno run build`           | Build your production site to `./dist/`          |
-| `deno run preview`         | Preview your build locally, before deploying     |
-| `deno run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `deno run astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Feel free to check [our documentation](https://docs.astro.build) or jump into
-our [Discord server](https://astro.build/chat).
+| Command         | Action                                      |
+| :-------------- | :------------------------------------------ |
+| `pnpm install`  | Install dependencies                        |
+| `pnpm dev`      | Start the dev server at `localhost:4321`    |
+| `pnpm build`    | Build the site to `./dist/`                 |
+| `pnpm check`    | Type check                                  |
+| `pnpm lint`     | Lint TypeScript and Astro files             |
+| `pnpm lint:css` | Lint CSS                                    |
+| `pnpm format`   | Format with Prettier                        |
