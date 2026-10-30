@@ -42,11 +42,15 @@ const navItems = [
         </label>
       </div>
       <ul class="nav-list">
-        {navItems.map(({ label, href }) => (
-          <li class="nav-item">
-            <a class="link" href={href}>{label}</a>
-          </li>
-        ))}
+        {
+          navItems.map(({ label, href }) => (
+            <li class="nav-item">
+              <a class="link" href={href}>
+                {label}
+              </a>
+            </li>
+          ))
+        }
       </ul>
     </nav>
 
@@ -54,8 +58,7 @@ const navItems = [
       for="nav-toggle"
       class="scrim"
       aria-hidden="true"
-      aria-label="Close menu"
-    ></label>
+      aria-label="Close menu"></label>
 
     <div class="utils">
       <label
