@@ -1,6 +1,9 @@
 ---
 const repoLinks = [
-  { label: "Frontend Repo", href: "https://repo.getmonero.org/monero-project/ccs-proposals" },
+  {
+    label: "Frontend Repo",
+    href: "https://repo.getmonero.org/monero-project/ccs-proposals",
+  },
   { label: "Backend Repo", href: "https://github.com/monero-project" },
   { label: "Proposals Repo", href: "https://getmonero.org" },
 ];
@@ -10,11 +13,15 @@ const repoLinks = [
   <div class="footer-inner">
     <nav class="links" aria-label="Footer navigation">
       <ul class="link-list">
-        {repoLinks.map(({ label, href }) => (
-          <li>
-            <a href={href} target="_blank" rel="noopener noreferrer external">{label}</a>
-          </li>
-        ))}
+        {
+          repoLinks.map(({ label, href }) => (
+            <li>
+              <a href={href} target="_blank" rel="noopener noreferrer external">
+                {label}
+              </a>
+            </li>
+          ))
+        }
       </ul>
     </nav>
   </div>
