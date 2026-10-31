@@ -1,6 +1,7 @@
 ---
 import { Image } from "astro:assets";
 import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
+import { externalLinks } from "@/lib/links";
 import { icons } from "@/utils/icons";
 import moneroLogo from "@/../public/meta/monerologo.avif";
 
@@ -45,6 +46,20 @@ const navItems = [
           navItems.map(({ label, href }) => (
             <li class="nav-item">
               <a class="link" href={href}>
+                {label}
+              </a>
+            </li>
+          ))
+        }
+        {
+          externalLinks.map(({ label, href }) => (
+            <li class="nav-item external-item">
+              <a
+                class="link"
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer external"
+              >
                 {label}
               </a>
             </li>
@@ -195,6 +210,23 @@ const navItems = [
     }
   }
 
+  .nav-item:has(+ .external-item),
+  .nav-item.external-item {
+    border-bottom: none;
+  }
+
+  .nav-item:not(.external-item) + .external-item {
+    margin-block-start: auto;
+    padding-block-start: var(--space-sm);
+    border-block-start: 1px solid var(--border-color);
+  }
+
+  .external-item .link {
+    padding-block: var(--space-sm);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+  }
+
   .scrim {
     position: fixed;
     inset: 0;
@@ -285,6 +317,7 @@ const navItems = [
     }
 
     .drawer-header,
+    .external-item,
     .scrim,
     .hamburger,
     .utils {

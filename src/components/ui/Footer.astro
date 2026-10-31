@@ -1,19 +1,5 @@
 ---
-const repoLinks = [
-  {
-    label: "Frontend Repo",
-    href: "https://repo.getmonero.org/monero-project/ccs-front",
-  },
-  {
-    label: "Backend Repo",
-    href: "https://repo.getmonero.org/monero-project/ccs-back",
-  },
-  {
-    label: "Proposals Repo",
-    href: "https://repo.getmonero.org/monero-project/ccs-proposals",
-  },
-  { label: "Back to Getmonero.org", href: "https://getmonero.org" },
-];
+import { externalLinks } from "@/lib/links";
 ---
 
 <footer class="footer">
@@ -21,7 +7,7 @@ const repoLinks = [
     <nav class="links" aria-label="Footer navigation">
       <ul class="link-list">
         {
-          repoLinks.map(({ label, href }) => (
+          externalLinks.map(({ label, href }) => (
             <li>
               <a href={href} target="_blank" rel="noopener noreferrer external">
                 {label}
@@ -41,7 +27,7 @@ const repoLinks = [
   }
 
   .footer-inner {
-    padding: var(--space-4xl) var(--mobile-padding-inline);
+    padding: var(--space-4xl) var(--desktop-padding-inline);
     max-width: var(--content-max-width);
     margin: 0 auto;
     display: flex;
@@ -73,9 +59,10 @@ const repoLinks = [
     }
   }
 
-  @media (width >= 1200px) {
-    .footer-inner {
-      padding-inline: var(--desktop-padding-inline);
+  /* these links move into the header menu whenever it's a drawer */
+  @media (width < 1200px), (hover: none) {
+    .footer {
+      display: none;
     }
   }
 </style>
