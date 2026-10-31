@@ -57,11 +57,7 @@ const raised = proposal.amountFunded || 0;
 
   .progress-track,
   .milestone-segment {
-    background-color: color-mix(
-      in srgb,
-      var(--progress-color),
-      transparent 85%
-    );
+    background-color: color-mix(in srgb, var(--stage-color), transparent 85%);
     border-radius: var(--radius-full);
   }
 
@@ -72,7 +68,7 @@ const raised = proposal.amountFunded || 0;
 
   .progress-fill {
     block-size: 100%;
-    background-color: var(--progress-color);
+    background-color: var(--stage-color);
   }
 
   .milestone-track {
@@ -86,6 +82,6 @@ const raised = proposal.amountFunded || 0;
   }
 
   .milestone-segment.active {
-    background-color: var(--progress-color);
+    background-color: var(--stage-color);
   }
 </style>

@@ -5,8 +5,10 @@ import { getCollection } from "astro:content";
 import landingImage from "@/assets/funding-required.png";
 import ProposalCard from "@/components/ProposalCard.astro";
 import StageLayout from "@/components/StageLayout.astro";
+import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
 import Layout from "@/layouts/Layout.astro";
 import { stages } from "@/lib/stages";
+import { icons } from "@/utils/icons";
 
 const entries = await getCollection(
   "proposals",
@@ -57,12 +59,17 @@ const funding = entries.map((entry) => entry.data);
         </div>
         <ol class="steps">
           {
-            stages.map((stage, index) => (
-              <li style={`--stage-color: ${stage.color}`}>
-                <strong>
-                  {index + 1}. {stage.step}
-                </strong>
-                <span>{stage.description}</span>
+            stages.map((stage) => (
+              <li class="card" style={`--stage-color: ${stage.color}`}>
+                <div class="step-title">
+                  <span class="step-icon">
+                    <MaskIcon src={icons.mask(stage.icon)} size="1rem" />
+                  </span>
+                  <h3>
+                    <a href={`/${stage.slug}/`}>{stage.short}</a>
+                  </h3>
+                </div>
+                <p>{stage.description}</p>
               </li>
             ))
           }
@@ -76,7 +83,8 @@ const funding = entries.map((entry) => entry.data);
   .home {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2xl);
+    gap: var(--space-4xl);
+    padding-block-end: var(--space-md);
   }
 
   .hero {
@@ -135,32 +143,91 @@ const funding = entries.map((entry) => entry.data);
 
   .steps {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-md);
     margin: 0;
     padding: 0;
     list-style: none;
 
     li {
+      position: relative;
       display: flex;
       flex-direction: column;
       gap: var(--space-2xs);
-      padding-block-start: var(--space-xs);
-      border-block-start: 4px solid var(--stage-color);
+      padding: var(--space-md);
     }
 
-    strong {
+    h3 {
+      margin: 0;
+      font-size: var(--font-size-base);
       font-weight: var(--font-weight-semibold);
-      color: var(--heading-color);
     }
 
-    span {
+    a {
+      color: var(--heading-color);
+      font-weight: inherit;
+
+      &::after {
+        content: "";
+        position: absolute;
+        inset: -4px 0 0;
+        border-radius: inherit;
+      }
+
+      &:hover {
+        text-decoration: none;
+      }
+
+      &:focus-visible {
+        outline: none;
+      }
+
+      &:focus-visible::after {
+        outline: 2px solid currentcolor;
+        outline-offset: -2px;
+      }
+    }
+
+    p {
+      margin: 0;
       font-size: var(--font-size-sm);
       color: var(--text-secondary);
+    }
+
+    .step-title {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+
+    .step-icon {
+      display: flex;
+      flex: none;
+      align-items: center;
+      justify-content: center;
+      inline-size: 1.75rem;
+      block-size: 1.75rem;
+      background: var(--stage-color);
+      border-radius: var(--radius-full);
+      color: white;
+    }
+  }
+
+  @media (width < 375px) {
+    .steps {
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 
   @media (width >= 1200px) {
+    .funding {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .steps {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
     .hero {
       gap: var(--space-xs) var(--space-lg);
 

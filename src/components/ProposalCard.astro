@@ -36,9 +36,9 @@ const meta = [
 
 <Tag
   href={proposal.url || undefined}
-  class="proposal-card"
+  class="proposal-card card"
   data-variant={variant}
-  style={`--progress-color: ${color}`}
+  style={`--stage-color: ${color}`}
 >
   <Title class="proposal-title">{proposal.title}</Title>
   <ProposalMeta items={meta.filter((item) => item.show)} />
@@ -48,27 +48,15 @@ const meta = [
 <style>
   .proposal-card {
     display: block;
-    background: var(--card-color);
-    border-radius: 0 0 var(--radius-md) var(--radius-md);
-    box-shadow: var(--shadow-sm);
-    border-top: 6px solid var(--progress-color);
     padding: var(--space-lg);
     text-decoration: none;
     color: inherit;
     font-weight: var(--font-weight-normal);
     overflow-wrap: anywhere;
-    transition:
-      transform 0.15s ease,
-      box-shadow 0.15s ease;
 
     .proposal-progress {
       margin-block-start: var(--space-lg);
     }
-  }
-
-  a.proposal-card:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
   }
 
   .proposal-title {

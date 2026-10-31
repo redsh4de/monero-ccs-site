@@ -52,7 +52,7 @@ const lastTabInput = `stabs-${stableId(tabs.map((tab) => tab.label))}-${lastTab}
 <Layout title={proposal.title}>
   <div
     class="proposal"
-    style={`--progress-color: ${stage?.color ?? "var(--border-color)"}`}
+    style={`--stage-color: ${stage?.color ?? "var(--border-color)"}`}
   >
     <BackLink href={stage ? `/${stage.slug}/` : "/"}>
       {stage?.label ?? "Home"}

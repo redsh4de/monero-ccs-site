@@ -8,7 +8,6 @@ export const stages = [
     label: "Ideas",
     short: "Ideas",
     summary: "",
-    step: "Pitch",
     description:
       "Anyone with an idea for a feature, task, or service can pitch it for discussion.",
   },
@@ -21,7 +20,6 @@ export const stages = [
     label: "Funding Required",
     short: "Funding",
     summary: "Contribute",
-    step: "Fund",
     description: "Once approved, the idea moves to community fundraising.",
   },
   {
@@ -33,7 +31,6 @@ export const stages = [
     label: "Work in Progress",
     short: "Progress",
     summary: "Progress",
-    step: "Work",
     description:
       "Funded ideas get picked up, and their progress can be monitored.",
   },
@@ -46,7 +43,6 @@ export const stages = [
     label: "Completed",
     short: "Completed",
     summary: "Funded",
-    step: "Complete",
     description:
       "The work is finished once all milestones are met and all funds are paid out.",
   },
