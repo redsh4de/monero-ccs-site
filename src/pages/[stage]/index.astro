@@ -1,0 +1,108 @@
+---
+import { getCollection } from "astro:content";
+
+import ProposalCard from "@/components/ProposalCard.astro";
+import StageLayout from "@/components/StageLayout.astro";
+import Button from "@/components/ui/Button.astro";
+import Layout from "@/layouts/Layout.astro";
+import type { ProposalStatus } from "@/lib/proposals";
+import { stages } from "@/lib/stages";
+
+export function getStaticPaths() {
+  return stages.map((stage) => ({
+    params: { stage: stage.slug },
+    props: stage,
+  }));
+}
+
+interface Props {
+  status: ProposalStatus;
+  label: string;
+}
+
+const { status, label } = Astro.props;
+
+const entries = await getCollection(
+  "proposals",
+  (entry) => entry.data.status === status,
+);
+const proposals = entries.map((entry) => entry.data);
+---
+
+<Layout title={label}>
+  <StageLayout current={status}>
+    <h1>{label}</h1>
+
+    {
+      status === "idea" && (
+        <div class="idea-intro">
+          <p>Pitch an idea to the community for discussion.</p>
+          <Button href="/how-to-ccs/">Submit Idea</Button>
+        </div>
+      )
+    }
+
+    <div class="proposals">
+      {
+        proposals.length > 0 ? (
+          proposals.map((proposal) => <ProposalCard {proposal} />)
+        ) : (
+          <p class="empty">Nothing here right now.</p>
+        )
+      }
+    </div>
+  </StageLayout>
+</Layout>
+
+<style>
+  h1 {
+    margin: 0 0 var(--space-md);
+    font-size: var(--font-size-2xl);
+  }
+
+  .idea-intro {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    margin-block-end: var(--space-md);
+
+    p {
+      margin: 0;
+      color: var(--text-secondary);
+    }
+  }
+
+  .proposals {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .empty {
+    margin-block-start: var(--space-2xl);
+    text-align: center;
+    color: var(--text-secondary);
+  }
+
+  @media (width >= 1200px) {
+    h1 {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .idea-intro {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .empty {
+      margin-block-start: 0;
+      text-align: start;
+    }
+  }
+</style>

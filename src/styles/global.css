@@ -3,6 +3,13 @@
 
   /* Accent Colors */
   --monero-orange: #e2611f;
+  --orange-text: light-dark(#b84c18, #ef7a3a);
+
+  /* Status Colors */
+  --status-idea-color: light-dark(#e8c24f, #b89336);
+  --status-funding-color: light-dark(#f28080, #b85c5c);
+  --status-wip-color: light-dark(#3a72aa, #4679a4);
+  --status-completed-color: light-dark(#70af71, #548c6a);
 
   /* Text Colors */
   --heading-color: light-dark(#191b23, #f0f0f0);
@@ -61,7 +68,7 @@
   /* Layout Spacing */
   --page-top-margin: var(--space-2xl);
   --desktop-padding-inline: 5rem;
-  --mobile-padding-inline: var(--space-2xl);
+  --mobile-padding-inline: var(--space-md);
 
   /* Typography - Font Sizes */
   --font-size-base: 1rem; /* body-base */
