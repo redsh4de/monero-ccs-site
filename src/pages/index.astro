@@ -1,5 +1,184 @@
 ---
-import Layout from "../layouts/Layout.astro";
+import { Image } from "astro:assets";
+import { getCollection } from "astro:content";
+
+import landingImage from "@/assets/funding-required.png";
+import ProposalCard from "@/components/ProposalCard.astro";
+import StageLayout from "@/components/StageLayout.astro";
+import Layout from "@/layouts/Layout.astro";
+import { stages } from "@/lib/stages";
+
+const entries = await getCollection(
+  "proposals",
+  (entry) => entry.data.status === "funding-required",
+);
+const funding = entries.map((entry) => entry.data);
 ---
 
-<Layout />
+<Layout>
+  <StageLayout current="home">
+    <div class="home">
+      <div class="hero">
+        <Image src={landingImage} alt="" width={232} loading="eager" />
+        <h1>Community Crowdfunding System</h1>
+        <p>
+          Monero is a decentralized, community driven project. The CCS is a way
+          for the community to fund development and other initiatives that
+          benefit the Monero ecosystem.
+        </p>
+      </div>
+
+      <section aria-labelledby="funding-title">
+        <div class="section-heading">
+          <h2 id="funding-title">Needs funding</h2>
+          {
+            funding.length > 4 && (
+              <a href="/funding-required/">See all {funding.length}</a>
+            )
+          }
+        </div>
+        {
+          funding.length > 0 ? (
+            <div class="funding">
+              {funding.slice(0, 4).map((proposal) => (
+                <ProposalCard {proposal} variant="simple" />
+              ))}
+            </div>
+          ) : (
+            <p class="empty">Nothing needs funding right now.</p>
+          )
+        }
+      </section>
+
+      <section aria-labelledby="how-title">
+        <div class="section-heading">
+          <h2 id="how-title">How it works</h2>
+          <a href="/about/">Learn more</a>
+        </div>
+        <ol class="steps">
+          {
+            stages.map((stage, index) => (
+              <li style={`--stage-color: ${stage.color}`}>
+                <strong>
+                  {index + 1}. {stage.step}
+                </strong>
+                <span>{stage.text}</span>
+              </li>
+            ))
+          }
+        </ol>
+      </section>
+    </div>
+  </StageLayout>
+</Layout>
+
+<style>
+  .home {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xl);
+  }
+
+  .hero {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: var(--space-sm) var(--space-md);
+
+    img {
+      inline-size: 3.75rem;
+      block-size: auto;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: var(--font-size-2xl);
+      line-height: var(--line-height-title);
+      color: var(--orange-text);
+    }
+
+    p {
+      grid-column: 1 / -1;
+      margin: 0;
+      color: var(--text-secondary);
+    }
+  }
+
+  .section-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-md);
+    margin-block-end: var(--space-sm);
+
+    h2 {
+      margin: 0;
+      font-size: var(--font-size-xl);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    a {
+      color: var(--orange-text);
+    }
+  }
+
+  .funding {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    gap: var(--space-md);
+  }
+
+  .empty {
+    margin: 0;
+    color: var(--text-secondary);
+  }
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+    gap: var(--space-md);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+      padding-block-start: var(--space-xs);
+      border-block-start: 4px solid var(--stage-color);
+    }
+
+    strong {
+      font-weight: var(--font-weight-semibold);
+      color: var(--heading-color);
+    }
+
+    span {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+  }
+
+  @media (width >= 1200px) {
+    .hero {
+      gap: var(--space-xs) var(--space-lg);
+
+      img {
+        grid-row: 1 / 3;
+        inline-size: 7.25rem;
+      }
+
+      h1 {
+        align-self: end;
+        font-size: var(--font-size-3xl);
+      }
+
+      p {
+        grid-column: 2;
+        align-self: start;
+        text-wrap: pretty;
+      }
+    }
+  }
+</style>
