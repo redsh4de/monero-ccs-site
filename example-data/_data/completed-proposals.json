@@ -1,0 +1,19 @@
+[
+  {
+    "stage": "Completed Proposals",
+    "proposals": [
+      {
+        "name": "Example completed",
+        "gitlab-url": "https://repo.getmonero.org/monero-project/ccs-proposals/-/merge_requests/4",
+        "local-url": "/proposals/example-completed.html",
+        "author": "example",
+        "date": "June 1, 2026",
+        "contributions": 30,
+        "percentage": 100,
+        "milestones-completed": 1,
+        "amount": 9.9,
+        "amount-funded": 9.9
+      }
+    ]
+  }
+]
