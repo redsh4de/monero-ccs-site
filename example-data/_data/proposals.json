@@ -24,6 +24,17 @@
         "percentage": 40,
         "amount": 25,
         "amount-funded": 10
+      },
+      {
+        "name": "Example without an address",
+        "gitlab-url": "https://repo.getmonero.org/monero-project/ccs-proposals/-/merge_requests/9",
+        "local-url": "/proposals/example-no-address.html",
+        "author": "example",
+        "date": "October 1, 2026",
+        "contributions": 0,
+        "percentage": 0,
+        "amount": 15,
+        "amount-funded": 0
       }
     ]
   },

@@ -5,8 +5,7 @@ import ProposalCard from "@/components/ProposalCard.astro";
 import StageLayout from "@/components/StageLayout.astro";
 import Button from "@/components/ui/Button.astro";
 import Layout from "@/layouts/Layout.astro";
-import type { ProposalStatus } from "@/lib/proposals";
-import { stages } from "@/lib/stages";
+import { type ProposalStatus, stages } from "@/lib/stages";
 
 export function getStaticPaths() {
   return stages.map((stage) => ({

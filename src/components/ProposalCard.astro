@@ -1,7 +1,7 @@
 ---
 import ProposalMeta from "@/components/ProposalMeta.astro";
 import ProposalProgress from "@/components/ProposalProgress.astro";
-import type { Proposal } from "@/lib/proposals";
+import { contributionsText, type Proposal } from "@/lib/proposals";
 import { stages } from "@/lib/stages";
 
 interface Props {
@@ -23,7 +23,7 @@ const meta = [
   { icon: "calendar", text: proposal.date, show: !simple && proposal.date },
   {
     icon: "users",
-    text: `${proposal.contributions} contributions`,
+    text: contributionsText(proposal.contributions),
     show: proposal.status !== "idea",
   },
   {

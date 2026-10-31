@@ -1,0 +1,90 @@
+---
+import { renderSVG } from "uqr";
+
+import ProposalMeta from "@/components/ProposalMeta.astro";
+import ProposalProgress from "@/components/ProposalProgress.astro";
+import { contributionsText, type Proposal } from "@/lib/proposals";
+
+interface Props {
+  proposal: Proposal;
+  heading: string;
+}
+
+const { proposal, heading } = Astro.props;
+
+const meta = [];
+if (proposal.status !== "funding-required" && proposal.amount) {
+  meta.push({ icon: "coins", text: `${proposal.amount} XMR` });
+}
+meta.push({ icon: "users", text: contributionsText(proposal.contributions) });
+
+const uri = `monero:${proposal.address}`;
+---
+
+<aside class="summary" aria-label={heading}>
+  <h2>{heading}</h2>
+  <ProposalProgress {proposal} />
+  <ProposalMeta items={meta} />
+  {
+    proposal.address && (
+      <>
+        <a class="qr" href={uri}>
+          <img
+            src={`data:image/svg+xml,${encodeURIComponent(renderSVG(uri, { border: 4 }))}`}
+            alt="QR code for this proposal's Monero address"
+            width="200"
+            height="200"
+          />
+        </a>
+        <p>
+          Scan the QR code or tap it to open your wallet, or copy the address:
+        </p>
+        <code>{proposal.address}</code>
+      </>
+    )
+  }
+</aside>
+
+<style>
+  .summary {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    padding: var(--space-lg);
+    background: var(--card-color);
+    border-top: 4px solid var(--progress-color);
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    box-shadow: var(--shadow-sm);
+  }
+
+  h2 {
+    margin: 0;
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .qr {
+    align-self: center;
+    display: flex;
+    background: white;
+    border-radius: var(--radius-md);
+  }
+
+  p {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+  }
+
+  code {
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--heading-color);
+    font-size: 0.8125rem;
+    line-height: var(--line-height-caption);
+    overflow-wrap: anywhere;
+    user-select: all;
+  }
+</style>

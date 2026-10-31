@@ -2,8 +2,7 @@
 import { getCollection } from "astro:content";
 
 import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
-import type { ProposalStatus } from "@/lib/proposals";
-import { stages } from "@/lib/stages";
+import { type ProposalStatus, stages } from "@/lib/stages";
 import { icons } from "@/utils/icons";
 
 interface Props {
@@ -115,7 +114,7 @@ const count = (status: string) =>
 
     .sidebar {
       position: sticky;
-      inset-block-start: 5.5rem;
+      inset-block-start: var(--sticky-top);
     }
 
     .stages {
@@ -167,13 +166,6 @@ const count = (status: string) =>
 
     .short {
       display: none;
-    }
-  }
-
-  /* the header only stops being sticky here */
-  @media (width >= 1200px) and (hover: hover) {
-    .sidebar {
-      inset-block-start: var(--space-2xl);
     }
   }
 </style>

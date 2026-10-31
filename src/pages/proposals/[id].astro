@@ -1,0 +1,382 @@
+---
+import { getCollection } from "astro:content";
+
+import ProposalMeta from "@/components/ProposalMeta.astro";
+import ProposalProgress from "@/components/ProposalProgress.astro";
+import ProposalSummary from "@/components/ProposalSummary.astro";
+import BackLink from "@/components/ui/BackLink.astro";
+import SectionTabs from "@/components/ui/tabs/SectionTabs.astro";
+import Layout from "@/layouts/Layout.astro";
+import type { Proposal } from "@/lib/proposals";
+import { stages } from "@/lib/stages";
+import { safeMarkdown } from "@/utils/safeMarkdown";
+import { stableId } from "@/utils/stableId";
+
+export async function getStaticPaths() {
+  const entries = await getCollection("proposals", (entry) =>
+    entry.data.url.startsWith("/proposals/"),
+  );
+  return entries.map(({ data }) => ({
+    params: { id: data.id },
+    props: { proposal: data },
+  }));
+}
+
+interface Props {
+  proposal: Proposal;
+}
+
+const { proposal } = Astro.props;
+
+const stage = stages.find((item) => item.status === proposal.status);
+
+const summaryHeading = stage?.summary;
+
+const meta = [
+  { icon: "user", text: proposal.author },
+  { icon: "calendar", text: proposal.date },
+].filter((item) => item.text);
+
+const showPayouts =
+  proposal.status === "work-in-progress" || proposal.status === "completed";
+
+const tabs = [{ label: "Proposal" }, { label: "Milestones" }];
+if (showPayouts) tabs.push({ label: "Payouts" });
+// phones get the summary as a tab, desktop shows it beside the content
+if (summaryHeading) tabs.push({ label: summaryHeading });
+
+const lastTab = tabs.length - 1;
+const lastTabInput = `stabs-${stableId(tabs.map((tab) => tab.label))}-${lastTab}`;
+---
+
+<Layout title={proposal.title}>
+  <div
+    class="proposal"
+    style={`--progress-color: ${stage?.color ?? "var(--border-color)"}`}
+  >
+    <BackLink href={stage ? `/${stage.slug}/` : "/"}>
+      {stage?.label ?? "Home"}
+    </BackLink>
+
+    <div class="columns">
+      <div class="content">
+        <h1>{proposal.title}</h1>
+        <ProposalMeta items={meta} />
+
+        <div class:list={{ "with-summary": summaryHeading }}>
+          <SectionTabs {tabs}>
+            <Fragment slot="panel-0">
+              <article class="prose" set:html={safeMarkdown(proposal.body)} />
+              {
+                proposal.gitlabUrl && (
+                  <div class="discussion">
+                    <h2>Community discussion and updates</h2>
+                    <a
+                      href={proposal.gitlabUrl}
+                      target="_blank"
+                      rel="noopener noreferrer external"
+                    >
+                      View community discussion, comments, and proposal updates
+                      on GitLab
+                    </a>
+                  </div>
+                )
+              }
+            </Fragment>
+
+            <Fragment slot="panel-1">
+              {
+                proposal.milestones.length > 0 ? (
+                  <ol class="milestones">
+                    {proposal.milestones.map((milestone) => (
+                      <li>
+                        <h2>{milestone.name}</h2>
+                        <span>
+                          {milestone.finished ? "Finished" : "Unfinished"}
+                        </span>
+                        {milestone.funds && (
+                          <p>To be paid: {milestone.funds}</p>
+                        )}
+                        {milestone.done && (
+                          <p>Completion date: {milestone.done}</p>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p class="empty">No milestones listed.</p>
+                )
+              }
+            </Fragment>
+
+            {
+              showPayouts && (
+                <Fragment slot="panel-2">
+                  {proposal.payouts.length > 0 ? (
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Funds awarded</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {proposal.payouts.map((payout) => (
+                          <tr>
+                            <td>{payout.date}</td>
+                            <td>{payout.amount}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p class="empty">No payouts yet.</p>
+                  )}
+                </Fragment>
+              )
+            }
+
+            {
+              summaryHeading && (
+                <div slot={`panel-${lastTab}`}>
+                  <ProposalSummary {proposal} heading={summaryHeading} />
+                </div>
+              )
+            }
+          </SectionTabs>
+        </div>
+      </div>
+
+      {
+        summaryHeading && (
+          <div class="side">
+            <ProposalSummary {proposal} heading={summaryHeading} />
+          </div>
+        )
+      }
+    </div>
+
+    {
+      proposal.address && (
+        <div class="contribute-bar">
+          <ProposalProgress {proposal} />
+          <label for={lastTabInput}>Contribute</label>
+        </div>
+      )
+    }
+  </div>
+</Layout>
+
+<style>
+  .proposal {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    inline-size: 100%;
+    max-inline-size: 80rem;
+    margin-inline: auto;
+  }
+
+  .columns {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xl);
+  }
+
+  .content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    min-inline-size: 0;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: var(--font-size-2xl);
+    line-height: var(--line-height-title);
+    overflow-wrap: anywhere;
+  }
+
+  .prose {
+    max-inline-size: 75ch;
+    color: var(--paragraph-main);
+    overflow-wrap: anywhere;
+
+    h1,
+    h2 {
+      margin: var(--space-xl) 0 var(--space-xs);
+      font-size: var(--font-size-xl);
+    }
+
+    h3,
+    h4,
+    h5,
+    h6 {
+      margin: var(--space-lg) 0 var(--space-xs);
+      font-size: var(--font-size-lg);
+    }
+
+    > :first-child {
+      margin-block-start: 0;
+    }
+
+    p,
+    ul,
+    ol {
+      margin-block: 0 var(--space-md);
+    }
+
+    a {
+      color: var(--orange-text);
+      text-decoration: underline;
+    }
+
+    img {
+      max-inline-size: 100%;
+      block-size: auto;
+    }
+
+    pre {
+      padding: var(--space-md);
+      overflow-x: auto;
+      background: var(--card-color);
+      border-radius: var(--radius-md);
+    }
+
+    code {
+      font-size: 0.9em;
+    }
+
+    blockquote {
+      margin: 0 0 var(--space-md);
+      padding-inline-start: var(--space-md);
+      border-inline-start: 3px solid var(--border-color);
+    }
+
+    table {
+      display: block;
+      overflow-x: auto;
+    }
+  }
+
+  .discussion {
+    margin-block-start: var(--space-xl);
+    padding-block-start: var(--space-md);
+    border-block-start: 1px solid var(--border-color);
+
+    h2 {
+      margin: 0 0 var(--space-xs);
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    a {
+      color: var(--orange-text);
+    }
+  }
+
+  .milestones {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: var(--space-2xs) var(--space-md);
+      padding: var(--space-md);
+      background: var(--card-color);
+      border-radius: var(--radius-md);
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    h2 {
+      margin: 0;
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-semibold);
+      overflow-wrap: anywhere;
+    }
+
+    p {
+      grid-column: 1 / -1;
+      margin: 0;
+    }
+  }
+
+  .empty {
+    margin: 0;
+    color: var(--text-secondary);
+  }
+
+  .contribute-bar {
+    position: sticky;
+    inset-block-end: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    margin-inline: calc(-1 * var(--mobile-padding-inline));
+    padding: var(--space-xs) var(--mobile-padding-inline);
+    background: var(--bg-color);
+    border-block-start: 1px solid var(--border-color);
+
+    .proposal-progress {
+      flex: 1;
+      min-inline-size: 0;
+    }
+
+    .progress-text {
+      text-align: start;
+    }
+
+    label {
+      padding: 0.75em 1.5em;
+      background: color-mix(in srgb, var(--monero-orange) 90%, black);
+      border-radius: var(--radius-full);
+      color: white;
+      font-weight: var(--font-weight-bold);
+      cursor: pointer;
+    }
+  }
+
+  .proposal:has(.tab-input:last-of-type:checked) .contribute-bar {
+    display: none;
+  }
+
+  .side {
+    display: none;
+  }
+
+  @media (width >= 1200px) {
+    .with-summary {
+      .tab-input:last-of-type,
+      .tab-label:last-child {
+        display: none;
+      }
+    }
+
+    .columns {
+      flex-direction: row;
+      align-items: flex-start;
+      gap: var(--space-4xl);
+    }
+
+    .content {
+      flex: 1;
+    }
+
+    .side {
+      position: sticky;
+      inset-block-start: var(--sticky-top);
+      display: block;
+      flex: 0 0 21rem;
+    }
+
+    .contribute-bar {
+      display: none;
+    }
+  }
+</style>
