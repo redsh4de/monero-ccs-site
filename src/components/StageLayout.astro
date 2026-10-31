@@ -1,0 +1,179 @@
+---
+import { getCollection } from "astro:content";
+
+import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
+import type { ProposalStatus } from "@/lib/proposals";
+import { stages } from "@/lib/stages";
+import { icons } from "@/utils/icons";
+
+interface Props {
+  current: ProposalStatus | "home";
+}
+
+const { current } = Astro.props;
+
+const proposals = await getCollection("proposals");
+const count = (status: string) =>
+  proposals.filter((entry) => entry.data.status === status).length;
+---
+
+<div class="stage-layout">
+  <aside class="sidebar">
+    <nav class="stages" aria-label="Proposal stages">
+      <a
+        href="/"
+        class="stage"
+        aria-current={current === "home" ? "page" : undefined}
+      >
+        <MaskIcon src={icons.mask("house")} size="1.375rem" />
+        <span>Home</span>
+      </a>
+      {
+        stages.map((stage) => (
+          <a
+            href={`/${stage.slug}/`}
+            class="stage"
+            aria-current={current === stage.status ? "page" : undefined}
+            style={`--stage-color: ${stage.color}`}
+          >
+            <span class="stage-icon">
+              <MaskIcon src={icons.mask(stage.icon)} size="1.375rem" />
+            </span>
+            <span class="label">{stage.label}</span>
+            <span class="short">{stage.short}</span>
+            <span class="count">{count(stage.status)}</span>
+          </a>
+        ))
+      }
+    </nav>
+  </aside>
+
+  <div>
+    <slot />
+  </div>
+</div>
+
+<style>
+  .stage-layout {
+    inline-size: 100%;
+    max-inline-size: 67rem;
+    margin-inline: auto;
+  }
+
+  .stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2xs);
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    text-decoration: none;
+
+    &[aria-current="page"] {
+      color: var(--orange-text);
+      font-weight: var(--font-weight-bold);
+    }
+  }
+
+  .stage-icon {
+    display: flex;
+  }
+
+  @media (width < 1200px) {
+    :global(body) {
+      --tab-bar-height: 4.25rem;
+
+      box-sizing: border-box;
+      padding-block-end: var(--tab-bar-height);
+    }
+
+    .label,
+    .count {
+      display: none;
+    }
+
+    .stages {
+      position: fixed;
+      inset: auto 0 0;
+      z-index: var(--z-dropdown);
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      block-size: var(--tab-bar-height);
+      background: var(--bg-color);
+      border-block-start: 1px solid var(--border-color);
+    }
+  }
+
+  @media (width >= 1200px) {
+    .stage-layout {
+      display: grid;
+      grid-template-columns: 16rem minmax(0, 1fr);
+      gap: var(--space-2xl);
+      align-items: start;
+    }
+
+    .sidebar {
+      position: sticky;
+      inset-block-start: 5.5rem;
+    }
+
+    .stages {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+
+    .stage {
+      flex-direction: row;
+      justify-content: flex-start;
+      gap: var(--space-sm);
+      min-block-size: 3rem;
+      padding-inline: var(--space-md);
+      box-sizing: border-box;
+      background: var(--card-color);
+      border: 2px solid transparent;
+      border-radius: var(--radius-md);
+      color: var(--heading-color);
+      font-size: var(--font-size-base);
+
+      &:hover {
+        background: var(--card-hover-color);
+      }
+
+      &[aria-current="page"] {
+        background: var(--card-hover-color);
+        border-color: var(--orange-text);
+        font-weight: var(--font-weight-semibold);
+      }
+    }
+
+    .stage-icon {
+      color: var(--stage-color);
+    }
+
+    .label {
+      flex: 1;
+    }
+
+    .count {
+      color: var(--text-secondary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    [aria-current="page"] .count {
+      color: inherit;
+    }
+
+    .short {
+      display: none;
+    }
+  }
+
+  /* the header only stops being sticky here */
+  @media (width >= 1200px) and (hover: hover) {
+    .sidebar {
+      inset-block-start: var(--space-2xl);
+    }
+  }
+</style>
