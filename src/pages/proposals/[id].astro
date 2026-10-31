@@ -31,7 +31,7 @@ const { proposal } = Astro.props;
 
 const stage = stages.find((item) => item.status === proposal.status);
 
-const summaryHeading = stage?.summary;
+const summaryHeading = proposal.fullyFunded ? "Fully funded" : stage?.summary;
 
 const meta = [
   { icon: "user", text: proposal.author },
@@ -61,7 +61,7 @@ if (proposal.status === "work-in-progress" || proposal.status === "completed") {
 
       {
         summaryHeading && (
-          <div class="side">
+          <div class:list={["side", { "desktop-only": proposal.fullyFunded }]}>
             <ProposalSummary {proposal} heading={summaryHeading} />
           </div>
         )
@@ -140,11 +140,17 @@ if (proposal.status === "work-in-progress" || proposal.status === "completed") {
     </div>
 
     {
-      proposal.address && (
+      (proposal.address || proposal.fullyFunded) && (
         <BottomBar>
           <div class="contribute-row">
             <ProposalProgress {proposal} />
-            <Button {...{ popovertarget: "summary" }}>Contribute</Button>
+            {proposal.fullyFunded ? (
+              <Button variant="secondary" {...{ disabled: true }}>
+                Fully funded
+              </Button>
+            ) : (
+              <Button {...{ popovertarget: "summary" }}>Contribute</Button>
+            )}
           </div>
         </BottomBar>
       )
@@ -306,6 +312,16 @@ if (proposal.status === "work-in-progress" || proposal.status === "completed") {
 
     .progress-text {
       text-align: start;
+    }
+
+    .button:disabled {
+      pointer-events: none;
+    }
+  }
+
+  @media (width < 1200px) {
+    .desktop-only {
+      display: none;
     }
   }
 

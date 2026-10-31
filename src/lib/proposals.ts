@@ -26,6 +26,7 @@ export type Proposal = {
   gitlabUrl: string;
   amount: string;
   amountFunded: string;
+  fullyFunded: boolean;
   contributions: number;
   percentage: number;
   milestonesCompleted: number;
@@ -164,10 +165,17 @@ function toProposal(
   const link = clean(entry["gitlab-url"]);
   const gitlabUrl = link.startsWith("https://") ? link : "";
 
+  const amount = clean(entry.amount) || file?.amount || "";
+  const amountFunded = clean(entry["amount-funded"]);
+  const fullyFunded =
+    status === "funding-required" &&
+    Number(amount) > 0 &&
+    Number(amountFunded) >= Number(amount);
+
   const address = entry["donate-address"] ?? "";
-  const acceptsDonations =
-    status === "funding-required" && ADDRESS.test(address);
-  if (status === "funding-required" && !acceptsDonations) {
+  const needsFunding = status === "funding-required" && !fullyFunded;
+  const acceptsDonations = needsFunding && ADDRESS.test(address);
+  if (needsFunding && !acceptsDonations) {
     console.warn(`No valid donation address for "${title}"`);
   }
   if (status !== "idea" && !file) console.warn(`No file for "${title}"`);
@@ -182,8 +190,9 @@ function toProposal(
     date: clean(entry.date) || file?.date || "",
     url: slug ? `/proposals/${slug}.html` : gitlabUrl,
     gitlabUrl,
-    amount: clean(entry.amount) || file?.amount || "",
-    amountFunded: clean(entry["amount-funded"]),
+    amount,
+    amountFunded,
+    fullyFunded,
     contributions: entry.contributions ?? 0,
     percentage: entry.percentage ?? 0,
     milestonesCompleted: entry["milestones-completed"] ?? 0,

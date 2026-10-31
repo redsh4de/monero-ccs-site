@@ -71,9 +71,11 @@ const qrImage = proposal.address ? await qrCode(uri) : "";
   </div>
 
   {
-    proposal.status === "funding-required" && !proposal.address && (
-      <p>The donation address isn't available right now.</p>
-    )
+    proposal.status === "funding-required" &&
+      !proposal.address &&
+      !proposal.fullyFunded && (
+        <p>The donation address isn't available right now.</p>
+      )
   }
 
   {proposal.address && <Button href={uri}>Open in wallet</Button>}

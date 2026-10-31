@@ -15,6 +15,7 @@ const entries = await getCollection(
   (entry) => entry.data.status === "funding-required",
 );
 const funding = entries.map((entry) => entry.data);
+const needsFunding = funding.filter((proposal) => !proposal.fullyFunded);
 ---
 
 <Layout>
@@ -40,9 +41,9 @@ const funding = entries.map((entry) => entry.data);
           }
         </div>
         {
-          funding.length > 0 ? (
+          needsFunding.length > 0 ? (
             <div class="funding">
-              {funding.slice(0, 4).map((proposal) => (
+              {needsFunding.slice(0, 4).map((proposal) => (
                 <ProposalCard {proposal} variant="simple" />
               ))}
             </div>
