@@ -1,0 +1,42 @@
+---
+import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
+import { icons } from "@/utils/icons";
+
+interface Props {
+  items: { icon: string; text: string }[];
+}
+
+const { items } = Astro.props;
+---
+
+<div class="proposal-meta">
+  {
+    items.map((item) => (
+      <div class="meta-item">
+        <MaskIcon
+          src={icons.mask(item.icon)}
+          size="1.25em"
+          color="var(--monero-orange)"
+        />
+        <span>{item.text}</span>
+      </div>
+    ))
+  }
+</div>
+
+<style>
+  .proposal-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-md) var(--space-xl);
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
+  }
+
+  .meta-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+  }
+</style>

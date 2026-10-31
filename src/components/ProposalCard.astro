@@ -1,8 +1,8 @@
 ---
-import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
+import ProposalMeta from "@/components/ProposalMeta.astro";
+import ProposalProgress from "@/components/ProposalProgress.astro";
 import type { Proposal } from "@/lib/proposals";
 import { stages } from "@/lib/stages";
-import { icons } from "@/utils/icons";
 
 interface Props {
   proposal: Proposal;
@@ -19,8 +19,8 @@ const simple = variant === "simple";
 const Title = simple ? "h3" : "h2";
 
 const meta = [
-  { icon: "user", text: proposal.author, show: true },
-  { icon: "calendar", text: proposal.date, show: !simple },
+  { icon: "user", text: proposal.author, show: proposal.author },
+  { icon: "calendar", text: proposal.date, show: !simple && proposal.date },
   {
     icon: "users",
     text: `${proposal.contributions} contributions`,
@@ -41,61 +41,8 @@ const meta = [
   style={`--progress-color: ${color}`}
 >
   <Title class="proposal-title">{proposal.title}</Title>
-
-  <div class="proposal-meta">
-    {
-      meta
-        .filter((item) => item.show)
-        .map((item) => (
-          <div class="meta-item">
-            <MaskIcon
-              src={icons.mask(item.icon)}
-              size="1.25em"
-              color="var(--monero-orange)"
-            />
-            <span>{item.text}</span>
-          </div>
-        ))
-    }
-  </div>
-
-  {
-    proposal.status === "funding-required" && (
-      <div class="proposal-progress">
-        <div class="progress-text">
-          Raised {proposal.amountFunded || 0} of {proposal.amount} XMR
-        </div>
-        <div class="progress-track">
-          <div
-            class="progress-fill"
-            style={`width: ${Math.min(proposal.percentage, 100)}%`}
-          />
-        </div>
-      </div>
-    )
-  }
-
-  {
-    proposal.status === "work-in-progress" &&
-      proposal.milestones.length > 0 && (
-        <div class="proposal-progress">
-          <div class="progress-text">
-            Completed {proposal.milestonesCompleted} of{" "}
-            {proposal.milestones.length} milestones
-          </div>
-          <div class="milestone-grid">
-            {proposal.milestones.map((_, index) => (
-              <div
-                class:list={[
-                  "milestone-seg",
-                  { active: index < proposal.milestonesCompleted },
-                ]}
-              />
-            ))}
-          </div>
-        </div>
-      )
-  }
+  <ProposalMeta items={meta.filter((item) => item.show)} />
+  <ProposalProgress {proposal} />
 </Tag>
 
 <style>
@@ -113,6 +60,10 @@ const meta = [
     transition:
       transform 0.15s ease,
       box-shadow 0.15s ease;
+
+    .proposal-progress {
+      margin-block-start: var(--space-lg);
+    }
   }
 
   a.proposal-card:hover {
@@ -124,64 +75,6 @@ const meta = [
     font-size: var(--font-size-lg);
     font-weight: var(--font-weight-semibold);
     margin: 0 0 var(--space-md);
-  }
-
-  .proposal-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-md) var(--space-xl);
-    font-size: var(--font-size-sm);
-    color: var(--text-secondary);
-  }
-
-  .meta-item {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-  }
-
-  .proposal-progress {
-    margin-top: var(--space-lg);
-  }
-
-  .progress-text {
-    font-size: var(--font-size-sm);
-    margin-bottom: var(--space-xs);
-    text-align: right;
-  }
-
-  .progress-track,
-  .milestone-seg {
-    background-color: color-mix(
-      in srgb,
-      var(--progress-color),
-      transparent 85%
-    );
-    border-radius: 10px;
-  }
-
-  .progress-track {
-    height: 8px;
-    overflow: hidden;
-  }
-
-  .progress-fill {
-    height: 100%;
-    background-color: var(--progress-color);
-  }
-
-  .milestone-grid {
-    display: flex;
-    gap: 4px;
-    height: 8px;
-  }
-
-  .milestone-seg {
-    flex: 1;
-  }
-
-  .milestone-seg.active {
-    background-color: var(--progress-color);
   }
 
   .proposal-card[data-variant="simple"] {
