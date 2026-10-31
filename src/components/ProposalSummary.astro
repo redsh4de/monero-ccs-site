@@ -1,9 +1,12 @@
 ---
-import { renderSVG } from "uqr";
-
+/* eslint-disable astro/jsx-a11y/no-autofocus -- moves focus into the drawer as it opens, never on page load */
 import ProposalMeta from "@/components/ProposalMeta.astro";
 import ProposalProgress from "@/components/ProposalProgress.astro";
+import Button from "@/components/ui/Button.astro";
+import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
 import { contributionsText, type Proposal } from "@/lib/proposals";
+import { icons } from "@/utils/icons";
+import { qrCode } from "@/utils/qrCode";
 
 interface Props {
   proposal: Proposal;
@@ -19,42 +22,89 @@ if (proposal.status !== "funding-required" && proposal.amount) {
 meta.push({ icon: "users", text: contributionsText(proposal.contributions) });
 
 const uri = `monero:${proposal.address}`;
+const qrImage = proposal.address ? await qrCode(uri) : "";
 ---
 
-<aside class="summary" aria-label={heading}>
-  <h2>{heading}</h2>
-  <ProposalProgress {proposal} />
-  <ProposalMeta items={meta} />
-  {
-    proposal.address && (
-      <>
-        <a class="qr" href={uri}>
+<aside
+  id="summary"
+  class="summary"
+  aria-label={heading}
+  popover={proposal.address ? "auto" : undefined}
+>
+  <div class="details">
+    <h2>{heading}</h2>
+
+    <div class="top">
+      <div class="numbers">
+        <ProposalProgress {proposal} />
+        <ProposalMeta items={meta} />
+      </div>
+      {
+        proposal.address && (
+          <button
+            class="close"
+            autofocus
+            popovertarget="summary"
+            popovertargetaction="hide"
+            aria-label="Close"
+          >
+            <MaskIcon src={icons.mask("close")} size="1.25rem" />
+          </button>
+        )
+      }
+    </div>
+
+    {
+      proposal.address && (
+        <>
           <img
-            src={`data:image/svg+xml,${encodeURIComponent(renderSVG(uri, { border: 4 }))}`}
+            class="qr"
+            src={qrImage}
             alt="QR code for this proposal's Monero address"
             width="200"
             height="200"
           />
-        </a>
-        <p>
-          Scan the QR code or tap it to open your wallet, or copy the address:
-        </p>
-        <code>{proposal.address}</code>
-      </>
+          <code title="Monero address">{proposal.address}</code>
+        </>
+      )
+    }
+  </div>
+
+  {
+    proposal.status === "funding-required" && !proposal.address && (
+      <p>The donation address isn't available right now.</p>
     )
   }
+
+  {proposal.address && <Button href={uri}>Open in wallet</Button>}
 </aside>
 
 <style>
   .summary {
+    position: static;
+    inset: auto;
     display: flex;
     flex-direction: column;
     gap: var(--space-md);
+    box-sizing: border-box;
+    inline-size: auto;
+    block-size: auto;
+    margin: 0;
     padding: var(--space-lg);
+    overflow: visible;
     background: var(--card-color);
+    border: none;
     border-top: 4px solid var(--stage-color);
     border-radius: 0 0 var(--radius-md) var(--radius-md);
     box-shadow: var(--shadow-sm);
+    color: inherit;
+  }
+
+  .details {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    min-block-size: 0;
   }
 
   h2 {
@@ -63,9 +113,39 @@ const uri = `monero:${proposal.address}`;
     font-weight: var(--font-weight-semibold);
   }
 
+  .top {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+  }
+
+  .numbers {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--space-sm);
+    min-inline-size: 0;
+  }
+
+  .close {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    inline-size: 2.75rem;
+    block-size: 2.75rem;
+    padding: 0;
+    background: var(--card-color);
+    border: none;
+    border-radius: var(--radius-full);
+    color: var(--heading-color);
+    cursor: pointer;
+  }
+
   .qr {
     align-self: center;
-    display: flex;
+    inline-size: 12.5rem;
+    block-size: auto;
     background: white;
     border-radius: var(--radius-md);
   }
@@ -84,7 +164,130 @@ const uri = `monero:${proposal.address}`;
     color: var(--heading-color);
     font-size: 0.8125rem;
     line-height: var(--line-height-caption);
-    overflow-wrap: anywhere;
     user-select: all;
+  }
+
+  @media (width < 1200px) {
+    h2 {
+      display: none;
+    }
+
+    .numbers {
+      .progress-text {
+        text-align: start;
+      }
+    }
+
+    /* without popover support the card stays on the page */
+    @supports selector(:popover-open) {
+      .summary[popover] {
+        position: fixed;
+        inset: auto 0 0;
+        inline-size: 100%;
+        max-block-size: 90dvh;
+        padding: var(--space-md);
+        background: var(--bg-color);
+        border: none;
+        border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+        box-shadow: 0 -8px 24px rgb(0 0 0 / 18%);
+        transform: translateY(100%);
+        transition:
+          transform 0.3s cubic-bezier(0.32, 0.72, 0, 1),
+          display 0.3s allow-discrete,
+          overlay 0.3s allow-discrete;
+
+        &:not(:popover-open) {
+          display: none;
+        }
+
+        &:popover-open {
+          transform: none;
+
+          @starting-style {
+            transform: translateY(100%);
+          }
+        }
+
+        &::backdrop {
+          background: var(--scrim-color);
+          opacity: 0;
+          backdrop-filter: blur(2px);
+          transition:
+            opacity 0.3s ease,
+            display 0.3s allow-discrete,
+            overlay 0.3s allow-discrete;
+        }
+
+        &:popover-open::backdrop {
+          opacity: 1;
+
+          @starting-style {
+            opacity: 0;
+          }
+        }
+
+        .details {
+          overflow-y: auto;
+        }
+
+        .top {
+          gap: var(--space-sm);
+        }
+
+        .numbers {
+          flex-flow: row wrap;
+          justify-content: space-between;
+          gap: var(--space-2xs) var(--space-xs);
+        }
+
+        .proposal-progress {
+          display: contents;
+        }
+
+        .progress-text {
+          margin: 0;
+        }
+
+        .progress-track {
+          flex-basis: 100%;
+          order: 1;
+          margin-block-start: var(--space-2xs);
+        }
+
+        .qr {
+          inline-size: 10rem;
+        }
+      }
+    }
+  }
+
+  @media (width >= 1200px) {
+    .close {
+      display: none;
+    }
+
+    /* a drawer left open on a phone sits where the side card goes, below the
+       header, top margin, back link and gap */
+    .summary[popover]:popover-open {
+      position: fixed;
+      inset: 9.625rem
+        max(
+          var(--desktop-padding-inline),
+          calc((100vw - var(--proposal-width)) / 2)
+        )
+        auto auto;
+      inline-size: var(--summary-width);
+    }
+
+    .summary[popover]::backdrop {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .summary[popover],
+    .summary[popover]::backdrop {
+      transition: none;
+    }
   }
 </style>

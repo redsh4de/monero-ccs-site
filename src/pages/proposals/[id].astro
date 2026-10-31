@@ -5,12 +5,13 @@ import ProposalMeta from "@/components/ProposalMeta.astro";
 import ProposalProgress from "@/components/ProposalProgress.astro";
 import ProposalSummary from "@/components/ProposalSummary.astro";
 import BackLink from "@/components/ui/BackLink.astro";
+import BottomBar from "@/components/ui/BottomBar.astro";
+import Button from "@/components/ui/Button.astro";
 import SectionTabs from "@/components/ui/tabs/SectionTabs.astro";
 import Layout from "@/layouts/Layout.astro";
 import type { Proposal } from "@/lib/proposals";
 import { stages } from "@/lib/stages";
 import { safeMarkdown } from "@/utils/safeMarkdown";
-import { stableId } from "@/utils/stableId";
 
 export async function getStaticPaths() {
   const entries = await getCollection("proposals", (entry) =>
@@ -37,16 +38,10 @@ const meta = [
   { icon: "calendar", text: proposal.date },
 ].filter((item) => item.text);
 
-const showPayouts =
-  proposal.status === "work-in-progress" || proposal.status === "completed";
-
 const tabs = [{ label: "Proposal" }, { label: "Milestones" }];
-if (showPayouts) tabs.push({ label: "Payouts" });
-// phones get the summary as a tab, desktop shows it beside the content
-if (summaryHeading) tabs.push({ label: summaryHeading });
-
-const lastTab = tabs.length - 1;
-const lastTabInput = `stabs-${stableId(tabs.map((tab) => tab.label))}-${lastTab}`;
+if (proposal.status === "work-in-progress" || proposal.status === "completed") {
+  tabs.push({ label: "Payouts" });
+}
 ---
 
 <Layout title={proposal.title}>
@@ -59,92 +54,9 @@ const lastTabInput = `stabs-${stableId(tabs.map((tab) => tab.label))}-${lastTab}
     </BackLink>
 
     <div class="columns">
-      <div class="content">
+      <div class="heading">
         <h1>{proposal.title}</h1>
         <ProposalMeta items={meta} />
-
-        <div class:list={{ "with-summary": summaryHeading }}>
-          <SectionTabs {tabs}>
-            <Fragment slot="panel-0">
-              <article class="prose" set:html={safeMarkdown(proposal.body)} />
-              {
-                proposal.gitlabUrl && (
-                  <div class="discussion">
-                    <h2>Community discussion and updates</h2>
-                    <a
-                      href={proposal.gitlabUrl}
-                      target="_blank"
-                      rel="noopener noreferrer external"
-                    >
-                      View community discussion, comments, and proposal updates
-                      on GitLab
-                    </a>
-                  </div>
-                )
-              }
-            </Fragment>
-
-            <Fragment slot="panel-1">
-              {
-                proposal.milestones.length > 0 ? (
-                  <ol class="milestones">
-                    {proposal.milestones.map((milestone) => (
-                      <li>
-                        <h2>{milestone.name}</h2>
-                        <span>
-                          {milestone.finished ? "Finished" : "Unfinished"}
-                        </span>
-                        {milestone.funds && (
-                          <p>To be paid: {milestone.funds}</p>
-                        )}
-                        {milestone.done && (
-                          <p>Completion date: {milestone.done}</p>
-                        )}
-                      </li>
-                    ))}
-                  </ol>
-                ) : (
-                  <p class="empty">No milestones listed.</p>
-                )
-              }
-            </Fragment>
-
-            {
-              showPayouts && (
-                <Fragment slot="panel-2">
-                  {proposal.payouts.length > 0 ? (
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Date</th>
-                          <th>Funds awarded</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {proposal.payouts.map((payout) => (
-                          <tr>
-                            <td>{payout.date}</td>
-                            <td>{payout.amount}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <p class="empty">No payouts yet.</p>
-                  )}
-                </Fragment>
-              )
-            }
-
-            {
-              summaryHeading && (
-                <div slot={`panel-${lastTab}`}>
-                  <ProposalSummary {proposal} heading={summaryHeading} />
-                </div>
-              )
-            }
-          </SectionTabs>
-        </div>
       </div>
 
       {
@@ -154,14 +66,87 @@ const lastTabInput = `stabs-${stableId(tabs.map((tab) => tab.label))}-${lastTab}
           </div>
         )
       }
+
+      <div class="sections">
+        <SectionTabs {tabs}>
+          <Fragment slot="panel-0">
+            <article class="prose" set:html={safeMarkdown(proposal.body)} />
+            {
+              proposal.gitlabUrl && (
+                <div class="discussion">
+                  <h2>Community discussion and updates</h2>
+                  <a
+                    href={proposal.gitlabUrl}
+                    target="_blank"
+                    rel="noopener noreferrer external"
+                  >
+                    View community discussion, comments, and proposal updates on
+                    GitLab
+                  </a>
+                </div>
+              )
+            }
+          </Fragment>
+
+          <Fragment slot="panel-1">
+            {
+              proposal.milestones.length > 0 ? (
+                <ol class="milestones">
+                  {proposal.milestones.map((milestone) => (
+                    <li>
+                      <h2>{milestone.name}</h2>
+                      <span>
+                        {milestone.finished ? "Finished" : "Unfinished"}
+                      </span>
+                      {milestone.funds && <p>To be paid: {milestone.funds}</p>}
+                      {milestone.done && (
+                        <p>Completion date: {milestone.done}</p>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p class="empty">No milestones listed.</p>
+              )
+            }
+          </Fragment>
+
+          <Fragment slot="panel-2">
+            {
+              proposal.payouts.length > 0 ? (
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Funds awarded</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {proposal.payouts.map((payout) => (
+                      <tr>
+                        <td>{payout.date}</td>
+                        <td>{payout.amount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p class="empty">No payouts yet.</p>
+              )
+            }
+          </Fragment>
+        </SectionTabs>
+      </div>
     </div>
 
     {
       proposal.address && (
-        <div class="contribute-bar">
-          <ProposalProgress {proposal} />
-          <label for={lastTabInput}>Contribute</label>
-        </div>
+        <BottomBar>
+          <div class="contribute-row">
+            <ProposalProgress {proposal} />
+            <Button {...{ popovertarget: "summary" }}>Contribute</Button>
+          </div>
+        </BottomBar>
       )
     }
   </div>
@@ -169,38 +154,34 @@ const lastTabInput = `stabs-${stableId(tabs.map((tab) => tab.label))}-${lastTab}
 
 <style>
   .proposal {
+    --proposal-width: 80rem;
+    --summary-width: 21rem;
+
     display: flex;
     flex-direction: column;
     gap: var(--space-md);
     inline-size: 100%;
-    max-inline-size: 80rem;
+    max-inline-size: var(--proposal-width);
     margin-inline: auto;
   }
 
-  .columns {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2xl);
-  }
-
-  .content {
+  .columns,
+  .heading {
     display: flex;
     flex-direction: column;
     gap: var(--space-md);
-    min-inline-size: 0;
+    overflow-wrap: anywhere;
   }
 
   h1 {
     margin: 0;
     font-size: var(--font-size-2xl);
     line-height: var(--line-height-title);
-    overflow-wrap: anywhere;
   }
 
   .prose {
     max-inline-size: 75ch;
     color: var(--paragraph-main);
-    overflow-wrap: anywhere;
 
     h1,
     h2 {
@@ -298,7 +279,6 @@ const lastTabInput = `stabs-${stableId(tabs.map((tab) => tab.label))}-${lastTab}
       margin: 0;
       font-size: var(--font-size-base);
       font-weight: var(--font-weight-semibold);
-      overflow-wrap: anywhere;
     }
 
     p {
@@ -312,16 +292,12 @@ const lastTabInput = `stabs-${stableId(tabs.map((tab) => tab.label))}-${lastTab}
     color: var(--text-secondary);
   }
 
-  .contribute-bar {
-    position: sticky;
-    inset-block-end: 0;
+  .contribute-row {
     display: flex;
     align-items: center;
     gap: var(--space-md);
-    margin-inline: calc(-1 * var(--mobile-padding-inline));
-    padding: var(--space-xs) var(--mobile-padding-inline);
-    background: var(--bg-color);
-    border-block-start: 1px solid var(--border-color);
+    block-size: 100%;
+    padding-inline: var(--mobile-padding-inline);
 
     .proposal-progress {
       flex: 1;
@@ -331,51 +307,29 @@ const lastTabInput = `stabs-${stableId(tabs.map((tab) => tab.label))}-${lastTab}
     .progress-text {
       text-align: start;
     }
-
-    label {
-      padding: 0.75em 1.5em;
-      background: color-mix(in srgb, var(--monero-orange) 90%, black);
-      border-radius: var(--radius-full);
-      color: white;
-      font-weight: var(--font-weight-bold);
-      cursor: pointer;
-    }
-  }
-
-  .proposal:has(.tab-input:last-of-type:checked) .contribute-bar {
-    display: none;
-  }
-
-  .side {
-    display: none;
   }
 
   @media (width >= 1200px) {
-    .with-summary {
-      .tab-input:last-of-type,
-      .tab-label:last-child {
-        display: none;
-      }
+    .columns:has(.side) {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) var(--summary-width);
+      grid-template-rows: auto 1fr;
+      gap: var(--space-md) var(--space-4xl);
     }
 
-    .columns {
-      flex-direction: row;
-      align-items: flex-start;
-      gap: var(--space-4xl);
-    }
-
-    .content {
-      flex: 1;
+    .heading,
+    .sections {
+      grid-column: 1;
     }
 
     .side {
       position: sticky;
       inset-block-start: var(--sticky-top);
-      display: block;
-      flex: 0 0 21rem;
+      grid-area: 1 / 2 / -1;
+      align-self: start;
     }
 
-    .contribute-bar {
+    .contribute-row {
       display: none;
     }
   }
