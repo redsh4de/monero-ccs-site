@@ -2,6 +2,7 @@
 import { getCollection } from "astro:content";
 
 import BackLink from "@/components/ui/BackLink.astro";
+import BottomBar from "@/components/ui/BottomBar.astro";
 import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
 import { type ProposalStatus, stages } from "@/lib/stages";
 import { icons } from "@/utils/icons";
@@ -22,33 +23,35 @@ const count = (status: string) =>
     <div class="home-back">
       <BackLink href="/">Home</BackLink>
     </div>
-    <nav class="stages" aria-label="Proposal stages">
-      <a
-        href="/"
-        class="stage home-tab"
-        aria-current={current === "home" ? "page" : undefined}
-      >
-        <MaskIcon src={icons.mask("house")} size="1.375rem" />
-        <span>Home</span>
-      </a>
-      {
-        stages.map((stage) => (
-          <a
-            href={`/${stage.slug}/`}
-            class="stage"
-            aria-current={current === stage.status ? "page" : undefined}
-            style={`--stage-color: ${stage.color}`}
-          >
-            <span class="stage-icon">
-              <MaskIcon src={icons.mask(stage.icon)} size="1.375rem" />
-            </span>
-            <span class="label">{stage.label}</span>
-            <span class="short">{stage.short}</span>
-            <span class="count">{count(stage.status)}</span>
-          </a>
-        ))
-      }
-    </nav>
+    <BottomBar>
+      <nav class="stages" aria-label="Proposal stages">
+        <a
+          href="/"
+          class="stage home-tab"
+          aria-current={current === "home" ? "page" : undefined}
+        >
+          <MaskIcon src={icons.mask("house")} size="1.375rem" />
+          <span>Home</span>
+        </a>
+        {
+          stages.map((stage) => (
+            <a
+              href={`/${stage.slug}/`}
+              class="stage"
+              aria-current={current === stage.status ? "page" : undefined}
+              style={`--stage-color: ${stage.color}`}
+            >
+              <span class="stage-icon">
+                <MaskIcon src={icons.mask(stage.icon)} size="1.375rem" />
+              </span>
+              <span class="label">{stage.label}</span>
+              <span class="short">{stage.short}</span>
+              <span class="count">{count(stage.status)}</span>
+            </a>
+          ))
+        }
+      </nav>
+    </BottomBar>
   </aside>
 
   <div>
@@ -84,13 +87,6 @@ const count = (status: string) =>
   }
 
   @media (width < 1200px) {
-    :global(body) {
-      --tab-bar-height: 4.25rem;
-
-      box-sizing: border-box;
-      padding-block-end: var(--tab-bar-height);
-    }
-
     .label,
     .count,
     .home-back {
@@ -98,14 +94,9 @@ const count = (status: string) =>
     }
 
     .stages {
-      position: fixed;
-      inset: auto 0 0;
-      z-index: var(--z-dropdown);
       display: grid;
       grid-template-columns: repeat(5, minmax(0, 1fr));
-      block-size: var(--tab-bar-height);
-      background: var(--bg-color);
-      border-block-start: 1px solid var(--border-color);
+      block-size: 100%;
     }
   }
 
