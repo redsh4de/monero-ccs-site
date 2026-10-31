@@ -1,0 +1,206 @@
+---
+import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
+import type { Proposal } from "@/lib/proposals";
+import { stages } from "@/lib/stages";
+import { icons } from "@/utils/icons";
+
+interface Props {
+  proposal: Proposal;
+  variant?: "full" | "simple";
+}
+
+const { proposal, variant = "full" } = Astro.props;
+
+const color =
+  stages.find((stage) => stage.status === proposal.status)?.color ??
+  "var(--border-color)";
+const Tag = proposal.url ? "a" : "div";
+const simple = variant === "simple";
+const Title = simple ? "h3" : "h2";
+
+const meta = [
+  { icon: "user", text: proposal.author, show: true },
+  { icon: "calendar", text: proposal.date, show: !simple },
+  {
+    icon: "users",
+    text: `${proposal.contributions} contributions`,
+    show: proposal.status !== "idea",
+  },
+  {
+    icon: "coins",
+    text: `${proposal.amount} XMR`,
+    show: !simple && proposal.amount,
+  },
+];
+---
+
+<Tag
+  href={proposal.url || undefined}
+  class="proposal-card"
+  data-variant={variant}
+  style={`--progress-color: ${color}`}
+>
+  <Title class="proposal-title">{proposal.title}</Title>
+
+  <div class="proposal-meta">
+    {
+      meta
+        .filter((item) => item.show)
+        .map((item) => (
+          <div class="meta-item">
+            <MaskIcon
+              src={icons.mask(item.icon)}
+              size="1.25em"
+              color="var(--monero-orange)"
+            />
+            <span>{item.text}</span>
+          </div>
+        ))
+    }
+  </div>
+
+  {
+    proposal.status === "funding-required" && (
+      <div class="proposal-progress">
+        <div class="progress-text">
+          Raised {proposal.amountFunded || 0} of {proposal.amount} XMR
+        </div>
+        <div class="progress-track">
+          <div
+            class="progress-fill"
+            style={`width: ${Math.min(proposal.percentage, 100)}%`}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  {
+    proposal.status === "work-in-progress" &&
+      proposal.milestones.length > 0 && (
+        <div class="proposal-progress">
+          <div class="progress-text">
+            Completed {proposal.milestonesCompleted} of{" "}
+            {proposal.milestones.length} milestones
+          </div>
+          <div class="milestone-grid">
+            {proposal.milestones.map((_, index) => (
+              <div
+                class:list={[
+                  "milestone-seg",
+                  { active: index < proposal.milestonesCompleted },
+                ]}
+              />
+            ))}
+          </div>
+        </div>
+      )
+  }
+</Tag>
+
+<style>
+  .proposal-card {
+    display: block;
+    background: var(--card-color);
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    border-top: 6px solid var(--progress-color);
+    padding: var(--space-lg);
+    text-decoration: none;
+    color: inherit;
+    font-weight: var(--font-weight-normal);
+    overflow-wrap: anywhere;
+    transition:
+      transform 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+
+  a.proposal-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+  }
+
+  .proposal-title {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    margin: 0 0 var(--space-md);
+  }
+
+  .proposal-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-md) var(--space-xl);
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+  }
+
+  .meta-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+  }
+
+  .proposal-progress {
+    margin-top: var(--space-lg);
+  }
+
+  .progress-text {
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--space-xs);
+    text-align: right;
+  }
+
+  .progress-track,
+  .milestone-seg {
+    background-color: color-mix(
+      in srgb,
+      var(--progress-color),
+      transparent 85%
+    );
+    border-radius: 10px;
+  }
+
+  .progress-track {
+    height: 8px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background-color: var(--progress-color);
+  }
+
+  .milestone-grid {
+    display: flex;
+    gap: 4px;
+    height: 8px;
+  }
+
+  .milestone-seg {
+    flex: 1;
+  }
+
+  .milestone-seg.active {
+    background-color: var(--progress-color);
+  }
+
+  .proposal-card[data-variant="simple"] {
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-md) var(--space-lg);
+
+    .proposal-title {
+      font-size: 1.0625rem;
+      margin-block-end: var(--space-xs);
+    }
+
+    .proposal-meta {
+      gap: var(--space-2xs) var(--space-md);
+    }
+
+    .proposal-progress {
+      margin-block-start: auto;
+      padding-block-start: var(--space-md);
+    }
+  }
+</style>
