@@ -2,15 +2,16 @@
 import { getCollection } from "astro:content";
 
 import ContributeBar from "@/components/pages/proposals/ContributeBar.astro";
-import ProposalBody from "@/components/pages/proposals/ProposalBody.astro";
 import ProposalMeta from "@/components/pages/proposals/ProposalMeta.astro";
 import ProposalMilestones from "@/components/pages/proposals/ProposalMilestones.astro";
 import ProposalSummary from "@/components/pages/proposals/ProposalSummary.astro";
 import BackLink from "@/components/ui/BackLink.astro";
+import Prose from "@/components/ui/Prose.astro";
 import SectionTabs from "@/components/ui/tabs/SectionTabs.astro";
 import Layout from "@/layouts/Layout.astro";
 import type { Proposal } from "@/lib/proposals";
 import { stages } from "@/lib/stages";
+import { safeMarkdown } from "@/utils/safeMarkdown";
 
 export async function getStaticPaths() {
   const entries = await getCollection("proposals", (entry) =>
@@ -68,7 +69,7 @@ if (proposal.status === "work-in-progress" || proposal.status === "completed") {
 
       <SectionTabs {tabs}>
         <Fragment slot="panel-0">
-          <ProposalBody body={proposal.body} />
+          <Prose><Fragment set:html={safeMarkdown(proposal.body)} /></Prose>
           {
             proposal.gitlabUrl && (
               <div class="discussion">

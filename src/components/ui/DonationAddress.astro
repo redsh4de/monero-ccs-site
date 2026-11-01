@@ -1,0 +1,40 @@
+---
+interface Props {
+  address: string;
+  qrImage: string;
+}
+
+const { address, qrImage } = Astro.props;
+---
+
+<img
+  class="qr"
+  src={qrImage}
+  alt="QR code for this Monero address"
+  width="200"
+  height="200"
+/>
+<code title="Monero address">{address}</code>
+
+<style>
+  .qr {
+    align-self: center;
+    inline-size: var(--qr-size, 12.5rem);
+    max-inline-size: 100%;
+    block-size: auto;
+    background: white;
+    border-radius: var(--radius-md);
+  }
+
+  code {
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--heading-color);
+    font-size: 0.8125rem;
+    line-height: var(--line-height-caption);
+    overflow-wrap: anywhere;
+    user-select: all;
+  }
+</style>

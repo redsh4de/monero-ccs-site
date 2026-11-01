@@ -4,6 +4,7 @@ import ProposalMeta from "@/components/pages/proposals/ProposalMeta.astro";
 import ProposalProgress from "@/components/pages/proposals/ProposalProgress.astro";
 import Card from "@/components/ui/Card.astro";
 import Button from "@/components/ui/Button.astro";
+import DonationAddress from "@/components/ui/DonationAddress.astro";
 import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
 import { contributionsText, type Proposal } from "@/lib/proposals";
 import { icons } from "@/utils/icons";
@@ -58,16 +59,7 @@ const qrImage = proposal.address ? await qrCode(uri) : "";
 
     {
       proposal.address && (
-        <>
-          <img
-            class="qr"
-            src={qrImage}
-            alt="QR code for this proposal's Monero address"
-            width="200"
-            height="200"
-          />
-          <code title="Monero address">{proposal.address}</code>
-        </>
+        <DonationAddress address={proposal.address} {qrImage} />
       )
     }
   </div>
@@ -145,29 +137,10 @@ const qrImage = proposal.address ? await qrCode(uri) : "";
     cursor: pointer;
   }
 
-  .qr {
-    align-self: center;
-    inline-size: 12.5rem;
-    block-size: auto;
-    background: white;
-    border-radius: var(--radius-md);
-  }
-
   p {
     margin: 0;
     font-size: var(--font-size-sm);
     color: var(--text-secondary);
-  }
-
-  code {
-    padding: var(--space-xs) var(--space-sm);
-    background: var(--bg-color);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    color: var(--heading-color);
-    font-size: 0.8125rem;
-    line-height: var(--line-height-caption);
-    user-select: all;
   }
 
   @media (width < 1200px) {
@@ -182,6 +155,8 @@ const qrImage = proposal.address ? await qrCode(uri) : "";
     /* without popover support the card stays on the page */
     @supports selector(:popover-open) {
       .summary[popover] {
+        --qr-size: 10rem;
+
         position: fixed;
         inset: auto 0 0;
         inline-size: 100%;
@@ -253,10 +228,6 @@ const qrImage = proposal.address ? await qrCode(uri) : "";
           flex-basis: 100%;
           order: 1;
           margin-block-start: var(--space-2xs);
-        }
-
-        .qr {
-          inline-size: 10rem;
         }
       }
     }
