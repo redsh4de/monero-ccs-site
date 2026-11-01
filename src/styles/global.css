@@ -46,6 +46,7 @@
   --shadow-sm: 0 2px 4px rgb(0 0 0 / 15%);
   --shadow-md: 0 4px 8px rgb(0 0 0 / 20%);
   --shadow-lg: 0 12px 30px rgb(0 0 0 / 35%);
+  --scrim-color: rgb(0 0 0 / 45%);
 
   /* Z-Index */
   --z-dropdown: 10;

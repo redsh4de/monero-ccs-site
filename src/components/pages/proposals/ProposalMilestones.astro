@@ -1,0 +1,55 @@
+---
+import type { Milestone } from "@/lib/proposals";
+
+interface Props {
+  milestones: Milestone[];
+}
+
+const { milestones } = Astro.props;
+---
+
+<ol>
+  {
+    milestones.map((milestone) => (
+      <li>
+        <h2>{milestone.name}</h2>
+        <span>{milestone.finished ? "Finished" : "Unfinished"}</span>
+        {milestone.funds && <p>To be paid: {milestone.funds}</p>}
+        {milestone.done && <p>Completion date: {milestone.done}</p>}
+      </li>
+    ))
+  }
+</ol>
+
+<style>
+  ol {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-2xs) var(--space-md);
+    padding: var(--space-md);
+    background: var(--card-color);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+  }
+
+  h2 {
+    margin: 0;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  p {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+</style>

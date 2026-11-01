@@ -1,6 +1,7 @@
 ---
 import { Image } from "astro:assets";
 import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
+import { externalLinks } from "@/lib/links";
 import { icons } from "@/utils/icons";
 import moneroLogo from "@/../public/meta/monerologo.avif";
 
@@ -50,6 +51,20 @@ const navItems = [
             </li>
           ))
         }
+        {
+          externalLinks.map(({ label, href }) => (
+            <li class="nav-item external-item">
+              <a
+                class="link"
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer external"
+              >
+                {label}
+              </a>
+            </li>
+          ))
+        }
       </ul>
     </nav>
 
@@ -75,6 +90,7 @@ const navItems = [
 <style>
   :root {
     --drawer-gap: clamp(5rem, 20vw, 9rem);
+    --sticky-top: 5.5rem;
   }
 
   .header {
@@ -194,10 +210,27 @@ const navItems = [
     }
   }
 
+  .nav-item:has(+ .external-item),
+  .nav-item.external-item {
+    border-bottom: none;
+  }
+
+  .nav-item:not(.external-item) + .external-item {
+    margin-block-start: auto;
+    padding-block-start: var(--space-sm);
+    border-block-start: 1px solid var(--border-color);
+  }
+
+  .external-item .link {
+    padding-block: var(--space-sm);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+  }
+
   .scrim {
     position: fixed;
     inset: 0;
-    background: rgb(0 0 0 / 45%);
+    background: var(--scrim-color);
     z-index: var(--z-modal-background);
     touch-action: none;
     opacity: 0;
@@ -231,6 +264,11 @@ const navItems = [
   }
 
   @media (width >= 1200px) and (hover: hover) {
+    /* the header only stops being sticky here */
+    :root {
+      --sticky-top: var(--page-top-margin);
+    }
+
     .header {
       position: relative;
       background: unset;
@@ -279,6 +317,7 @@ const navItems = [
     }
 
     .drawer-header,
+    .external-item,
     .scrim,
     .hamburger,
     .utils {

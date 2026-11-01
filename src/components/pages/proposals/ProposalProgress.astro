@@ -1,0 +1,88 @@
+---
+import type { Proposal } from "@/lib/proposals";
+
+interface Props {
+  proposal: Proposal;
+  class?: string;
+}
+
+const { proposal, class: className, ...rest } = Astro.props;
+
+const raised = proposal.amountFunded || 0;
+---
+
+{
+  proposal.status === "funding-required" && (
+    <div class={className} {...rest}>
+      <div class="progress-text">
+        Raised {proposal.amount ? `${raised} of ${proposal.amount}` : raised}{" "}
+        XMR
+      </div>
+      <div class="progress-track">
+        <div
+          class="progress-fill"
+          style={`width: ${Math.min(proposal.percentage, 100)}%`}
+        />
+      </div>
+    </div>
+  )
+}
+
+{
+  proposal.status === "work-in-progress" && proposal.milestones.length > 0 && (
+    <div class={className} {...rest}>
+      <div class="progress-text">
+        Completed {proposal.milestonesCompleted} of {proposal.milestones.length}{" "}
+        milestones
+      </div>
+      <div class="milestone-track">
+        {proposal.milestones.map((_, index) => (
+          <div
+            class:list={[
+              "milestone-segment",
+              { active: index < proposal.milestonesCompleted },
+            ]}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+<style>
+  .progress-text {
+    font-size: var(--font-size-sm);
+    margin-block-end: var(--space-xs);
+    text-align: var(--progress-text-align, end);
+  }
+
+  .progress-track,
+  .milestone-segment {
+    background-color: color-mix(in srgb, var(--stage-color), transparent 85%);
+    border-radius: var(--radius-full);
+  }
+
+  .progress-track {
+    block-size: 8px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    block-size: 100%;
+    background-color: var(--stage-color);
+  }
+
+  .milestone-track {
+    display: flex;
+    gap: 4px;
+    block-size: 8px;
+  }
+
+  .milestone-segment {
+    flex: 1;
+  }
+
+  .milestone-segment.active {
+    background-color: var(--stage-color);
+  }
+</style>

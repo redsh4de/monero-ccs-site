@@ -1,0 +1,91 @@
+---
+import SectionHeading from "@/components/pages/index/SectionHeading.astro";
+import Card from "@/components/ui/Card.astro";
+import CardLink from "@/components/ui/CardLink.astro";
+import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
+import { stages } from "@/lib/stages";
+import { icons } from "@/utils/icons";
+---
+
+<section aria-labelledby="how-title">
+  <SectionHeading id="how-title" title="How it works">
+    <a href="/about/">Learn more</a>
+  </SectionHeading>
+  <ol>
+    {
+      stages.map((stage) => (
+        <Card as="li" class="step" color={stage.color} hover>
+          <div class="step-title">
+            <span class="step-icon">
+              <MaskIcon src={icons.mask(stage.icon)} size="1rem" />
+            </span>
+            <h3>
+              <CardLink href={`/${stage.slug}/`}>{stage.short}</CardLink>
+            </h3>
+          </div>
+          <p>{stage.description}</p>
+        </Card>
+      ))
+    }
+  </ol>
+</section>
+
+<style>
+  ol {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-md);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .step {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xs);
+    padding: var(--space-md);
+  }
+
+  .step-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+  }
+
+  .step-icon {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    inline-size: 1.75rem;
+    block-size: 1.75rem;
+    background: var(--stage-color);
+    border-radius: var(--radius-full);
+    color: white;
+  }
+
+  h3 {
+    margin: 0;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  p {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+  }
+
+  @media (width < 375px) {
+    ol {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @media (width >= 1200px) {
+    ol {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+</style>

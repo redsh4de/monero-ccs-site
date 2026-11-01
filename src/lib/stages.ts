@@ -1,42 +1,51 @@
 export const stages = [
   {
     status: "idea",
+    backendName: "Ideas",
     slug: "ideas",
     icon: "lightbulb",
     color: "var(--status-idea-color)",
     label: "Ideas",
     short: "Ideas",
-    step: "Pitch",
-    text: "Anyone with an idea for a feature, task, or service can pitch it for discussion.",
+    summary: "",
+    description:
+      "Anyone with an idea for a feature, task, or service can pitch it for discussion.",
   },
   {
     status: "funding-required",
+    backendName: "Funding Required",
     slug: "funding-required",
     icon: "hand-coins",
     color: "var(--status-funding-color)",
     label: "Funding Required",
     short: "Funding",
-    step: "Fund",
-    text: "Once approved, the idea moves to community fundraising.",
+    summary: "Contribute",
+    description: "Once approved, the idea moves to community fundraising.",
   },
   {
     status: "work-in-progress",
+    backendName: "Work in Progress",
     slug: "work-in-progress",
     icon: "cog",
     color: "var(--status-wip-color)",
     label: "Work in Progress",
     short: "Progress",
-    step: "Work",
-    text: "Funded ideas get picked up, and their progress can be monitored.",
+    summary: "Progress",
+    description:
+      "Funded ideas get picked up, and their progress can be monitored.",
   },
   {
     status: "completed",
+    backendName: "Completed Proposals",
     slug: "completed-proposals",
     icon: "package",
     color: "var(--status-completed-color)",
     label: "Completed",
     short: "Completed",
-    step: "Complete",
-    text: "The work is finished once all milestones are met and all funds are paid out.",
+    summary: "Funded",
+    description:
+      "The work is finished once all milestones are met and all funds are paid out.",
   },
-];
+] as const;
+
+export type ProposalStatus = (typeof stages)[number]["status"] | "unlisted";

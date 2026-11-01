@@ -2,12 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parse } from "yaml";
 
-export type ProposalStatus =
-  | "idea"
-  | "funding-required"
-  | "work-in-progress"
-  | "completed"
-  | "unlisted";
+import { type ProposalStatus, stages } from "@/lib/stages";
 
 export interface Milestone {
   name: string;
@@ -31,11 +26,11 @@ export type Proposal = {
   gitlabUrl: string;
   amount: string;
   amountFunded: string;
+  fullyFunded: boolean;
   contributions: number;
   percentage: number;
   milestonesCompleted: number;
   address: string;
-  qrCode: string;
   milestones: Milestone[];
   payouts: Payout[];
   body: string;
@@ -53,7 +48,6 @@ interface BackendEntry {
   "gitlab-url"?: string;
   "local-url"?: string;
   "donate-address"?: string;
-  "donate-qr-code"?: string;
 }
 
 interface BackendStage {
@@ -73,27 +67,19 @@ type ProposalFile = Pick<
   | "body"
 >;
 
-const STAGES: [string, ProposalStatus][] = [
-  ["Ideas", "idea"],
-  ["Funding Required", "funding-required"],
-  ["Work in Progress", "work-in-progress"],
-  ["Completed Proposals", "completed"],
-];
-
 const ADDRESS = /^[48][1-9A-HJ-NP-Za-km-z]{94}$/;
-const QR_CODE = /^data:image\/png;base64,\s?[A-Za-z0-9+/=]+$/;
 
 export async function getProposals(): Promise<Proposal[]> {
   const root = process.env.CCS_DATA_ROOT ?? process.cwd();
-  const stages = [
+  const backendStages = [
     ...(await readStages(join(root, "_data", "proposals.json"))),
     ...(await readStages(join(root, "_data", "completed-proposals.json"))),
   ];
   const files = await readProposalFiles(join(root, "proposals"));
 
-  const listed = STAGES.flatMap(([name, status]) => {
-    const stage = stages.find((item) => item.stage === name);
-    if (!stage) throw new Error(`ccs-back data has no "${name}" stage`);
+  const listed = stages.flatMap(({ backendName, status }) => {
+    const stage = backendStages.find((item) => item.stage === backendName);
+    if (!stage) throw new Error(`ccs-back data has no "${backendName}" stage`);
     return stage.proposals.map((entry) =>
       toProposal(entry, status, files.get(slugOf(entry))),
     );
@@ -144,10 +130,12 @@ function parseProposalFile(filename: string, source: string): ProposalFile {
       done: clean(milestone.done),
       finished: /^(finished|completed|done)$/i.test(clean(milestone.status)),
     })),
-    payouts: list(front.payouts).map((payout) => ({
-      date: clean(payout.date),
-      amount: clean(payout.amount),
-    })),
+    payouts: list(front.payouts)
+      .map((payout) => ({
+        date: clean(payout.date),
+        amount: clean(payout.amount),
+      }))
+      .filter((payout) => payout.date || payout.amount),
     body,
   };
 }
@@ -177,10 +165,17 @@ function toProposal(
   const link = clean(entry["gitlab-url"]);
   const gitlabUrl = link.startsWith("https://") ? link : "";
 
+  const amount = clean(entry.amount) || file?.amount || "";
+  const amountFunded = clean(entry["amount-funded"]);
+  const fullyFunded =
+    status === "funding-required" &&
+    Number(amount) > 0 &&
+    Number(amountFunded) >= Number(amount);
+
   const address = entry["donate-address"] ?? "";
-  const qrCode = entry["donate-qr-code"] ?? "";
-  const donatable = status === "funding-required" && ADDRESS.test(address);
-  if (status === "funding-required" && !donatable) {
+  const needsFunding = status === "funding-required" && !fullyFunded;
+  const acceptsDonations = needsFunding && ADDRESS.test(address);
+  if (needsFunding && !acceptsDonations) {
     console.warn(`No valid donation address for "${title}"`);
   }
   if (status !== "idea" && !file) console.warn(`No file for "${title}"`);
@@ -195,17 +190,21 @@ function toProposal(
     date: clean(entry.date) || file?.date || "",
     url: slug ? `/proposals/${slug}.html` : gitlabUrl,
     gitlabUrl,
-    amount: clean(entry.amount) || file?.amount || "",
-    amountFunded: clean(entry["amount-funded"]),
+    amount,
+    amountFunded,
+    fullyFunded,
     contributions: entry.contributions ?? 0,
     percentage: entry.percentage ?? 0,
     milestonesCompleted: entry["milestones-completed"] ?? 0,
-    address: donatable ? address : "",
-    qrCode: donatable && QR_CODE.test(qrCode) ? qrCode : "",
+    address: acceptsDonations ? address : "",
     milestones: file?.milestones ?? [],
     payouts: file?.payouts ?? [],
     body: file?.body ?? "",
   };
+}
+
+export function contributionsText(count: number): string {
+  return `${count} ${count === 1 ? "contribution" : "contributions"}`;
 }
 
 function list(value: unknown): Record<string, unknown>[] {

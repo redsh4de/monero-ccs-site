@@ -1,0 +1,31 @@
+<div class="bottom-bar">
+  <slot />
+</div>
+
+<style>
+  @media (width < 1200px) {
+    :global(body:has(.bottom-bar)) {
+      --bottom-bar-height: 4.25rem;
+
+      box-sizing: border-box;
+      padding-block-end: var(--bottom-bar-height);
+    }
+
+    .bottom-bar {
+      position: fixed;
+      inset: auto 0 0;
+      z-index: var(--z-dropdown);
+      box-sizing: border-box;
+      block-size: var(--bottom-bar-height);
+      background: var(--bg-color);
+      border-block-start: 1px solid var(--border-color);
+    }
+  }
+
+  /* the bar's contents lay themselves out on desktop */
+  @media (width >= 1200px) {
+    .bottom-bar {
+      display: contents;
+    }
+  }
+</style>

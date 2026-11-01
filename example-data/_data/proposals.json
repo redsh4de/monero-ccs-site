@@ -24,6 +24,29 @@
         "percentage": 40,
         "amount": 25,
         "amount-funded": 10
+      },
+      {
+        "name": "Example fully funded",
+        "gitlab-url": "https://repo.getmonero.org/monero-project/ccs-proposals/-/merge_requests/5",
+        "local-url": "/proposals/example-funded.html",
+        "author": "example",
+        "date": "October 5, 2026",
+        "donate-address": "888tNkZrPN6JsEgekjMnABU4TBzc2Dt29EPAvkRxbANsAnjyPbb3iQ1YBRk1UXcdRsiKc9dhwMVgN5S9cQUiyoogDavup3H",
+        "contributions": 8,
+        "percentage": 100,
+        "amount": 30,
+        "amount-funded": 30
+      },
+      {
+        "name": "Example without an address",
+        "gitlab-url": "https://repo.getmonero.org/monero-project/ccs-proposals/-/merge_requests/9",
+        "local-url": "/proposals/example-no-address.html",
+        "author": "example",
+        "date": "October 1, 2026",
+        "contributions": 0,
+        "percentage": 0,
+        "amount": 15,
+        "amount-funded": 0
       }
     ]
   },

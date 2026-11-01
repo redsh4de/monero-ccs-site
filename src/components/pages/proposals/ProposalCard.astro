@@ -1,0 +1,93 @@
+---
+import ProposalMeta from "@/components/pages/proposals/ProposalMeta.astro";
+import ProposalProgress from "@/components/pages/proposals/ProposalProgress.astro";
+import Card from "@/components/ui/Card.astro";
+import CardLink from "@/components/ui/CardLink.astro";
+import { contributionsText, type Proposal } from "@/lib/proposals";
+import { stages } from "@/lib/stages";
+
+interface Props {
+  proposal: Proposal;
+  variant?: "full" | "simple";
+}
+
+const { proposal, variant = "full" } = Astro.props;
+
+const color =
+  stages.find((stage) => stage.status === proposal.status)?.color ??
+  "var(--border-color)";
+const simple = variant === "simple";
+const Title = simple ? "h3" : "h2";
+
+const meta = [
+  { icon: "user", text: proposal.author, show: proposal.author },
+  { icon: "calendar", text: proposal.date, show: !simple && proposal.date },
+  {
+    icon: "users",
+    text: contributionsText(proposal.contributions),
+    show: proposal.status !== "idea",
+  },
+  {
+    icon: "coins",
+    text: `${proposal.amount} XMR`,
+    show: !simple && proposal.amount,
+  },
+];
+---
+
+<Card
+  as="article"
+  class="proposal-card"
+  data-variant={variant}
+  {color}
+  hover={Boolean(proposal.url)}
+>
+  <Title class="proposal-title">
+    {
+      proposal.url ? (
+        <CardLink href={proposal.url}>{proposal.title}</CardLink>
+      ) : (
+        proposal.title
+      )
+    }
+  </Title>
+  <ProposalMeta class="meta" items={meta.filter((item) => item.show)} />
+  <ProposalProgress {proposal} class="progress" />
+</Card>
+
+<style>
+  .proposal-card {
+    padding: var(--space-lg);
+    overflow-wrap: anywhere;
+  }
+
+  .progress {
+    margin-block-start: var(--space-lg);
+  }
+
+  .proposal-title {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    margin: 0 0 var(--space-md);
+  }
+
+  .proposal-card[data-variant="simple"] {
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-md) var(--space-lg);
+
+    .proposal-title {
+      font-size: 1.0625rem;
+      margin-block-end: var(--space-xs);
+    }
+
+    .meta {
+      gap: var(--space-2xs) var(--space-md);
+    }
+
+    .progress {
+      margin-block-start: auto;
+      padding-block-start: var(--space-md);
+    }
+  }
+</style>

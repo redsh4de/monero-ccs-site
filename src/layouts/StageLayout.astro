@@ -1,0 +1,55 @@
+---
+import StageNav from "@/components/pages/proposals/StageNav.astro";
+import type { ProposalStatus } from "@/lib/stages";
+
+interface Props {
+  current: ProposalStatus | "home";
+}
+
+const { current } = Astro.props;
+---
+
+<div class:list={["stage-layout", { "no-sidebar": current === "home" }]}>
+  <StageNav class="sidebar" {current} />
+
+  <div>
+    <slot />
+  </div>
+</div>
+
+<style>
+  .stage-layout {
+    inline-size: 100%;
+    max-inline-size: 48rem;
+    margin-inline: auto;
+  }
+
+  @media (width >= 1200px) {
+    /* equal side columns keep the content centered on the page */
+    .stage-layout {
+      --side: minmax(14rem, 1fr);
+
+      display: grid;
+      grid-template-columns: var(--side) minmax(0, 48rem) var(--side);
+      gap: var(--space-2xl);
+      align-items: start;
+      max-inline-size: none;
+    }
+
+    .sidebar {
+      position: sticky;
+      inset-block-start: var(--sticky-top);
+      justify-self: end;
+      inline-size: 14rem;
+    }
+
+    .no-sidebar {
+      display: block;
+      max-inline-size: 67rem;
+
+      .sidebar {
+        display: none;
+      }
+    }
+  }
+</style>

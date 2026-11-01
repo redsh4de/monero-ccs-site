@@ -1,0 +1,60 @@
+---
+import ProposalProgress from "@/components/pages/proposals/ProposalProgress.astro";
+import BottomBar from "@/components/ui/BottomBar.astro";
+import Button from "@/components/ui/Button.astro";
+import type { Proposal } from "@/lib/proposals";
+
+interface Props {
+  proposal: Proposal;
+}
+
+const { proposal } = Astro.props;
+
+// Button's types only allow attributes its tags share, so these need a spread
+const disabled = { disabled: true };
+const opensSummary = { popovertarget: "summary" };
+---
+
+{
+  (proposal.address || proposal.fullyFunded) && (
+    <BottomBar>
+      <div class="contribute-row">
+        <ProposalProgress {proposal} class="progress" />
+        {proposal.fullyFunded ? (
+          <Button class="funded" variant="secondary" {...disabled}>
+            Fully funded
+          </Button>
+        ) : (
+          <Button {...opensSummary}>Contribute</Button>
+        )}
+      </div>
+    </BottomBar>
+  )
+}
+
+<style>
+  .contribute-row {
+    --progress-text-align: start;
+
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    block-size: 100%;
+    padding-inline: var(--mobile-padding-inline);
+  }
+
+  .progress {
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  .funded {
+    pointer-events: none;
+  }
+
+  @media (width >= 1200px) {
+    .contribute-row {
+      display: none;
+    }
+  }
+</style>
