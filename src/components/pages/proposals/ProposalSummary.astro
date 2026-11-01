@@ -6,7 +6,11 @@ import Button from "@/components/ui/Button.astro";
 import DonationAddress from "@/components/ui/DonationAddress.astro";
 import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
 import StageCard from "@/components/ui/StageCard.astro";
-import { contributionsText, type Proposal } from "@/lib/proposals";
+import {
+  addressMissingText,
+  contributionsText,
+  type Proposal,
+} from "@/lib/proposals";
 import { icons } from "@/utils/icons";
 import { qrCode } from "@/utils/qrCode";
 
@@ -64,13 +68,7 @@ const qrImage = proposal.address ? await qrCode(uri) : "";
     }
   </div>
 
-  {
-    proposal.status === "funding-required" &&
-      !proposal.address &&
-      !proposal.fullyFunded && (
-        <p>The donation address isn't available right now.</p>
-      )
-  }
+  {proposal.addressMissing && <p>{addressMissingText}</p>}
 
   {proposal.address && <Button href={uri}>Open in wallet</Button>}
 </StageCard>

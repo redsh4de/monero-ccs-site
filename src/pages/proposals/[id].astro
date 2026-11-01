@@ -9,7 +9,7 @@ import BackLink from "@/components/ui/BackLink.astro";
 import Prose from "@/components/ui/Prose.astro";
 import SectionTabs from "@/components/ui/tabs/SectionTabs.astro";
 import Layout from "@/layouts/Layout.astro";
-import type { Proposal } from "@/lib/proposals";
+import { addressMissingText, type Proposal } from "@/lib/proposals";
 import { stages } from "@/lib/stages";
 import { safeMarkdown } from "@/utils/safeMarkdown";
 
@@ -32,6 +32,9 @@ const { proposal } = Astro.props;
 const stage = stages.find((item) => item.status === proposal.status);
 
 const summaryHeading = proposal.fullyFunded ? "Fully funded" : stage?.summary;
+
+// on phones the bar is all these need, as there's no address to show
+const barOnly = proposal.status === "funding-required" && !proposal.address;
 
 const meta = [
   { icon: "user", text: proposal.author },
@@ -57,11 +60,16 @@ if (proposal.status === "work-in-progress" || proposal.status === "completed") {
       <div class="heading">
         <h1>{proposal.title}</h1>
         <ProposalMeta items={meta} />
+        {
+          proposal.addressMissing && (
+            <p class="no-address">{addressMissingText}</p>
+          )
+        }
       </div>
 
       {
         summaryHeading && (
-          <div class:list={["side", { "desktop-only": proposal.fullyFunded }]}>
+          <div class:list={["side", { "desktop-only": barOnly }]}>
             <ProposalSummary {proposal} heading={summaryHeading} />
           </div>
         )
@@ -176,6 +184,12 @@ if (proposal.status === "work-in-progress" || proposal.status === "completed") {
     color: var(--text-secondary);
   }
 
+  /* phones only: desktop says so in the side card */
+  .no-address {
+    margin: 0;
+    color: var(--text-secondary);
+  }
+
   @media (width < 1200px) {
     .desktop-only {
       display: none;
@@ -183,6 +197,10 @@ if (proposal.status === "work-in-progress" || proposal.status === "completed") {
   }
 
   @media (width >= 1200px) {
+    .no-address {
+      display: none;
+    }
+
     .columns:has(.side) {
       display: grid;
       grid-template-columns: minmax(0, 1fr) var(--summary-width);
