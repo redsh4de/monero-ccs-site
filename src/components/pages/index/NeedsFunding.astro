@@ -1,0 +1,53 @@
+---
+import { getCollection } from "astro:content";
+
+import SectionHeading from "@/components/pages/index/SectionHeading.astro";
+import ProposalCard from "@/components/pages/proposals/ProposalCard.astro";
+
+const entries = await getCollection(
+  "proposals",
+  (entry) => entry.data.status === "funding-required",
+);
+const funding = entries.map((entry) => entry.data);
+const needsFunding = funding.filter((proposal) => !proposal.fullyFunded);
+---
+
+<section aria-labelledby="funding-title">
+  <SectionHeading id="funding-title" title="Needs funding">
+    {
+      funding.length > 4 && (
+        <a href="/funding-required/">See all {funding.length}</a>
+      )
+    }
+  </SectionHeading>
+  {
+    needsFunding.length > 0 ? (
+      <div class="funding">
+        {needsFunding.slice(0, 4).map((proposal) => (
+          <ProposalCard {proposal} variant="simple" />
+        ))}
+      </div>
+    ) : (
+      <p>Nothing needs funding right now.</p>
+    )
+  }
+</section>
+
+<style>
+  .funding {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    gap: var(--space-md);
+  }
+
+  p {
+    margin: 0;
+    color: var(--text-secondary);
+  }
+
+  @media (width >= 1200px) {
+    .funding {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+</style>
