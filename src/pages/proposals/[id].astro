@@ -1,17 +1,16 @@
 ---
 import { getCollection } from "astro:content";
 
+import ContributeBar from "@/components/pages/proposals/ContributeBar.astro";
+import ProposalBody from "@/components/pages/proposals/ProposalBody.astro";
 import ProposalMeta from "@/components/pages/proposals/ProposalMeta.astro";
-import ProposalProgress from "@/components/pages/proposals/ProposalProgress.astro";
+import ProposalMilestones from "@/components/pages/proposals/ProposalMilestones.astro";
 import ProposalSummary from "@/components/pages/proposals/ProposalSummary.astro";
 import BackLink from "@/components/ui/BackLink.astro";
-import BottomBar from "@/components/ui/BottomBar.astro";
-import Button from "@/components/ui/Button.astro";
 import SectionTabs from "@/components/ui/tabs/SectionTabs.astro";
 import Layout from "@/layouts/Layout.astro";
 import type { Proposal } from "@/lib/proposals";
 import { stages } from "@/lib/stages";
-import { safeMarkdown } from "@/utils/safeMarkdown";
 
 export async function getStaticPaths() {
   const entries = await getCollection("proposals", (entry) =>
@@ -67,94 +66,64 @@ if (proposal.status === "work-in-progress" || proposal.status === "completed") {
         )
       }
 
-      <div class="sections">
-        <SectionTabs {tabs}>
-          <Fragment slot="panel-0">
-            <article class="prose" set:html={safeMarkdown(proposal.body)} />
-            {
-              proposal.gitlabUrl && (
-                <div class="discussion">
-                  <h2>Community discussion and updates</h2>
-                  <a
-                    href={proposal.gitlabUrl}
-                    target="_blank"
-                    rel="noopener noreferrer external"
-                  >
-                    View community discussion, comments, and proposal updates on
-                    GitLab
-                  </a>
-                </div>
-              )
-            }
-          </Fragment>
+      <SectionTabs {tabs}>
+        <Fragment slot="panel-0">
+          <ProposalBody body={proposal.body} />
+          {
+            proposal.gitlabUrl && (
+              <div class="discussion">
+                <h2>Community discussion and updates</h2>
+                <a
+                  href={proposal.gitlabUrl}
+                  target="_blank"
+                  rel="noopener noreferrer external"
+                >
+                  View community discussion, comments, and proposal updates on
+                  GitLab
+                </a>
+              </div>
+            )
+          }
+        </Fragment>
 
-          <Fragment slot="panel-1">
-            {
-              proposal.milestones.length > 0 ? (
-                <ol class="milestones">
-                  {proposal.milestones.map((milestone) => (
-                    <li>
-                      <h2>{milestone.name}</h2>
-                      <span>
-                        {milestone.finished ? "Finished" : "Unfinished"}
-                      </span>
-                      {milestone.funds && <p>To be paid: {milestone.funds}</p>}
-                      {milestone.done && (
-                        <p>Completion date: {milestone.done}</p>
-                      )}
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p class="empty">No milestones listed.</p>
-              )
-            }
-          </Fragment>
+        <Fragment slot="panel-1">
+          {
+            proposal.milestones.length > 0 ? (
+              <ProposalMilestones milestones={proposal.milestones} />
+            ) : (
+              <p class="empty">No milestones listed.</p>
+            )
+          }
+        </Fragment>
 
-          <Fragment slot="panel-2">
-            {
-              proposal.payouts.length > 0 ? (
-                <table>
-                  <thead>
+        <Fragment slot="panel-2">
+          {
+            proposal.payouts.length > 0 ? (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Funds awarded</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {proposal.payouts.map((payout) => (
                     <tr>
-                      <th>Date</th>
-                      <th>Funds awarded</th>
+                      <td>{payout.date}</td>
+                      <td>{payout.amount}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {proposal.payouts.map((payout) => (
-                      <tr>
-                        <td>{payout.date}</td>
-                        <td>{payout.amount}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p class="empty">No payouts yet.</p>
-              )
-            }
-          </Fragment>
-        </SectionTabs>
-      </div>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p class="empty">No payouts yet.</p>
+            )
+          }
+        </Fragment>
+      </SectionTabs>
     </div>
 
-    {
-      (proposal.address || proposal.fullyFunded) && (
-        <BottomBar>
-          <div class="contribute-row">
-            <ProposalProgress {proposal} />
-            {proposal.fullyFunded ? (
-              <Button variant="secondary" {...{ disabled: true }}>
-                Fully funded
-              </Button>
-            ) : (
-              <Button {...{ popovertarget: "summary" }}>Contribute</Button>
-            )}
-          </div>
-        </BottomBar>
-      )
-    }
+    <ContributeBar {proposal} />
   </div>
 </Layout>
 
@@ -185,67 +154,6 @@ if (proposal.status === "work-in-progress" || proposal.status === "completed") {
     line-height: var(--line-height-title);
   }
 
-  .prose {
-    max-inline-size: 75ch;
-    color: var(--paragraph-main);
-
-    h1,
-    h2 {
-      margin: var(--space-xl) 0 var(--space-xs);
-      font-size: var(--font-size-xl);
-    }
-
-    h3,
-    h4,
-    h5,
-    h6 {
-      margin: var(--space-lg) 0 var(--space-xs);
-      font-size: var(--font-size-lg);
-    }
-
-    > :first-child {
-      margin-block-start: 0;
-    }
-
-    p,
-    ul,
-    ol {
-      margin-block: 0 var(--space-md);
-    }
-
-    a {
-      color: var(--orange-text);
-      text-decoration: underline;
-    }
-
-    img {
-      max-inline-size: 100%;
-      block-size: auto;
-    }
-
-    pre {
-      padding: var(--space-md);
-      overflow-x: auto;
-      background: var(--card-color);
-      border-radius: var(--radius-md);
-    }
-
-    code {
-      font-size: 0.9em;
-    }
-
-    blockquote {
-      margin: 0 0 var(--space-md);
-      padding-inline-start: var(--space-md);
-      border-inline-start: 3px solid var(--border-color);
-    }
-
-    table {
-      display: block;
-      overflow-x: auto;
-    }
-  }
-
   .discussion {
     margin-block-start: var(--space-xl);
     padding-block-start: var(--space-md);
@@ -262,61 +170,9 @@ if (proposal.status === "work-in-progress" || proposal.status === "completed") {
     }
   }
 
-  .milestones {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-sm);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-
-    li {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: var(--space-2xs) var(--space-md);
-      padding: var(--space-md);
-      background: var(--card-color);
-      border-radius: var(--radius-md);
-      font-size: var(--font-size-sm);
-      color: var(--text-secondary);
-    }
-
-    h2 {
-      margin: 0;
-      font-size: var(--font-size-base);
-      font-weight: var(--font-weight-semibold);
-    }
-
-    p {
-      grid-column: 1 / -1;
-      margin: 0;
-    }
-  }
-
   .empty {
     margin: 0;
     color: var(--text-secondary);
-  }
-
-  .contribute-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-md);
-    block-size: 100%;
-    padding-inline: var(--mobile-padding-inline);
-
-    .proposal-progress {
-      flex: 1;
-      min-inline-size: 0;
-    }
-
-    .progress-text {
-      text-align: start;
-    }
-
-    .button:disabled {
-      pointer-events: none;
-    }
   }
 
   @media (width < 1200px) {
@@ -333,20 +189,11 @@ if (proposal.status === "work-in-progress" || proposal.status === "completed") {
       gap: var(--space-md) var(--space-4xl);
     }
 
-    .heading,
-    .sections {
-      grid-column: 1;
-    }
-
     .side {
       position: sticky;
       inset-block-start: var(--sticky-top);
       grid-area: 1 / 2 / -1;
       align-self: start;
-    }
-
-    .contribute-row {
-      display: none;
     }
   }
 </style>

@@ -2,6 +2,7 @@
 /* eslint-disable astro/jsx-a11y/no-autofocus -- moves focus into the drawer as it opens, never on page load */
 import ProposalMeta from "@/components/pages/proposals/ProposalMeta.astro";
 import ProposalProgress from "@/components/pages/proposals/ProposalProgress.astro";
+import Card from "@/components/ui/Card.astro";
 import Button from "@/components/ui/Button.astro";
 import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
 import { contributionsText, type Proposal } from "@/lib/proposals";
@@ -25,7 +26,8 @@ const uri = `monero:${proposal.address}`;
 const qrImage = proposal.address ? await qrCode(uri) : "";
 ---
 
-<aside
+<Card
+  as="aside"
   id="summary"
   class="summary"
   aria-label={heading}
@@ -36,7 +38,7 @@ const qrImage = proposal.address ? await qrCode(uri) : "";
 
     <div class="top">
       <div class="numbers">
-        <ProposalProgress {proposal} />
+        <ProposalProgress {proposal} class="progress" />
         <ProposalMeta items={meta} />
       </div>
       {
@@ -79,9 +81,11 @@ const qrImage = proposal.address ? await qrCode(uri) : "";
   }
 
   {proposal.address && <Button href={uri}>Open in wallet</Button>}
-</aside>
+</Card>
 
 <style>
+  /* one element is the side card, the page card and the drawer, so this undoes
+     the browser's [popover] defaults */
   .summary {
     position: static;
     inset: auto;
@@ -94,11 +98,8 @@ const qrImage = proposal.address ? await qrCode(uri) : "";
     margin: 0;
     padding: var(--space-lg);
     overflow: visible;
-    background: var(--card-color);
-    border: none;
-    border-top: 4px solid var(--stage-color);
-    border-radius: 0 0 var(--radius-md) var(--radius-md);
-    box-shadow: var(--shadow-sm);
+    border-inline: none;
+    border-block-end: none;
     color: inherit;
   }
 
@@ -175,9 +176,7 @@ const qrImage = proposal.address ? await qrCode(uri) : "";
     }
 
     .numbers {
-      .progress-text {
-        text-align: start;
-      }
+      --progress-text-align: start;
     }
 
     /* without popover support the card stays on the page */
@@ -242,15 +241,15 @@ const qrImage = proposal.address ? await qrCode(uri) : "";
           gap: var(--space-2xs) var(--space-xs);
         }
 
-        .proposal-progress {
+        .progress {
           display: contents;
         }
 
-        .progress-text {
+        & :global(.progress-text) {
           margin: 0;
         }
 
-        .progress-track {
+        & :global(.progress-track) {
           flex-basis: 100%;
           order: 1;
           margin-block-start: var(--space-2xs);

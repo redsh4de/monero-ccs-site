@@ -1,0 +1,47 @@
+---
+import type { HTMLTag, Polymorphic } from "astro/types";
+
+type Props<T extends HTMLTag> = Polymorphic<{
+  as: T;
+  color?: string;
+  hover?: boolean;
+}>;
+
+const {
+  as: Tag = "div",
+  class: className,
+  color,
+  hover,
+  ...rest
+} = Astro.props;
+---
+
+<Tag
+  class:list={["card", className]}
+  data-hover={hover || undefined}
+  style={color && `--stage-color: ${color}`}
+  {...rest}
+>
+  <slot />
+</Tag>
+
+<style>
+  .card {
+    background: var(--card-color);
+    border-block-start: 4px solid var(--stage-color);
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    box-shadow: var(--shadow-sm);
+
+    &[data-hover] {
+      position: relative;
+      transition:
+        transform 0.15s ease,
+        box-shadow 0.15s ease;
+
+      &:hover {
+        box-shadow: var(--shadow-md);
+        transform: translateY(-2px);
+      }
+    }
+  }
+</style>

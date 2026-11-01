@@ -1,6 +1,8 @@
 ---
 import ProposalMeta from "@/components/pages/proposals/ProposalMeta.astro";
 import ProposalProgress from "@/components/pages/proposals/ProposalProgress.astro";
+import Card from "@/components/ui/Card.astro";
+import CardLink from "@/components/ui/CardLink.astro";
 import { contributionsText, type Proposal } from "@/lib/proposals";
 import { stages } from "@/lib/stages";
 
@@ -14,7 +16,6 @@ const { proposal, variant = "full" } = Astro.props;
 const color =
   stages.find((stage) => stage.status === proposal.status)?.color ??
   "var(--border-color)";
-const Tag = proposal.url ? "a" : "div";
 const simple = variant === "simple";
 const Title = simple ? "h3" : "h2";
 
@@ -34,29 +35,34 @@ const meta = [
 ];
 ---
 
-<Tag
-  href={proposal.url || undefined}
-  class="proposal-card card"
+<Card
+  as="article"
+  class="proposal-card"
   data-variant={variant}
-  style={`--stage-color: ${color}`}
+  {color}
+  hover={Boolean(proposal.url)}
 >
-  <Title class="proposal-title">{proposal.title}</Title>
-  <ProposalMeta items={meta.filter((item) => item.show)} />
-  <ProposalProgress {proposal} />
-</Tag>
+  <Title class="proposal-title">
+    {
+      proposal.url ? (
+        <CardLink href={proposal.url}>{proposal.title}</CardLink>
+      ) : (
+        proposal.title
+      )
+    }
+  </Title>
+  <ProposalMeta class="meta" items={meta.filter((item) => item.show)} />
+  <ProposalProgress {proposal} class="progress" />
+</Card>
 
 <style>
   .proposal-card {
-    display: block;
     padding: var(--space-lg);
-    text-decoration: none;
-    color: inherit;
-    font-weight: var(--font-weight-normal);
     overflow-wrap: anywhere;
+  }
 
-    .proposal-progress {
-      margin-block-start: var(--space-lg);
-    }
+  .progress {
+    margin-block-start: var(--space-lg);
   }
 
   .proposal-title {
@@ -75,11 +81,11 @@ const meta = [
       margin-block-end: var(--space-xs);
     }
 
-    .proposal-meta {
+    .meta {
       gap: var(--space-2xs) var(--space-md);
     }
 
-    .proposal-progress {
+    .progress {
       margin-block-start: auto;
       padding-block-start: var(--space-md);
     }

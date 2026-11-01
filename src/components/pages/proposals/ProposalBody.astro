@@ -1,0 +1,74 @@
+---
+import { safeMarkdown } from "@/utils/safeMarkdown";
+
+interface Props {
+  body: string;
+}
+
+const { body } = Astro.props;
+---
+
+<article class="proposal-body" set:html={safeMarkdown(body)} />
+
+<style is:global>
+  .proposal-body {
+    max-inline-size: 75ch;
+    color: var(--paragraph-main);
+
+    h1,
+    h2 {
+      margin: var(--space-xl) 0 var(--space-xs);
+      font-size: var(--font-size-xl);
+    }
+
+    h3,
+    h4,
+    h5,
+    h6 {
+      margin: var(--space-lg) 0 var(--space-xs);
+      font-size: var(--font-size-lg);
+    }
+
+    > :first-child {
+      margin-block-start: 0;
+    }
+
+    p,
+    ul,
+    ol {
+      margin-block: 0 var(--space-md);
+    }
+
+    a {
+      color: var(--orange-text);
+      text-decoration: underline;
+    }
+
+    img {
+      max-inline-size: 100%;
+      block-size: auto;
+    }
+
+    pre {
+      padding: var(--space-md);
+      overflow-x: auto;
+      background: var(--card-color);
+      border-radius: var(--radius-md);
+    }
+
+    code {
+      font-size: 0.9em;
+    }
+
+    blockquote {
+      margin: 0 0 var(--space-md);
+      padding-inline-start: var(--space-md);
+      border-inline-start: 3px solid var(--border-color);
+    }
+
+    table {
+      display: block;
+      overflow-x: auto;
+    }
+  }
+</style>

@@ -3,16 +3,17 @@ import type { Proposal } from "@/lib/proposals";
 
 interface Props {
   proposal: Proposal;
+  class?: string;
 }
 
-const { proposal } = Astro.props;
+const { proposal, class: className, ...rest } = Astro.props;
 
 const raised = proposal.amountFunded || 0;
 ---
 
 {
   proposal.status === "funding-required" && (
-    <div class="proposal-progress">
+    <div class={className} {...rest}>
       <div class="progress-text">
         Raised {proposal.amount ? `${raised} of ${proposal.amount}` : raised}{" "}
         XMR
@@ -29,7 +30,7 @@ const raised = proposal.amountFunded || 0;
 
 {
   proposal.status === "work-in-progress" && proposal.milestones.length > 0 && (
-    <div class="proposal-progress">
+    <div class={className} {...rest}>
       <div class="progress-text">
         Completed {proposal.milestonesCompleted} of {proposal.milestones.length}{" "}
         milestones
@@ -52,7 +53,7 @@ const raised = proposal.amountFunded || 0;
   .progress-text {
     font-size: var(--font-size-sm);
     margin-block-end: var(--space-xs);
-    text-align: end;
+    text-align: var(--progress-text-align, end);
   }
 
   .progress-track,

@@ -4,12 +4,13 @@ import { icons } from "@/utils/icons";
 
 interface Props {
   items: { icon: string; text: string }[];
+  class?: string;
 }
 
-const { items } = Astro.props;
+const { items, class: className, ...rest } = Astro.props;
 ---
 
-<div class="proposal-meta">
+<div class:list={["proposal-meta", className]} {...rest}>
   {
     items.map((item) => (
       <div class="meta-item">

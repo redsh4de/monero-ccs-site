@@ -4,9 +4,11 @@ import { getCollection } from "astro:content";
 
 import landingImage from "@/assets/funding-required.png";
 import ProposalCard from "@/components/pages/proposals/ProposalCard.astro";
-import StageLayout from "@/layouts/StageLayout.astro";
+import Card from "@/components/ui/Card.astro";
+import CardLink from "@/components/ui/CardLink.astro";
 import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
 import Layout from "@/layouts/Layout.astro";
+import StageLayout from "@/layouts/StageLayout.astro";
 import { stages } from "@/lib/stages";
 import { icons } from "@/utils/icons";
 
@@ -61,17 +63,17 @@ const needsFunding = funding.filter((proposal) => !proposal.fullyFunded);
         <ol class="steps">
           {
             stages.map((stage) => (
-              <li class="card" style={`--stage-color: ${stage.color}`}>
+              <Card as="li" class="step" color={stage.color} hover>
                 <div class="step-title">
                   <span class="step-icon">
                     <MaskIcon src={icons.mask(stage.icon)} size="1rem" />
                   </span>
                   <h3>
-                    <a href={`/${stage.slug}/`}>{stage.short}</a>
+                    <CardLink href={`/${stage.slug}/`}>{stage.short}</CardLink>
                   </h3>
                 </div>
                 <p>{stage.description}</p>
-              </li>
+              </Card>
             ))
           }
         </ol>
@@ -150,8 +152,7 @@ const needsFunding = funding.filter((proposal) => !proposal.fullyFunded);
     padding: 0;
     list-style: none;
 
-    li {
-      position: relative;
+    .step {
       display: flex;
       flex-direction: column;
       gap: var(--space-2xs);
@@ -162,31 +163,6 @@ const needsFunding = funding.filter((proposal) => !proposal.fullyFunded);
       margin: 0;
       font-size: var(--font-size-base);
       font-weight: var(--font-weight-semibold);
-    }
-
-    a {
-      color: var(--heading-color);
-      font-weight: inherit;
-
-      &::after {
-        content: "";
-        position: absolute;
-        inset: -4px 0 0;
-        border-radius: inherit;
-      }
-
-      &:hover {
-        text-decoration: none;
-      }
-
-      &:focus-visible {
-        outline: none;
-      }
-
-      &:focus-visible::after {
-        outline: 2px solid currentcolor;
-        outline-offset: -2px;
-      }
     }
 
     p {

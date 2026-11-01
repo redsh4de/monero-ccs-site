@@ -1,0 +1,34 @@
+---
+import type { HTMLAttributes } from "astro/types";
+
+type Props = HTMLAttributes<"a">;
+---
+
+<a class="card-link" {...Astro.props}><slot /></a>
+
+<style>
+  .card-link {
+    color: inherit;
+    font-weight: inherit;
+
+    /* stretches over the whole card, -4px covers its top border */
+    &::after {
+      content: "";
+      position: absolute;
+      inset: -4px 0 0;
+    }
+
+    &:hover {
+      text-decoration: none;
+    }
+
+    &:focus-visible {
+      outline: none;
+    }
+
+    &:focus-visible::after {
+      outline: 2px solid currentcolor;
+      outline-offset: -2px;
+    }
+  }
+</style>
