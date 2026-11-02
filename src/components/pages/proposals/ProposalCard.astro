@@ -1,8 +1,8 @@
 ---
 import ProposalMeta from "@/components/pages/proposals/ProposalMeta.astro";
 import ProposalProgress from "@/components/pages/proposals/ProposalProgress.astro";
-import Card from "@/components/ui/Card.astro";
 import CardLink from "@/components/ui/CardLink.astro";
+import StageCard from "@/components/ui/StageCard.astro";
 import { contributionsText, type Proposal } from "@/lib/proposals";
 import { stages } from "@/lib/stages";
 
@@ -35,7 +35,7 @@ const meta = [
 ];
 ---
 
-<Card
+<StageCard
   as="article"
   class="proposal-card"
   data-variant={variant}
@@ -53,7 +53,7 @@ const meta = [
   </Title>
   <ProposalMeta class="meta" items={meta.filter((item) => item.show)} />
   <ProposalProgress {proposal} class="progress" />
-</Card>
+</StageCard>
 
 <style>
   .proposal-card {

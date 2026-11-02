@@ -1,3 +1,9 @@
+export const navLinks = [
+  { label: "About", href: "/what-is-ccs/" },
+  { label: "Rules", href: "/what-is-ccs/#ccs-rules-and-expectations" },
+  { label: "Donate", href: "/donate/" },
+];
+
 export const externalLinks = [
   {
     label: "Frontend Repo",

@@ -1,0 +1,39 @@
+---
+import Button from "@/components/ui/Button.astro";
+import Card from "@/components/ui/Card.astro";
+---
+
+<div class="guide-link">
+  <Card padding="lg" class="row">
+    <h2 class="title">How to submit a proposal</h2>
+    <Button href="/how-to-ccs/">Read the guide</Button>
+  </Card>
+</div>
+
+<style>
+  .guide-link {
+    container-type: inline-size;
+    margin-block-start: var(--space-2xl);
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm) var(--space-xl);
+  }
+
+  .title {
+    margin: 0;
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  /* below this the title and button no longer fit side by side */
+  @container (width < 28em) {
+    .row {
+      flex-direction: column;
+      text-align: center;
+    }
+  }
+</style>

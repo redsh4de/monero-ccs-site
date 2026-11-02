@@ -11,8 +11,8 @@ interface Props {
   title?: string;
 }
 
-const { title = "Monero CCS" } = Astro.props;
-const fullTitle = title === "Monero CCS" ? title : `${title} | Monero CCS`;
+const { title } = Astro.props;
+const fullTitle = title ? `${title} | Monero CCS` : "Monero CCS";
 ---
 
 <!doctype html>

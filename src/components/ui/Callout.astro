@@ -1,0 +1,27 @@
+<div class="callout" role="note">
+  <span class="mark" aria-hidden="true">!</span>
+  <div><slot /></div>
+</div>
+
+<style>
+  .callout {
+    display: flex;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-md);
+    background: color-mix(in srgb, var(--orange-text) 9%, transparent);
+    border-radius: var(--radius-md);
+    color: var(--heading-color);
+    font-weight: var(--font-weight-medium);
+    margin-block: 0 var(--space-md);
+    line-height: var(--line-height-body);
+
+    > div > :global(:last-child) {
+      margin-block-end: 0;
+    }
+  }
+
+  .mark {
+    color: var(--orange-text);
+    font-weight: var(--font-weight-bold);
+  }
+</style>

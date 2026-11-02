@@ -1,0 +1,70 @@
+---
+import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
+import { stages } from "@/lib/stages";
+import { icons } from "@/utils/icons";
+
+interface Props {
+  slug: (typeof stages)[number]["slug"];
+}
+
+const { slug } = Astro.props;
+const stage = stages.find((s) => s.slug === slug);
+if (!stage) throw new Error(`Unknown stage: ${slug}`);
+---
+
+<div class="flow-stage" style={`--stage-color: ${stage.color}`}>
+  <span class="icon">
+    <MaskIcon src={icons.mask(stage.icon)} size="1.125rem" />
+  </span>
+  <h3 class="label">{stage.label}</h3>
+  <div class="steps">
+    <slot />
+  </div>
+</div>
+
+<style>
+  .flow-stage {
+    --dot: 2.125rem;
+    --line: 3px;
+
+    display: grid;
+    grid-template-columns: var(--dot) minmax(0, 1fr);
+    column-gap: var(--space-sm);
+    align-items: center;
+  }
+
+  .icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    block-size: var(--dot);
+    background: var(--stage-color);
+    border-radius: var(--radius-full);
+    color: white;
+  }
+
+  .label {
+    margin: 0;
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .steps {
+    grid-column: 1 / -1;
+
+    /* the line runs down the middle of the dot */
+    margin-inline-start: calc(var(--dot) / 2 - var(--line) / 2);
+    padding: var(--space-2xs) 0 var(--space-md)
+      calc(var(--dot) / 2 + var(--space-sm) - var(--line) / 2);
+    border-inline-start: var(--line) solid transparent;
+
+    > :global(:last-child) {
+      margin-block-end: 0;
+    }
+  }
+
+  /* the line down to the next stage */
+  .flow-stage:not(:last-child) .steps {
+    border-inline-start-color: var(--stage-color);
+  }
+</style>

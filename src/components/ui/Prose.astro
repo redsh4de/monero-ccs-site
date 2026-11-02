@@ -1,19 +1,14 @@
----
-import { safeMarkdown } from "@/utils/safeMarkdown";
-
-interface Props {
-  body: string;
-}
-
-const { body } = Astro.props;
----
-
-<article class="proposal-body" set:html={safeMarkdown(body)} />
+<div class="prose">
+  <slot />
+</div>
 
 <style is:global>
-  .proposal-body {
-    max-inline-size: 75ch;
+  .prose {
     color: var(--paragraph-main);
+
+    [id] {
+      scroll-margin-block-start: var(--sticky-top);
+    }
 
     h1,
     h2 {
@@ -29,8 +24,16 @@ const { body } = Astro.props;
       font-size: var(--font-size-lg);
     }
 
+    > section {
+      margin-block: var(--space-2xl);
+    }
+
     > :first-child {
       margin-block-start: 0;
+    }
+
+    > :last-child {
+      margin-block-end: 0;
     }
 
     p,
@@ -39,25 +42,48 @@ const { body } = Astro.props;
       margin-block: 0 var(--space-md);
     }
 
+    ul,
+    ol {
+      padding-inline-start: var(--space-xl);
+    }
+
+    li {
+      line-height: var(--line-height-body);
+    }
+
+    li + li {
+      margin-block-start: var(--space-2xs);
+    }
+
     a {
       color: var(--orange-text);
       text-decoration: underline;
     }
 
     img {
+      display: block;
       max-inline-size: 100%;
       block-size: auto;
+      margin-block: var(--space-sm);
     }
 
     pre {
       padding: var(--space-md);
+      font-size: var(--font-size-sm);
       overflow-x: auto;
       background: var(--card-color);
       border-radius: var(--radius-md);
     }
 
     code {
+      /* any family besides the bare generic one stops browsers shrinking
+         monospace text to 13px */
+      font-family: Menlo, Consolas, monospace;
       font-size: 0.9em;
+    }
+
+    pre code {
+      font-size: inherit;
     }
 
     blockquote {

@@ -1,15 +1,9 @@
 ---
 import { Image } from "astro:assets";
 import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
-import { externalLinks } from "@/lib/links";
+import { externalLinks, navLinks } from "@/lib/links";
 import { icons } from "@/utils/icons";
 import moneroLogo from "@/../public/meta/monerologo.avif";
-
-const navItems = [
-  { label: "About", href: "/about/" },
-  { label: "Rules", href: "/staff/" },
-  { label: "Wallet", href: "/wallet/" },
-];
 ---
 
 <header class="header">
@@ -43,7 +37,7 @@ const navItems = [
       </div>
       <ul class="nav-list">
         {
-          navItems.map(({ label, href }) => (
+          navLinks.map(({ label, href }) => (
             <li class="nav-item">
               <a class="link" href={href}>
                 {label}

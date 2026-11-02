@@ -16,16 +16,16 @@ const opensSummary = { popovertarget: "summary" };
 ---
 
 {
-  (proposal.address || proposal.fullyFunded) && (
+  proposal.status === "funding-required" && (
     <BottomBar>
       <div class="contribute-row">
         <ProposalProgress {proposal} class="progress" />
-        {proposal.fullyFunded ? (
-          <Button class="funded" variant="secondary" {...disabled}>
-            Fully funded
-          </Button>
-        ) : (
+        {proposal.address ? (
           <Button {...opensSummary}>Contribute</Button>
+        ) : (
+          <Button class="closed" variant="secondary" {...disabled}>
+            {proposal.fullyFunded ? "Fully funded" : "Unavailable"}
+          </Button>
         )}
       </div>
     </BottomBar>
@@ -48,7 +48,7 @@ const opensSummary = { popovertarget: "summary" };
     min-inline-size: 0;
   }
 
-  .funded {
+  .closed {
     pointer-events: none;
   }
 

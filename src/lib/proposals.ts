@@ -31,6 +31,8 @@ export type Proposal = {
   percentage: number;
   milestonesCompleted: number;
   address: string;
+  // needs funding, but has no address to take it
+  addressMissing: boolean;
   milestones: Milestone[];
   payouts: Payout[];
   body: string;
@@ -197,11 +199,15 @@ function toProposal(
     percentage: entry.percentage ?? 0,
     milestonesCompleted: entry["milestones-completed"] ?? 0,
     address: acceptsDonations ? address : "",
+    addressMissing: needsFunding && !acceptsDonations,
     milestones: file?.milestones ?? [],
     payouts: file?.payouts ?? [],
     body: file?.body ?? "",
   };
 }
+
+export const addressMissingText =
+  "The donation address isn't available right now.";
 
 export function contributionsText(count: number): string {
   return `${count} ${count === 1 ? "contribution" : "contributions"}`;
