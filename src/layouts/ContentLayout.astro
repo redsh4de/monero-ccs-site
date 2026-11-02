@@ -16,6 +16,7 @@ const { title, lead } = Astro.props.frontmatter;
     <h1>{title}</h1>
     {lead && <p class="lead">{lead}</p>}
     <Prose><slot /></Prose>
+    <slot name="after" />
   </div>
 </Layout>
 

@@ -1,0 +1,47 @@
+---
+import donateQr from "@/assets/donate-monero.png";
+import Button from "@/components/ui/Button.astro";
+import DonationAddress from "@/components/ui/DonationAddress.astro";
+import StageCard from "@/components/ui/StageCard.astro";
+import ContentLayout from "@/layouts/ContentLayout.astro";
+import { generalFundAddress } from "@/lib/generalFund";
+---
+
+<ContentLayout frontmatter={{ title: "Donate to the Monero Project" }}>
+  <p>
+    By donating to the following Monero address (General Fund), you are
+    supporting the Monero Project. If you wish to donate to a specific proposal,
+    please see <a href="/funding-required/">Funding Required</a>.
+  </p>
+
+  <Fragment slot="after">
+    <StageCard
+      as="section"
+      class="general-fund"
+      color="var(--monero-orange)"
+      aria-label="General Fund"
+    >
+      <DonationAddress address={generalFundAddress} qrImage={donateQr.src} />
+      <Button href={`monero:${generalFundAddress}`}>Open in wallet</Button>
+    </StageCard>
+  </Fragment>
+</ContentLayout>
+
+<style>
+  .general-fund {
+    --qr-size: 250px;
+
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    padding: var(--space-lg);
+  }
+
+  /* phones keep the card full width */
+  @media (width >= 600px) {
+    .general-fund {
+      align-self: center;
+      inline-size: 21rem;
+    }
+  }
+</style>
