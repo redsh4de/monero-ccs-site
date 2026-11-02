@@ -1,8 +1,8 @@
 ---
 import SectionHeading from "@/components/pages/index/SectionHeading.astro";
-import Card from "@/components/ui/Card.astro";
 import CardLink from "@/components/ui/CardLink.astro";
 import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
+import StageCard from "@/components/ui/StageCard.astro";
 import { stages } from "@/lib/stages";
 import { icons } from "@/utils/icons";
 ---
@@ -14,7 +14,7 @@ import { icons } from "@/utils/icons";
   <ol>
     {
       stages.map((stage) => (
-        <Card as="li" class="step" color={stage.color} hover>
+        <StageCard as="li" class="step" color={stage.color} hover>
           <div class="step-title">
             <span class="step-icon">
               <MaskIcon src={icons.mask(stage.icon)} size="1rem" />
@@ -24,7 +24,7 @@ import { icons } from "@/utils/icons";
             </h3>
           </div>
           <p>{stage.description}</p>
-        </Card>
+        </StageCard>
       ))
     }
   </ol>

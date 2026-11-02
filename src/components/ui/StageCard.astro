@@ -17,7 +17,7 @@ const {
 ---
 
 <Tag
-  class:list={["card", className]}
+  class:list={["stage-card", className]}
   data-hover={hover || undefined}
   style={color && `--stage-color: ${color}`}
   {...rest}
@@ -26,7 +26,7 @@ const {
 </Tag>
 
 <style>
-  .card {
+  .stage-card {
     background: var(--card-color);
     border-block-start: 4px solid var(--stage-color);
     border-radius: 0 0 var(--radius-md) var(--radius-md);

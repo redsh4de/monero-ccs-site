@@ -2,10 +2,10 @@
 /* eslint-disable astro/jsx-a11y/no-autofocus -- moves focus into the drawer as it opens, never on page load */
 import ProposalMeta from "@/components/pages/proposals/ProposalMeta.astro";
 import ProposalProgress from "@/components/pages/proposals/ProposalProgress.astro";
-import Card from "@/components/ui/Card.astro";
 import Button from "@/components/ui/Button.astro";
 import DonationAddress from "@/components/ui/DonationAddress.astro";
 import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
+import StageCard from "@/components/ui/StageCard.astro";
 import { contributionsText, type Proposal } from "@/lib/proposals";
 import { icons } from "@/utils/icons";
 import { qrCode } from "@/utils/qrCode";
@@ -27,7 +27,7 @@ const uri = `monero:${proposal.address}`;
 const qrImage = proposal.address ? await qrCode(uri) : "";
 ---
 
-<Card
+<StageCard
   as="aside"
   id="summary"
   class="summary"
@@ -73,7 +73,7 @@ const qrImage = proposal.address ? await qrCode(uri) : "";
   }
 
   {proposal.address && <Button href={uri}>Open in wallet</Button>}
-</Card>
+</StageCard>
 
 <style>
   /* one element is the side card, the page card and the drawer, so this undoes
