@@ -1,0 +1,36 @@
+---
+import BackLink from "@/components/ui/BackLink.astro";
+import Prose from "@/components/ui/Prose.astro";
+import Layout from "@/layouts/Layout.astro";
+
+interface Props {
+  frontmatter: { title: string };
+}
+
+const { title } = Astro.props.frontmatter;
+---
+
+<Layout {title}>
+  <div class="content">
+    <BackLink href="/">Home</BackLink>
+    <h1>{title}</h1>
+    <Prose><slot /></Prose>
+  </div>
+</Layout>
+
+<style>
+  .content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    inline-size: 100%;
+    max-inline-size: 48rem;
+    margin-inline: auto;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: var(--font-size-3xl);
+    line-height: var(--line-height-title);
+  }
+</style>
