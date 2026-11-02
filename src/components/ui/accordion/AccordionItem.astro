@@ -1,4 +1,5 @@
 ---
+import type { HTMLTag } from "astro/types";
 import DOMPurify from "isomorphic-dompurify";
 import MaskIcon from "../icons/MaskIcon.astro";
 import { icons } from "@/utils/icons";
@@ -9,9 +10,18 @@ export interface Props {
   variant?: "default" | "card";
   name?: string | undefined;
   open?: boolean;
+  headingLevel?: 2 | 3 | 4 | 5 | 6 | undefined;
 }
 
-const { title, content, variant = "default", name, open = false } = Astro.props;
+const {
+  title,
+  content,
+  variant = "default",
+  name,
+  open = false,
+  headingLevel,
+} = Astro.props;
+const Title = (headingLevel ? `h${headingLevel}` : "span") as HTMLTag;
 ---
 
 <details
@@ -21,10 +31,10 @@ const { title, content, variant = "default", name, open = false } = Astro.props;
   open={open}
 >
   <summary class="header">
-    <span class="title">{title}</span>
-    <div class="icon">
+    <Title class="title">{title}</Title>
+    <span class="icon">
       <MaskIcon src={icons.mask("chevron-down")} />
-    </div>
+    </span>
   </summary>
   {
     content ? (
@@ -62,6 +72,7 @@ const { title, content, variant = "default", name, open = false } = Astro.props;
   }
 
   .title {
+    margin: 0;
     color: var(--heading-color);
     font-weight: var(--font-weight-semibold);
     font-size: var(--font-size-lg);
@@ -121,6 +132,11 @@ const { title, content, variant = "default", name, open = false } = Astro.props;
 
     > .content {
       padding: 0 0 var(--space-lg) 0;
+
+      /* code on the card sits on the page colour */
+      & :global(pre) {
+        background: var(--bg-color);
+      }
     }
   }
 
