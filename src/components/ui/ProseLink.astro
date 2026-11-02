@@ -1,0 +1,16 @@
+---
+import type { HTMLAttributes } from "astro/types";
+
+type Props = HTMLAttributes<"a">;
+
+const { href, ...rest } = Astro.props;
+// web links leave the site; irc: and the like hand over to their app
+const external = /^https?:/i.test(String(href));
+---
+
+<a
+  {href}
+  target={external ? "_blank" : undefined}
+  rel={external ? "noopener noreferrer external" : undefined}
+  {...rest}><slot /></a
+>

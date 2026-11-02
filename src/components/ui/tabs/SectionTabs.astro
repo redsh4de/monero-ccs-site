@@ -140,6 +140,13 @@ const uid = `stabs-${stableId(tabs.map((t) => t.label))}`;
     display: none;
   }
 
+  /* hidden tabs still print */
+  @media print {
+    .tab-panel {
+      display: block;
+    }
+  }
+
   @for $i from 1 through 5 {
     .tab-input:nth-of-type(#{$i}):checked
       ~ .tab-labels

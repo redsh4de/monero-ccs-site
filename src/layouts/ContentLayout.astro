@@ -4,16 +4,17 @@ import Prose from "@/components/ui/Prose.astro";
 import Layout from "@/layouts/Layout.astro";
 
 interface Props {
-  frontmatter: { title: string };
+  frontmatter: { title: string; lead?: string | undefined };
 }
 
-const { title } = Astro.props.frontmatter;
+const { title, lead } = Astro.props.frontmatter;
 ---
 
 <Layout {title}>
   <div class="content">
     <BackLink href="/">Home</BackLink>
     <h1>{title}</h1>
+    {lead && <p class="lead">{lead}</p>}
     <Prose><slot /></Prose>
   </div>
 </Layout>
@@ -32,5 +33,11 @@ const { title } = Astro.props.frontmatter;
     margin: 0;
     font-size: var(--font-size-3xl);
     line-height: var(--line-height-title);
+  }
+
+  .lead {
+    margin: 0;
+    font-size: var(--font-size-lg);
+    color: var(--heading-color);
   }
 </style>
