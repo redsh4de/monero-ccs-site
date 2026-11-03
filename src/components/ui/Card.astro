@@ -25,9 +25,6 @@ const {
   class: className,
   ...rest
 }: Props = Astro.props;
-
-const cardPadding = padding === "none" ? "0" : `var(--space-${padding})`;
-const cardRadius = radius === "none" ? "0" : `var(--radius-${radius})`;
 ---
 
 <Tag
@@ -35,7 +32,8 @@ const cardRadius = radius === "none" ? "0" : `var(--radius-${radius})`;
   data-border={border || undefined}
   data-hover={hover || undefined}
   data-transparent={transparent || undefined}
-  style={`--card-padding: ${cardPadding}; --card-radius: ${cardRadius}`}
+  data-padding={padding}
+  data-radius={radius}
   {...rest}
 >
   <slot />
@@ -44,8 +42,48 @@ const cardRadius = radius === "none" ? "0" : `var(--radius-${radius})`;
 <style>
   .card {
     background: var(--card-color);
-    padding: var(--card-padding);
-    border-radius: var(--card-radius);
+    padding: var(--space-xl);
+    border-radius: var(--radius-md);
+
+    &[data-padding="none"] {
+      padding: 0;
+    }
+
+    &[data-padding="xs"] {
+      padding: var(--space-xs);
+    }
+
+    &[data-padding="sm"] {
+      padding: var(--space-sm);
+    }
+
+    &[data-padding="md"] {
+      padding: var(--space-md);
+    }
+
+    &[data-padding="lg"] {
+      padding: var(--space-lg);
+    }
+
+    &[data-padding="2xl"] {
+      padding: var(--space-2xl);
+    }
+
+    &[data-radius="none"] {
+      border-radius: 0;
+    }
+
+    &[data-radius="sm"] {
+      border-radius: var(--radius-sm);
+    }
+
+    &[data-radius="lg"] {
+      border-radius: var(--radius-lg);
+    }
+
+    &[data-radius="xl"] {
+      border-radius: var(--radius-xl);
+    }
 
     &[data-border] {
       border: 1px solid var(--border-color);
