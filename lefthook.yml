@@ -18,5 +18,6 @@ pre-commit:
 pre-push:
   commands:
     render:
-      # the example data has every state, so a template and the render can't drift apart
-      run: pnpm build && pnpm render
+      # the example data has every state, so a template and the render can't drift
+      # apart, and the CSP blocks inline styles, so no page may have one
+      run: pnpm build && pnpm render && ! grep -rlE '<style|[[:space:]]style="' dist --include='*.html'
