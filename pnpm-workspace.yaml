@@ -1,5 +1,6 @@
+# no package runs code at install; the git hooks are installed by hand, once
 allowBuilds:
-  lefthook: true
+  lefthook: false
   esbuild: false
   "@parcel/watcher": false
   sharp: false

@@ -23,6 +23,9 @@ pnpm-debug.log*
 # jetbrains setting folder
 .idea/
 
+# a release build's output (deploy/release.sh)
+release-site-v*/
+
 # the render's body cache (pnpm render)
 .render-cache/
 

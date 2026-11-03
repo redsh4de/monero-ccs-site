@@ -3,13 +3,14 @@
   "type": "module",
   "version": "0.0.1",
   "engines": {
-    "node": ">=22.x"
+    "node": ">=22.x",
+    "pnpm": ">=11.4.0"
   },
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
     "render:image": "podman build -t ccs-render -f deploy/Containerfile.render .",
-    "render": "podman run --rm -v \"$PWD\":/w:z -w /w ccs-render python3 -B deploy/render/render.py example-data dist/templates dist .render-cache",
+    "render": "mkdir -p .render-cache && podman run --rm --network=none -v \"$PWD\":/w:ro,z -v \"$PWD/dist\":/w/dist:z -v \"$PWD/.render-cache\":/w/.render-cache:z -w /w ccs-render python3 -B deploy/render/render.py example-data dist/templates dist .render-cache",
     "preview": "astro build && pnpm render && astro preview",
     "astro": "astro",
     "check": "astro check",
