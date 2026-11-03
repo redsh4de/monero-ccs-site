@@ -6,18 +6,20 @@ with no client-side JavaScript.
 
 ## Development
 
-Requires Node 22 or later and pnpm.
+Requires Node 22 or later, pnpm and podman. Run `pnpm render:image` once, then
+`pnpm preview` to see the site with the sample data in `example-data/`.
 
-`pnpm dev` and `pnpm check` use the example proposals in `example-data/`. `pnpm build`
-reads `_data/` and `proposals/` from ccs-back, and fails if they're missing.
+| Command             | Action                                             |
+| :------------------ | :------------------------------------------------- |
+| `pnpm install`      | Install dependencies                               |
+| `pnpm render:image` | Build the render container (once)                  |
+| `pnpm dev`          | Start the dev server, with the data pages unfilled |
+| `pnpm build`        | Build the static pages and templates               |
+| `pnpm render`       | Render `example-data/` into `dist/`                |
+| `pnpm preview`      | Build, render and serve the site                   |
+| `pnpm check`        | Type check                                         |
+| `pnpm lint`         | Lint TypeScript and Astro files                    |
+| `pnpm lint:css`     | Lint CSS                                           |
+| `pnpm format`       | Format with Prettier                               |
 
-| Command         | Action                                      |
-| :-------------- | :------------------------------------------ |
-| `pnpm install`  | Install dependencies                        |
-| `pnpm dev`      | Start the dev server at `localhost:4321`    |
-| `pnpm build`    | Build the site from ccs-back's data         |
-| `pnpm build:example` | Build the site from `example-data/`    |
-| `pnpm check`    | Type check                                  |
-| `pnpm lint`     | Lint TypeScript and Astro files             |
-| `pnpm lint:css` | Lint CSS                                    |
-| `pnpm format`   | Format with Prettier                        |
+[DEPLOYMENT.md](DEPLOYMENT.md) explains how the live site fills in its data.
