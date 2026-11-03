@@ -3,6 +3,7 @@
 markdown-it-py renders GitHub-flavoured Markdown (tables, strikethrough, bare
 links) plus footnotes. On the way, the token stream is narrowed:
 - links and images may only go to http, https, mailto or a relative path;
+- table alignment becomes a class, since the CSP blocks inline styles;
 - images become links, since inline images from other hosts would leak every
   visitor's IP;
 - raw HTML is escaped, comments dropped, and only six tags turned back;
@@ -91,6 +92,9 @@ def narrow(tokens: list[Token]) -> None:
                 token.content = REMOVED
         elif token.type in ("fence", "code_block") and has_address(token.content):
             token.content = REMOVED
+        elif token.type in ("th_open", "td_open") and "style" in token.attrs:
+            align = str(token.attrs.pop("style")).removeprefix("text-align:")
+            token.attrs["class"] = f"align-{align}"
 
 
 def render(markdown: str) -> str:
