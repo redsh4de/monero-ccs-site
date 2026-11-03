@@ -1,0 +1,15 @@
+[Unit]
+Description=Render the CCS site and switch to it
+
+[Service]
+Type=oneshot
+User=ccs-update
+ExecStart=/usr/local/lib/ccs/current/deploy/web/update.sh
+PrivateNetwork=yes
+IPAddressDeny=any
+# rsync's own pipes, and nothing else
+RestrictAddressFamilies=AF_UNIX
+ReadWritePaths=/var/lib/ccs
+ReadOnlyPaths=/var/lib/ccs/in
+MemoryMax=1G
+TimeoutStartSec=600

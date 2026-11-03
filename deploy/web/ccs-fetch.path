@@ -1,0 +1,8 @@
+[Unit]
+Description=Fetch the CCS site's content after each values push
+
+[Path]
+PathChanged=/var/lib/ccs/in/values
+
+[Install]
+WantedBy=multi-user.target

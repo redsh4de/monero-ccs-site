@@ -1,0 +1,23 @@
+[Unit]
+Description=Compare the live CCS site with its own render, over Tor
+Wants=tor.service
+After=tor.service
+
+[Service]
+Type=oneshot
+DynamicUser=yes
+StateDirectory=ccs-monitor
+# every request, alerts included, goes through Tor's socket. Its own network has
+# nothing on it, so the machine's local services, the wallet's RPC among them,
+# are out of reach whatever ccs-back's settings.
+Environment=ALL_PROXY=socks5h://localhost/run/tor/socks
+PrivateNetwork=yes
+IPAddressDeny=any
+RestrictAddressFamilies=AF_UNIX
+# its files are its own; no other user reads them
+UMask=0077
+ExecStart=/usr/local/lib/ccs/current/deploy/backend/monitor.sh
+# the alert URL, handed to this unit alone
+LoadCredential=alert_url:/etc/ccs/alert_url
+MemoryMax=1G
+TimeoutStartSec=1800

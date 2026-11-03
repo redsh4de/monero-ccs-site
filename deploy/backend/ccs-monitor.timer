@@ -1,0 +1,10 @@
+[Unit]
+Description=Compare the live CCS site with its own render, at random times
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=15min
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,14 @@
+[Unit]
+Description=Push the CCS values to the web server
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+DynamicUser=yes
+# systemd hands the key to each run; it stays root-only on disk
+LoadCredential=push_key:/etc/ccs/push_key
+StandardInput=file:/var/lib/ccs-backend/values
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ExecStart=/usr/bin/ssh -i %d/push_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/etc/ccs/known_hosts -o ConnectTimeout=20 -o ServerAliveInterval=15 ccs-fetch@${WEB_HOST}
+TimeoutStartSec=120
