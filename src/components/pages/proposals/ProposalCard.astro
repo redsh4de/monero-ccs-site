@@ -3,56 +3,46 @@ import ProposalMeta from "@/components/pages/proposals/ProposalMeta.astro";
 import ProposalProgress from "@/components/pages/proposals/ProposalProgress.astro";
 import CardLink from "@/components/ui/CardLink.astro";
 import StageCard from "@/components/ui/StageCard.astro";
-import { contributionsText, type Proposal } from "@/lib/proposals";
-import { stages } from "@/lib/stages";
 
+// a template: the render passes one card's item as `it`
 interface Props {
-  proposal: Proposal;
   variant?: "full" | "simple";
 }
 
-const { proposal, variant = "full" } = Astro.props;
+const { variant = "full" } = Astro.props;
 
-const color =
-  stages.find((stage) => stage.status === proposal.status)?.color ??
-  "var(--border-color)";
 const simple = variant === "simple";
 const Title = simple ? "h3" : "h2";
 
 const meta = [
-  { icon: "user", text: proposal.author, show: proposal.author },
-  { icon: "calendar", text: proposal.date, show: !simple && proposal.date },
+  { icon: "user", text: "[[ it.author ]]", when: "it.author", show: true },
+  { icon: "calendar", text: "[[ it.date ]]", when: "it.date", show: !simple },
   {
     icon: "users",
-    text: contributionsText(proposal.contributions),
-    show: proposal.status !== "idea",
+    text: "[[ it.contributions ]] contribution[% if it.contributions != 1 %]s[% endif %]",
+    when: "it.listed",
+    show: true,
   },
   {
     icon: "coins",
-    text: `${proposal.amount} XMR`,
-    show: !simple && proposal.amount,
+    text: "[[ it.amount ]] XMR",
+    when: "it.amount",
+    show: !simple,
   },
 ];
 ---
 
 <StageCard
   as="article"
-  class="proposal-card"
+  class="proposal-card stage-[[ it.stage ]]"
   data-variant={variant}
-  {color}
-  hover={Boolean(proposal.url)}
 >
   <Title class="proposal-title">
-    {
-      proposal.url ? (
-        <CardLink href={proposal.url}>{proposal.title}</CardLink>
-      ) : (
-        proposal.title
-      )
-    }
+    [% if it.url %]<CardLink href="[[ it.url ]]">[[ it.title ]]</CardLink>[%
+    else %][[ it.title ]][% endif %]
   </Title>
   <ProposalMeta class="meta" items={meta.filter((item) => item.show)} />
-  <ProposalProgress {proposal} class="progress" />
+  [% if it.listed %]<ProposalProgress class="progress" />[% endif %]
 </StageCard>
 
 <style>

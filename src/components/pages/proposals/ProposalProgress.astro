@@ -1,53 +1,36 @@
 ---
-import type { Proposal } from "@/lib/proposals";
-
 interface Props {
-  proposal: Proposal;
   class?: string;
 }
 
-const { proposal, class: className, ...rest } = Astro.props;
-
-const raised = proposal.amountFunded || 0;
+const { class: className, ...rest } = Astro.props;
 ---
 
-{
-  proposal.status === "funding-required" && (
-    <div class={className} {...rest}>
-      <div class="progress-text">
-        Raised {proposal.amount ? `${raised} of ${proposal.amount}` : raised}{" "}
-        XMR
-      </div>
-      <div class="progress-track">
-        <div
-          class="progress-fill"
-          style={`width: ${Math.min(proposal.percentage, 100)}%`}
-        />
-      </div>
-    </div>
-  )
-}
-
-{
-  proposal.status === "work-in-progress" && proposal.milestones.length > 0 && (
-    <div class={className} {...rest}>
-      <div class="progress-text">
-        Completed {proposal.milestonesCompleted} of {proposal.milestones.length}{" "}
-        milestones
-      </div>
-      <div class="milestone-track">
-        {proposal.milestones.map((_, index) => (
-          <div
-            class:list={[
-              "milestone-segment",
-              { active: index < proposal.milestonesCompleted },
-            ]}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
+[% if it.funding %]
+<div class={className} {...rest}>
+  <div class="progress-text">
+    Raised [[ it.raised ]] [% if it.amount %]of [[ it.amount ]] [% endif %]XMR
+  </div>
+  <progress class="progress-track" max="100" value="[[ it.percent ]]"
+    >[[ it.percent ]]%</progress
+  >
+</div>
+[% elif it.in_progress and it.milestones %]
+<div class={className} {...rest}>
+  <div class="progress-text">
+    Completed [[ it.milestones_done ]] of [[ it.milestones|length ]] milestones
+  </div>
+  <div class="milestone-track">
+    [% for i in range(it.milestones_done) %]<div
+      class="milestone-segment active"
+    >
+    </div>[% endfor %][% for i in range(it.milestones_left) %]<div
+      class="milestone-segment"
+    >
+    </div>[% endfor %]
+  </div>
+</div>
+[% endif %]
 
 <style>
   .progress-text {
@@ -63,12 +46,23 @@ const raised = proposal.amountFunded || 0;
   }
 
   .progress-track {
+    display: block;
+    inline-size: 100%;
     block-size: 8px;
     overflow: hidden;
+    border: 0;
+    appearance: none;
   }
 
-  .progress-fill {
-    block-size: 100%;
+  .progress-track::-webkit-progress-bar {
+    background-color: transparent;
+  }
+
+  .progress-track::-webkit-progress-value {
+    background-color: var(--stage-color);
+  }
+
+  .progress-track::-moz-progress-bar {
     background-color: var(--stage-color);
   }
 

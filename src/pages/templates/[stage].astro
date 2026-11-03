@@ -1,6 +1,4 @@
 ---
-import { getCollection } from "astro:content";
-
 import ProposalCard from "@/components/pages/proposals/ProposalCard.astro";
 import Button from "@/components/ui/Button.astro";
 import Layout from "@/layouts/Layout.astro";
@@ -20,12 +18,6 @@ interface Props {
 }
 
 const { status, label } = Astro.props;
-
-const entries = await getCollection(
-  "proposals",
-  (entry) => entry.data.status === status,
-);
-const proposals = entries.map((entry) => entry.data);
 ---
 
 <Layout title={label}>
@@ -42,13 +34,9 @@ const proposals = entries.map((entry) => entry.data);
     }
 
     <div class="proposals">
-      {
-        proposals.length > 0 ? (
-          proposals.map((proposal) => <ProposalCard {proposal} />)
-        ) : (
-          <p class="empty">Nothing here right now.</p>
-        )
-      }
+      [% for it in cards %]<ProposalCard />[% else %]<p class="empty">
+        Nothing here right now.
+      </p>[% endfor %]
     </div>
   </StageLayout>
 </Layout>

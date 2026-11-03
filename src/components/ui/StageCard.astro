@@ -4,21 +4,13 @@ import type { HTMLTag, Polymorphic } from "astro/types";
 type Props<T extends HTMLTag> = Polymorphic<{
   as: T;
   color?: string;
-  hover?: boolean;
 }>;
 
-const {
-  as: Tag = "div",
-  class: className,
-  color,
-  hover,
-  ...rest
-} = Astro.props;
+const { as: Tag = "div", class: className, color, ...rest } = Astro.props;
 ---
 
 <Tag
   class:list={["stage-card", className]}
-  data-hover={hover || undefined}
   style={color && `--stage-color: ${color}`}
   {...rest}
 >
@@ -33,7 +25,7 @@ const {
     border-radius: 0 0 var(--radius-md) var(--radius-md);
     box-shadow: var(--shadow-sm);
 
-    &[data-hover] {
+    &:has(.card-link) {
       position: relative;
       transition:
         transform 0.15s ease,
