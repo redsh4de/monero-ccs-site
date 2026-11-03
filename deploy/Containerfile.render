@@ -1,0 +1,6 @@
+# The render's tools at production's versions (Debian 13), for local previews
+FROM docker.io/library/debian:trixie
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3-yaml python3-markdown-it \
+    python3-mdit-py-plugins python3-jinja2 qrencode \
+  && rm -rf /var/lib/apt/lists/*

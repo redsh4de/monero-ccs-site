@@ -2,35 +2,26 @@
 import ProposalProgress from "@/components/pages/proposals/ProposalProgress.astro";
 import BottomBar from "@/components/ui/BottomBar.astro";
 import Button from "@/components/ui/Button.astro";
-import type { Proposal } from "@/lib/proposals";
-
-interface Props {
-  proposal: Proposal;
-}
-
-const { proposal } = Astro.props;
 
 // Button's types only allow attributes its tags share, so these need a spread
 const disabled = { disabled: true };
 const opensSummary = { popovertarget: "summary" };
 ---
 
-{
-  proposal.status === "funding-required" && (
-    <BottomBar>
-      <div class="contribute-row">
-        <ProposalProgress {proposal} class="progress" />
-        {proposal.address ? (
-          <Button {...opensSummary}>Contribute</Button>
-        ) : (
-          <Button class="closed" variant="secondary" {...disabled}>
-            {proposal.fullyFunded ? "Fully funded" : "Unavailable"}
-          </Button>
-        )}
-      </div>
-    </BottomBar>
-  )
-}
+[% if it.funding %]
+<BottomBar>
+  <div class="contribute-row">
+    <ProposalProgress class="progress" />
+    [% if it.open %]<Button {...opensSummary}>Contribute</Button>[% else %]<Button
+      class="closed"
+      variant="secondary"
+      {...disabled}
+    >
+      [% if it.fully_funded %]Fully funded[% else %]Unavailable[% endif %]
+    </Button>[% endif %]
+  </div>
+</BottomBar>
+[% endif %]
 
 <style>
   .contribute-row {

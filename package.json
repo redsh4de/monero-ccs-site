@@ -6,12 +6,13 @@
     "node": ">=22.x"
   },
   "scripts": {
-    "dev": "CCS_DATA_ROOT=example-data astro dev",
+    "dev": "astro dev",
     "build": "astro build",
-    "build:example": "CCS_DATA_ROOT=example-data astro build",
-    "preview": "astro preview",
+    "render:image": "podman build -t ccs-render -f deploy/Containerfile.render .",
+    "render": "podman run --rm -v \"$PWD\":/w:z -w /w ccs-render python3 -B deploy/render/render.py example-data dist/templates dist .render-cache",
+    "preview": "astro build && pnpm render && astro preview",
     "astro": "astro",
-    "check": "CCS_DATA_ROOT=example-data astro check",
+    "check": "astro check",
     "lint": "eslint .",
     "lint:css": "stylelint \"src/**/*.{css,astro}\"",
     "lint:fix": "eslint . --fix",
@@ -22,12 +23,8 @@
     "@astrojs/mdx": "^8.1.0",
     "@fontsource-variable/dm-sans": "^5.3.0",
     "astro": "^7.3.2",
-    "isomorphic-dompurify": "^2.36.0",
-    "marked": "^17.0.6",
     "sass": "^1.105.2",
-    "sharp": "^0.35.4",
-    "uqr": "0.1.3",
-    "yaml": "^2.9.1"
+    "sharp": "^0.35.4"
   },
   "packageManager": "pnpm@11.4.0",
   "devDependencies": {

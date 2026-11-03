@@ -6,71 +6,59 @@ import Button from "@/components/ui/Button.astro";
 import DonationAddress from "@/components/ui/DonationAddress.astro";
 import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
 import StageCard from "@/components/ui/StageCard.astro";
-import {
-  addressMissingText,
-  contributionsText,
-  type Proposal,
-} from "@/lib/proposals";
 import { icons } from "@/utils/icons";
-import { qrCode } from "@/utils/qrCode";
 
-interface Props {
-  proposal: Proposal;
-  heading: string;
-}
-
-const { proposal, heading } = Astro.props;
-
-const meta = [];
-if (proposal.status !== "funding-required" && proposal.amount) {
-  meta.push({ icon: "coins", text: `${proposal.amount} XMR` });
-}
-meta.push({ icon: "users", text: contributionsText(proposal.contributions) });
-
-const uri = `monero:${proposal.address}`;
-const qrImage = proposal.address ? await qrCode(uri) : "";
+const meta = [
+  {
+    icon: "coins",
+    text: "[[ it.amount ]] XMR",
+    when: "it.amount and not it.funding",
+  },
+  {
+    icon: "users",
+    text: "[[ it.contributions ]] contribution[% if it.contributions != 1 %]s[% endif %]",
+  },
+];
 ---
 
+{
+  /* popover is always set, and the drawer class only when donations are open;
+   the styles below undo the browser's popover hiding for the plain card */
+}
 <StageCard
   as="aside"
   id="summary"
-  class="summary"
-  aria-label={heading}
-  popover={proposal.address ? "auto" : undefined}
+  class="summary[% if it.open %] drawer[% endif %]"
+  aria-label="[[ it.summary_heading ]]"
+  popover="auto"
 >
   <div class="details">
-    <h2>{heading}</h2>
+    <h2>[[ it.summary_heading ]]</h2>
 
     <div class="top">
       <div class="numbers">
-        <ProposalProgress {proposal} class="progress" />
+        <ProposalProgress class="progress" />
         <ProposalMeta items={meta} />
       </div>
-      {
-        proposal.address && (
-          <button
-            class="close"
-            autofocus
-            popovertarget="summary"
-            popovertargetaction="hide"
-            aria-label="Close"
-          >
-            <MaskIcon src={icons.mask("close")} size="1.25rem" />
-          </button>
-        )
-      }
+      [% if it.open %]<button
+        class="close"
+        autofocus
+        popovertarget="summary"
+        popovertargetaction="hide"
+        aria-label="Close"
+      >
+        <MaskIcon src={icons.mask("close")} size="1.25rem" />
+      </button>[% endif %]
     </div>
 
-    {
-      proposal.address && (
-        <DonationAddress address={proposal.address} {qrImage} />
-      )
-    }
+    [% if it.open %]<DonationAddress />[% endif %]
   </div>
 
-  {proposal.addressMissing && <p>{addressMissingText}</p>}
-
-  {proposal.address && <Button href={uri}>Open in wallet</Button>}
+  [% if it.address_missing %]<p>
+    The donation address isn't available right now.
+  </p>[% endif %] [% if it.open %]<Button href="monero:[[ it.address ]]"
+    >Open in wallet</Button
+  >[% endif %]
 </StageCard>
 
 <style>
@@ -151,7 +139,7 @@ const qrImage = proposal.address ? await qrCode(uri) : "";
 
     /* without popover support the card stays on the page */
     @supports selector(:popover-open) {
-      .summary[popover] {
+      .summary.drawer {
         --qr-size: 10rem;
 
         position: fixed;
@@ -237,7 +225,7 @@ const qrImage = proposal.address ? await qrCode(uri) : "";
 
     /* a drawer left open on a phone sits where the side card goes, below the
        header, top margin, back link and gap */
-    .summary[popover]:popover-open {
+    .summary.drawer:popover-open {
       position: fixed;
       inset: 9.625rem
         max(
@@ -248,14 +236,14 @@ const qrImage = proposal.address ? await qrCode(uri) : "";
       inline-size: var(--summary-width);
     }
 
-    .summary[popover]::backdrop {
+    .summary.drawer::backdrop {
       display: none;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .summary[popover],
-    .summary[popover]::backdrop {
+    .summary.drawer,
+    .summary.drawer::backdrop {
       transition: none;
     }
   }

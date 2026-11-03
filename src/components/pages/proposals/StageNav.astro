@@ -1,6 +1,4 @@
 ---
-import { getCollection } from "astro:content";
-
 import BackLink from "@/components/ui/BackLink.astro";
 import BottomBar from "@/components/ui/BottomBar.astro";
 import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
@@ -13,10 +11,6 @@ interface Props {
 }
 
 const { current, class: className, ...rest } = Astro.props;
-
-const proposals = await getCollection("proposals");
-const count = (status: string) =>
-  proposals.filter((entry) => entry.data.status === status).length;
 ---
 
 <aside class={className} {...rest}>
@@ -46,7 +40,7 @@ const count = (status: string) =>
             </span>
             <span class="label">{stage.label}</span>
             <span class="short">{stage.short}</span>
-            <span class="count">{count(stage.status)}</span>
+            <span class="count" set:html={`[[ counts['${stage.slug}'] ]]`} />
           </a>
         ))
       }

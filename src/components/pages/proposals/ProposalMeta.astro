@@ -3,7 +3,8 @@ import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
 import { icons } from "@/utils/icons";
 
 interface Props {
-  items: { icon: string; text: string }[];
+  // when: a template condition; the item shows only if it holds
+  items: { icon: string; text: string; when?: string }[];
   class?: string;
 }
 
@@ -13,14 +14,18 @@ const { items, class: className, ...rest } = Astro.props;
 <div class:list={["proposal-meta", className]} {...rest}>
   {
     items.map((item) => (
-      <div class="meta-item">
-        <MaskIcon
-          src={icons.mask(item.icon)}
-          size="1.25em"
-          color="var(--monero-orange)"
-        />
-        <span>{item.text}</span>
-      </div>
+      <>
+        <Fragment set:html={item.when ? `[% if ${item.when} %]` : ""} />
+        <div class="meta-item">
+          <MaskIcon
+            src={icons.mask(item.icon)}
+            size="1.25em"
+            color="var(--monero-orange)"
+          />
+          <span>{item.text}</span>
+        </div>
+        <Fragment set:html={item.when ? "[% endif %]" : ""} />
+      </>
     ))
   }
 </div>

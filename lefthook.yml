@@ -14,3 +14,9 @@ pre-commit:
       glob: "*.{js,ts,jsx,tsx,astro,json,md,css}"
       run: npx prettier --write {staged_files}
       stage_fixed: true
+
+pre-push:
+  commands:
+    render:
+      # the example data has every state, so a template and the render can't drift apart
+      run: pnpm build && pnpm render

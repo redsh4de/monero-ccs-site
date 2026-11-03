@@ -14,7 +14,7 @@ import { icons } from "@/utils/icons";
   <ol>
     {
       stages.map((stage) => (
-        <StageCard as="li" class="step" color={stage.color} hover>
+        <StageCard as="li" class="step" color={stage.color}>
           <div class="step-title">
             <span class="step-icon">
               <MaskIcon src={icons.mask(stage.icon)} size="1rem" />
