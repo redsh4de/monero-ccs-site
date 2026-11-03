@@ -3,17 +3,12 @@ import type { HTMLTag, Polymorphic } from "astro/types";
 
 type Props<T extends HTMLTag> = Polymorphic<{
   as: T;
-  color?: string;
 }>;
 
-const { as: Tag = "div", class: className, color, ...rest } = Astro.props;
+const { as: Tag = "div", class: className, ...rest } = Astro.props;
 ---
 
-<Tag
-  class:list={["stage-card", className]}
-  style={color && `--stage-color: ${color}`}
-  {...rest}
->
+<Tag class:list={["stage-card", className]} {...rest}>
   <slot />
 </Tag>
 

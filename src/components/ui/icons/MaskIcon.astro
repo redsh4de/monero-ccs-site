@@ -1,29 +1,33 @@
 ---
-import type { ImageMetadata } from "astro";
-import { getImage } from "astro:assets";
+import "@/styles/icons.css";
+import iconRules from "@/styles/icons.css?raw";
 
+// a parent sets the size and colour with --icon-size and --icon-color
 export interface Props {
-  src: ImageMetadata;
-  size?: number | string;
-  color?: string;
+  name: string;
 }
 
-const { src, size = "1em", color = "currentColor" } = Astro.props;
+const { name } = Astro.props;
 
-const iconSize = typeof size === "number" ? `${size}px` : size;
-const iconSrc = await getImage({ src, format: "avif" }).then(
-  (img) => `url(${img.src})`,
-);
+// an icon needs its image and its rule in icons.css; Vite doesn't check CSS URLs
+const image = `/src/assets/icons/mask/${name}.avif`;
+const rule = `.icon-${name} {\n  --icon-src: url("../assets/icons/mask/${name}.avif");\n}`;
+if (!import.meta.glob("/src/assets/icons/mask/*.avif")[image]) {
+  throw new Error(`No image for icon "${name}": add ${image}`);
+}
+if (!iconRules.includes(rule)) {
+  throw new Error(`No rule for icon "${name}" in src/styles/icons.css`);
+}
 ---
 
-<span class="icon"></span>
+<span class={`icon icon-${name}`}></span>
 
-<style define:vars={{ iconSize, iconSrc, iconColor: color }}>
+<style>
   .icon {
     display: inline-block;
-    inline-size: var(--iconSize);
-    block-size: var(--iconSize);
-    background: var(--iconColor);
-    mask: var(--iconSrc) no-repeat center / contain;
+    inline-size: var(--icon-size, 1em);
+    block-size: var(--icon-size, 1em);
+    background: var(--icon-color, currentColor);
+    mask: var(--icon-src) no-repeat center / contain;
   }
 </style>

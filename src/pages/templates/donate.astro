@@ -14,12 +14,7 @@ import ContentLayout from "@/layouts/ContentLayout.astro";
   </p>
 
   <Fragment slot="after">
-    <StageCard
-      as="section"
-      class="general-fund"
-      color="var(--monero-orange)"
-      aria-label="General Fund"
-    >
+    <StageCard as="section" class="general-fund" aria-label="General Fund">
       [% if it.address %]<DonationAddress />
       <Button href="monero:[[ it.address ]]">Open in wallet</Button>[% else %]<p
       >
@@ -31,6 +26,7 @@ import ContentLayout from "@/layouts/ContentLayout.astro";
 
 <style>
   .general-fund {
+    --stage-color: var(--monero-orange);
     --qr-size: 250px;
 
     display: flex;

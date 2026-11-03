@@ -4,7 +4,6 @@ import CardLink from "@/components/ui/CardLink.astro";
 import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
 import StageCard from "@/components/ui/StageCard.astro";
 import { stages } from "@/lib/stages";
-import { icons } from "@/utils/icons";
 ---
 
 <section aria-labelledby="how-title">
@@ -14,10 +13,10 @@ import { icons } from "@/utils/icons";
   <ol>
     {
       stages.map((stage) => (
-        <StageCard as="li" class="step" color={stage.color}>
+        <StageCard as="li" class={`step stage-${stage.status}`}>
           <div class="step-title">
             <span class="step-icon">
-              <MaskIcon src={icons.mask(stage.icon)} size="1rem" />
+              <MaskIcon name={stage.icon} />
             </span>
             <h3>
               <CardLink href={`/${stage.slug}/`}>{stage.short}</CardLink>
@@ -54,6 +53,8 @@ import { icons } from "@/utils/icons";
   }
 
   .step-icon {
+    --icon-size: 1rem;
+
     display: flex;
     flex: none;
     align-items: center;

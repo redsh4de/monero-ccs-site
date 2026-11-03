@@ -1,6 +1,5 @@
 ---
 import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
-import { icons } from "@/utils/icons";
 
 interface Props {
   // when: a template condition; the item shows only if it holds
@@ -17,11 +16,7 @@ const { items, class: className, ...rest } = Astro.props;
       <>
         <Fragment set:html={item.when ? `[% if ${item.when} %]` : ""} />
         <div class="meta-item">
-          <MaskIcon
-            src={icons.mask(item.icon)}
-            size="1.25em"
-            color="var(--monero-orange)"
-          />
+          <MaskIcon name={item.icon} />
           <span>{item.text}</span>
         </div>
         <Fragment set:html={item.when ? "[% endif %]" : ""} />
@@ -40,6 +35,9 @@ const { items, class: className, ...rest } = Astro.props;
   }
 
   .meta-item {
+    --icon-color: var(--monero-orange);
+    --icon-size: 1.25em;
+
     display: flex;
     align-items: center;
     gap: var(--space-xs);

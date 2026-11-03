@@ -3,7 +3,6 @@ export const stages = [
     status: "idea",
     slug: "ideas",
     icon: "lightbulb",
-    color: "var(--status-idea-color)",
     label: "Ideas",
     short: "Ideas",
     description:
@@ -13,7 +12,6 @@ export const stages = [
     status: "funding-required",
     slug: "funding-required",
     icon: "hand-coins",
-    color: "var(--status-funding-color)",
     label: "Funding Required",
     short: "Funding",
     description: "Once approved, the idea moves to community fundraising.",
@@ -22,7 +20,6 @@ export const stages = [
     status: "work-in-progress",
     slug: "work-in-progress",
     icon: "cog",
-    color: "var(--status-wip-color)",
     label: "Work in Progress",
     short: "Progress",
     description:
@@ -32,7 +29,6 @@ export const stages = [
     status: "completed",
     slug: "completed-proposals",
     icon: "package",
-    color: "var(--status-completed-color)",
     label: "Completed",
     short: "Completed",
     description:
