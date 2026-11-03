@@ -159,3 +159,24 @@ tbody tr {
     box-shadow: none;
   }
 }
+
+/* a stage's colour on proposal pages and cards, set by the render */
+.stage-idea {
+  --stage-color: var(--status-idea-color);
+}
+
+.stage-funding-required {
+  --stage-color: var(--status-funding-color);
+}
+
+.stage-work-in-progress {
+  --stage-color: var(--status-wip-color);
+}
+
+.stage-completed {
+  --stage-color: var(--status-completed-color);
+}
+
+.stage-unlisted {
+  --stage-color: var(--border-color);
+}

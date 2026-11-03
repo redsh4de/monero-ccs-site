@@ -1,20 +1,15 @@
 ---
-interface Props {
-  address: string;
-  qrImage: string;
-}
-
-const { address, qrImage } = Astro.props;
+// a template: the render passes the address as `it.address`
 ---
 
 <img
   class="qr"
-  src={qrImage}
+  src="/qr/[[ it.address ]].png"
   alt="QR code for this Monero address"
   width="200"
   height="200"
 />
-<code title="Monero address">{address}</code>
+<code title="Monero address">[[ it.address ]]</code>
 
 <style>
   .qr {

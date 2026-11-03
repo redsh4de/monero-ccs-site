@@ -1,0 +1,170 @@
+---
+import ContributeBar from "@/components/pages/proposals/ContributeBar.astro";
+import ProposalMeta from "@/components/pages/proposals/ProposalMeta.astro";
+import ProposalMilestones from "@/components/pages/proposals/ProposalMilestones.astro";
+import ProposalSummary from "@/components/pages/proposals/ProposalSummary.astro";
+import BackLink from "@/components/ui/BackLink.astro";
+import Prose from "@/components/ui/Prose.astro";
+import SectionTabs from "@/components/ui/tabs/SectionTabs.astro";
+import Layout from "@/layouts/Layout.astro";
+
+// a template: the render passes one proposal as `it`
+const meta = [
+  { icon: "user", text: "[[ it.author ]]", when: "it.author" },
+  { icon: "calendar", text: "[[ it.date ]]", when: "it.date" },
+];
+
+const tabs = [
+  { label: "Proposal" },
+  { label: "Milestones" },
+  { label: "Payouts", when: "it.in_progress or it.completed" },
+];
+---
+
+<Layout title="[[ it.title ]]">
+  <div class="proposal stage-[[ it.stage ]]">
+    <BackLink href="[[ it.back_href ]]">[[ it.back_label ]]</BackLink>
+
+    <div class="columns">
+      <div class="heading">
+        <h1>[[ it.title ]]</h1>
+        <ProposalMeta items={meta} />
+        [% if it.address_missing %]<p class="no-address">
+          The donation address isn't available right now.
+        </p>[% endif %]
+      </div>
+
+      {/* on phones the bar is all a proposal without an address needs */}
+      [% if it.summary_heading %]<div
+        class="side[% if it.funding and not it.open %] desktop-only[% endif %]"
+      >
+        <ProposalSummary />
+      </div>[% endif %]
+
+      <SectionTabs {tabs}>
+        <Fragment slot="panel-0">
+          <Prose>[[ it.body ]]</Prose>
+          <div class="discussion">
+            <h2>Community discussion and updates</h2>
+            <a
+              href="[[ it.gitlab_url ]]"
+              target="_blank"
+              rel="noopener noreferrer external"
+            >
+              View community discussion, comments, and proposal updates on
+              GitLab
+            </a>
+          </div>
+        </Fragment>
+
+        <Fragment slot="panel-1">
+          [% if it.milestones %]<ProposalMilestones />[% else %]<p
+            class="empty"
+          >
+            No milestones listed.
+          </p>[% endif %]
+        </Fragment>
+
+        <Fragment slot="panel-2">
+          [% if it.payouts %]<table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Funds awarded</th>
+              </tr>
+            </thead>
+            <tbody>
+              [% for payout in it.payouts %]<tr>
+                <td>[[ payout.date ]]</td>
+                <td>[[ payout.amount ]]</td>
+              </tr>[% endfor %]
+            </tbody>
+          </table>[% else %]<p class="empty">No payouts yet.</p>[% endif %]
+        </Fragment>
+      </SectionTabs>
+    </div>
+
+    <ContributeBar />
+  </div>
+</Layout>
+
+<style>
+  .proposal {
+    --proposal-width: 80rem;
+    --summary-width: 21rem;
+
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    inline-size: 100%;
+    max-inline-size: var(--proposal-width);
+    margin-inline: auto;
+  }
+
+  .columns,
+  .heading {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    overflow-wrap: anywhere;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: var(--font-size-2xl);
+    line-height: var(--line-height-title);
+  }
+
+  .discussion {
+    margin-block-start: var(--space-xl);
+    padding-block-start: var(--space-md);
+    border-block-start: 1px solid var(--border-color);
+
+    h2 {
+      margin: 0 0 var(--space-xs);
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    a {
+      color: var(--orange-text);
+    }
+  }
+
+  .empty {
+    margin: 0;
+    color: var(--text-secondary);
+  }
+
+  /* phones only: desktop says so in the side card */
+  .no-address {
+    margin: 0;
+    color: var(--text-secondary);
+  }
+
+  @media (width < 1200px) {
+    .desktop-only {
+      display: none;
+    }
+  }
+
+  @media (width >= 1200px) {
+    .no-address {
+      display: none;
+    }
+
+    .columns:has(.side) {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) var(--summary-width);
+      grid-template-rows: auto 1fr;
+      gap: var(--space-md) var(--space-4xl);
+    }
+
+    .side {
+      position: sticky;
+      inset-block-start: var(--sticky-top);
+      grid-area: 1 / 2 / -1;
+      align-self: start;
+    }
+  }
+</style>

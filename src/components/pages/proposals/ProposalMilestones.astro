@@ -1,24 +1,15 @@
----
-import type { Milestone } from "@/lib/proposals";
-
-interface Props {
-  milestones: Milestone[];
-}
-
-const { milestones } = Astro.props;
----
-
 <ol>
-  {
-    milestones.map((milestone) => (
-      <li>
-        <h2>{milestone.name}</h2>
-        <span>{milestone.finished ? "Finished" : "Unfinished"}</span>
-        {milestone.funds && <p>To be paid: {milestone.funds}</p>}
-        {milestone.done && <p>Completion date: {milestone.done}</p>}
-      </li>
-    ))
-  }
+  [% for milestone in it.milestones %]
+  <li>
+    <h2>[[ milestone.name ]]</h2>
+    <span
+      >[% if milestone.finished %]Finished[% else %]Unfinished[% endif %]</span
+    >
+    [% if milestone.funds %]<p>To be paid: [[ milestone.funds ]]</p>[% endif %]
+    [% if milestone.done %]<p>Completion date: [[ milestone.done ]]</p>[% endif
+    %]
+  </li>
+  [% endfor %]
 </ol>
 
 <style>

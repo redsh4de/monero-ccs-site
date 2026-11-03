@@ -4,6 +4,8 @@ import { stableId } from "@/utils/stableId";
 interface Tab {
   label: string;
   count?: number;
+  // a template condition: the tab shows only if it holds
+  when?: string;
 }
 
 interface Props {
@@ -18,30 +20,40 @@ if (!tabs || tabs.length === 0) {
 }
 
 const uid = `stabs-${stableId(tabs.map((t) => t.label))}`;
+const open = (tab?: Tab) => (tab?.when ? `[% if ${tab.when} %]` : "");
+const close = (tab?: Tab) => (tab?.when ? "[% endif %]" : "");
 ---
 
 <div class:list={["section-tabs", className]} id={uid}>
   {
-    tabs.map((_, index) => (
-      <input
-        type="radio"
-        name={uid}
-        id={`${uid}-${index}`}
-        class="tab-input"
-        checked={index === 0}
-      />
+    tabs.map((tab, index) => (
+      <>
+        <Fragment set:html={open(tab)} />
+        <input
+          type="radio"
+          name={uid}
+          id={`${uid}-${index}`}
+          class="tab-input"
+          checked={index === 0}
+        />
+        <Fragment set:html={close(tab)} />
+      </>
     ))
   }
 
   <div class="tab-labels">
     {
       tabs.map((tab, index) => (
-        <label for={`${uid}-${index}`} class="tab-label">
-          {tab.label}
-          {tab.count !== undefined && (
-            <span class="tab-count">{tab.count}</span>
-          )}
-        </label>
+        <>
+          <Fragment set:html={open(tab)} />
+          <label for={`${uid}-${index}`} class="tab-label">
+            {tab.label}
+            {tab.count !== undefined && (
+              <span class="tab-count">{tab.count}</span>
+            )}
+          </label>
+          <Fragment set:html={close(tab)} />
+        </>
       ))
     }
   </div>
@@ -49,37 +61,57 @@ const uid = `stabs-${stableId(tabs.map((t) => t.label))}`;
   <div class="tab-panels">
     {
       tabs[0] && (
-        <div class="tab-panel">
-          <slot name="panel-0" />
-        </div>
+        <>
+          <Fragment set:html={open(tabs[0])} />
+          <div class="tab-panel">
+            <slot name="panel-0" />
+          </div>
+          <Fragment set:html={close(tabs[0])} />
+        </>
       )
     }
     {
       tabs[1] && (
-        <div class="tab-panel">
-          <slot name="panel-1" />
-        </div>
+        <>
+          <Fragment set:html={open(tabs[1])} />
+          <div class="tab-panel">
+            <slot name="panel-1" />
+          </div>
+          <Fragment set:html={close(tabs[1])} />
+        </>
       )
     }
     {
       tabs[2] && (
-        <div class="tab-panel">
-          <slot name="panel-2" />
-        </div>
+        <>
+          <Fragment set:html={open(tabs[2])} />
+          <div class="tab-panel">
+            <slot name="panel-2" />
+          </div>
+          <Fragment set:html={close(tabs[2])} />
+        </>
       )
     }
     {
       tabs[3] && (
-        <div class="tab-panel">
-          <slot name="panel-3" />
-        </div>
+        <>
+          <Fragment set:html={open(tabs[3])} />
+          <div class="tab-panel">
+            <slot name="panel-3" />
+          </div>
+          <Fragment set:html={close(tabs[3])} />
+        </>
       )
     }
     {
       tabs[4] && (
-        <div class="tab-panel">
-          <slot name="panel-4" />
-        </div>
+        <>
+          <Fragment set:html={open(tabs[4])} />
+          <div class="tab-panel">
+            <slot name="panel-4" />
+          </div>
+          <Fragment set:html={close(tabs[4])} />
+        </>
       )
     }
   </div>

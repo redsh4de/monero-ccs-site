@@ -1,10 +1,9 @@
 ---
-import donateQr from "@/assets/donate-monero.png";
 import Button from "@/components/ui/Button.astro";
 import DonationAddress from "@/components/ui/DonationAddress.astro";
 import StageCard from "@/components/ui/StageCard.astro";
 import ContentLayout from "@/layouts/ContentLayout.astro";
-import { generalFundAddress } from "@/lib/generalFund";
+// a template: the render passes the General Fund as `it`
 ---
 
 <ContentLayout frontmatter={{ title: "Donate to the Monero Project" }}>
@@ -21,8 +20,11 @@ import { generalFundAddress } from "@/lib/generalFund";
       color="var(--monero-orange)"
       aria-label="General Fund"
     >
-      <DonationAddress address={generalFundAddress} qrImage={donateQr.src} />
-      <Button href={`monero:${generalFundAddress}`}>Open in wallet</Button>
+      [% if it.address %]<DonationAddress />
+      <Button href="monero:[[ it.address ]]">Open in wallet</Button>[% else %]<p
+      >
+        The donation address isn't available right now.
+      </p>[% endif %]
     </StageCard>
   </Fragment>
 </ContentLayout>

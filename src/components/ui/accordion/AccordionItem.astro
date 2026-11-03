@@ -1,12 +1,10 @@
 ---
 import type { HTMLTag } from "astro/types";
-import DOMPurify from "isomorphic-dompurify";
 import MaskIcon from "../icons/MaskIcon.astro";
 import { icons } from "@/utils/icons";
 
 export interface Props {
   title: string;
-  content?: string;
   variant?: "default" | "card";
   name?: string | undefined;
   open?: boolean;
@@ -15,7 +13,6 @@ export interface Props {
 
 const {
   title,
-  content,
   variant = "default",
   name,
   open = false,
@@ -36,15 +33,9 @@ const Title = (headingLevel ? `h${headingLevel}` : "span") as HTMLTag;
       <MaskIcon src={icons.mask("chevron-down")} />
     </span>
   </summary>
-  {
-    content ? (
-      <div class="content" set:html={DOMPurify.sanitize(content)} />
-    ) : (
-      <div class="content">
-        <slot />
-      </div>
-    )
-  }
+  <div class="content">
+    <slot />
+  </div>
 </details>
 
 <style>
