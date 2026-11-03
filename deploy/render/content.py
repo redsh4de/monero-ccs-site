@@ -39,8 +39,8 @@ class Site:
     def stage_pages(self) -> dict[str, list[Proposal] | list[Idea]]:
         """Each stage page's path, also its template's name, mapped to its cards."""
         pages = {IDEAS_PAGE: self.ideas}
-        for stage in STAGES.values():
-            pages[stage.page] = [p for p in self.listed if p.stage == stage.name]
+        for name, stage in STAGES.items():
+            pages[stage.page] = [p for p in self.listed if p.stage == name]
         return pages
 
     @property
