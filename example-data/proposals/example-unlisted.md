@@ -3,7 +3,7 @@ layout: fr
 title: Example unlisted proposal
 author: example
 date: September 20, 2026
-amount: 10
+amount:
 milestones:
   - name: First part
     funds: 10
@@ -16,4 +16,4 @@ payouts:
 
 ## What
 
-An example proposal file that ccs-back doesn't list, so it has a page but no stage.
+An example proposal file without an amount. ccs-back doesn't list it, so it has a page but no stage.
