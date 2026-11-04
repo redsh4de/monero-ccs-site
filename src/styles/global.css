@@ -160,7 +160,7 @@ tbody tr {
   }
 }
 
-/* a stage's colour on proposal pages and cards, set by the render */
+/* each stage's colour, for any element with that stage's class */
 .stage-idea {
   --stage-color: var(--status-idea-color);
 }

@@ -1,0 +1,52 @@
+/* each MaskIcon's image, one rule per icon name */
+.icon-calendar {
+  --icon-src: url("../assets/icons/mask/calendar.avif");
+}
+
+.icon-chevron-down {
+  --icon-src: url("../assets/icons/mask/chevron-down.avif");
+}
+
+.icon-chevron-left {
+  --icon-src: url("../assets/icons/mask/chevron-left.avif");
+}
+
+.icon-close {
+  --icon-src: url("../assets/icons/mask/close.avif");
+}
+
+.icon-cog {
+  --icon-src: url("../assets/icons/mask/cog.avif");
+}
+
+.icon-coins {
+  --icon-src: url("../assets/icons/mask/coins.avif");
+}
+
+.icon-hamburger {
+  --icon-src: url("../assets/icons/mask/hamburger.avif");
+}
+
+.icon-hand-coins {
+  --icon-src: url("../assets/icons/mask/hand-coins.avif");
+}
+
+.icon-house {
+  --icon-src: url("../assets/icons/mask/house.avif");
+}
+
+.icon-lightbulb {
+  --icon-src: url("../assets/icons/mask/lightbulb.avif");
+}
+
+.icon-package {
+  --icon-src: url("../assets/icons/mask/package.avif");
+}
+
+.icon-user {
+  --icon-src: url("../assets/icons/mask/user.avif");
+}
+
+.icon-users {
+  --icon-src: url("../assets/icons/mask/users.avif");
+}

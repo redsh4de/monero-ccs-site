@@ -2,7 +2,6 @@
 import { Image } from "astro:assets";
 import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
 import { externalLinks, navLinks } from "@/lib/links";
-import { icons } from "@/utils/icons";
 import moneroLogo from "@/../public/meta/monerologo.avif";
 ---
 
@@ -32,7 +31,7 @@ import moneroLogo from "@/../public/meta/monerologo.avif";
           aria-controls="primary-nav"
           aria-label="Close menu"
         >
-          <MaskIcon src={icons.mask("close")} size="1.5rem" />
+          <MaskIcon name="close" />
         </label>
       </div>
       <ul class="nav-list">
@@ -75,7 +74,7 @@ import moneroLogo from "@/../public/meta/monerologo.avif";
         aria-controls="primary-nav"
         aria-label="Open menu"
       >
-        <MaskIcon src={icons.mask("hamburger")} size="1.5rem" />
+        <MaskIcon name="hamburger" />
       </label>
     </div>
   </div>
@@ -129,6 +128,8 @@ import moneroLogo from "@/../public/meta/monerologo.avif";
 
   .hamburger,
   .close {
+    --icon-size: 1.5rem;
+
     color: var(--paragraph-main);
     display: inline-flex;
     align-items: center;

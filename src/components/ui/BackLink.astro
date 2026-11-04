@@ -1,6 +1,5 @@
 ---
 import MaskIcon from "./icons/MaskIcon.astro";
-import { icons } from "@/utils/icons";
 
 interface Props {
   href: string;
@@ -13,16 +12,15 @@ const { href, size = "sm", class: className, ...rest } = Astro.props;
 
 <a {href} class:list={["back-link", className]} data-size={size} {...rest}>
   <span class="icon-wrap">
-    <MaskIcon
-      src={icons.mask("chevron-left")}
-      size={size === "lg" ? "1.25rem" : "1.125rem"}
-    />
+    <MaskIcon name="chevron-left" />
   </span>
   <span class="label"><slot /></span>
 </a>
 
 <style>
   .back-link {
+    --icon-size: 1.125rem;
+
     display: inline-flex;
     align-items: center;
     gap: var(--space-xs);
@@ -48,6 +46,8 @@ const { href, size = "sm", class: className, ...rest } = Astro.props;
     }
 
     &[data-size="lg"] {
+      --icon-size: 1.25rem;
+
       font-size: var(--font-size-2xl);
       color: var(--monero-orange);
 

@@ -3,7 +3,6 @@ import BackLink from "@/components/ui/BackLink.astro";
 import BottomBar from "@/components/ui/BottomBar.astro";
 import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
 import { type ProposalStatus, stages } from "@/lib/stages";
-import { icons } from "@/utils/icons";
 
 interface Props {
   current: ProposalStatus | "home";
@@ -24,19 +23,18 @@ const { current, class: className, ...rest } = Astro.props;
         class="stage home-tab"
         aria-current={current === "home" ? "page" : undefined}
       >
-        <MaskIcon src={icons.mask("house")} size="1.375rem" />
+        <MaskIcon name="house" />
         <span>Home</span>
       </a>
       {
         stages.map((stage) => (
           <a
             href={`/${stage.slug}/`}
-            class="stage"
+            class={`stage stage-${stage.status}`}
             aria-current={current === stage.status ? "page" : undefined}
-            style={`--stage-color: ${stage.color}`}
           >
             <span class="stage-icon">
-              <MaskIcon src={icons.mask(stage.icon)} size="1.375rem" />
+              <MaskIcon name={stage.icon} />
             </span>
             <span class="label">{stage.label}</span>
             <span class="short">{stage.short}</span>
@@ -50,6 +48,8 @@ const { current, class: className, ...rest } = Astro.props;
 
 <style>
   .stage {
+    --icon-size: 1.375rem;
+
     display: flex;
     flex-direction: column;
     align-items: center;

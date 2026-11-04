@@ -6,7 +6,6 @@ import Button from "@/components/ui/Button.astro";
 import DonationAddress from "@/components/ui/DonationAddress.astro";
 import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
 import StageCard from "@/components/ui/StageCard.astro";
-import { icons } from "@/utils/icons";
 
 const meta = [
   {
@@ -47,7 +46,7 @@ const meta = [
         popovertargetaction="hide"
         aria-label="Close"
       >
-        <MaskIcon src={icons.mask("close")} size="1.25rem" />
+        <MaskIcon name="close" />
       </button>[% endif %]
     </div>
 
@@ -108,6 +107,8 @@ const meta = [
   }
 
   .close {
+    --icon-size: 1.25rem;
+
     display: flex;
     flex: none;
     align-items: center;

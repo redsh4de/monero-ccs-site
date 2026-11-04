@@ -1,7 +1,6 @@
 ---
 import type { HTMLTag } from "astro/types";
 import MaskIcon from "../icons/MaskIcon.astro";
-import { icons } from "@/utils/icons";
 
 export interface Props {
   title: string;
@@ -30,7 +29,7 @@ const Title = (headingLevel ? `h${headingLevel}` : "span") as HTMLTag;
   <summary class="header">
     <Title class="title">{title}</Title>
     <span class="icon">
-      <MaskIcon src={icons.mask("chevron-down")} />
+      <MaskIcon name="chevron-down" />
     </span>
   </summary>
   <div class="content">
