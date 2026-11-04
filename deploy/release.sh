@@ -199,6 +199,10 @@ build_site() {
   if [ -n "$bad" ]; then
     stop "a control byte in a text file, so this build isn't signed: $bad"
   fi
+  # a dependency can't slip a script file, a link elsewhere or an address
+  # into the site: checks.py refuses the build before anyone reads it
+  "$DEPLOY/checks.py" build "$WORK/src/dist" "$WORK/src/deploy/build-hosts" \
+    || stop "the build holds what a release may not, so it isn't signed"
 }
 
 # pack_release <out-dir> <tag>: writes the release's archive and SHA256SUMS
@@ -291,6 +295,47 @@ compare_attestations() {
   done
 }
 
+# list_packages <tag>: prints name@version for each package in the tag's
+# lockfile, sorted. Each is a key, two spaces in, of its packages: section.
+list_packages() {
+  local tag="$1"
+
+  git show "$tag:pnpm-lock.yaml" \
+    | sed -n '/^packages:$/,/^[^ ]/p' \
+    | sed -n "s/^  '\{0,1\}\([^' ]*\)'\{0,1\}:\$/\1/p" \
+    | LC_ALL=C sort
+}
+
+# show_packages <tag> <previous-tag>: lists the packages the lockfile
+# dropped (-) and added (+) since the release before, so a reviewer sees
+# what changed before reading what it did. A new version shows as both.
+show_packages() {
+  local tag="$1"
+  local previous_tag="$2"
+  local dropped=""
+  local added=""
+
+  if [ -z "$previous_tag" ]; then
+    return 0
+  fi
+  if ! git rev-parse -q --verify "$previous_tag^{commit}" >/dev/null; then
+    printf 'Packages: there is no tag %s here to compare with.\n' \
+      "$previous_tag"
+    return 0
+  fi
+  list_packages "$previous_tag" >"$WORK/packages.old"
+  list_packages "$tag" >"$WORK/packages.new"
+  dropped=$(LC_ALL=C comm -23 "$WORK/packages.old" "$WORK/packages.new")
+  added=$(LC_ALL=C comm -13 "$WORK/packages.old" "$WORK/packages.new")
+  printf 'Packages since %s:\n' "$previous_tag"
+  if [ -z "$dropped$added" ]; then
+    printf '  none changed\n'
+    return 0
+  fi
+  printf '%s\n' "$dropped" | sed '/^$/d; s/^/  - /'
+  printf '%s\n' "$added" | sed '/^$/d; s/^/  + /'
+}
+
 # show_changes <out-dir> <tag> <previous-tag>: shows what changed since the
 # release before, in less. deploy/ runs as root, so it is compared line by
 # line. dist/ is compared word by word, so a planted CSS declaration stands out
@@ -307,6 +352,7 @@ show_changes() {
   # a signer may quit less before the end, which stops the commands
   # writing to it; the run carries on to the question
   {
+    show_packages "$tag" "$previous_tag"
     git -C "$WORK" diff --no-index --no-color --no-ext-diff --no-textconv \
       --patch-with-stat old/files/deploy new/deploy || true
     git -C "$WORK" diff --no-index --no-color --no-ext-diff --no-textconv \

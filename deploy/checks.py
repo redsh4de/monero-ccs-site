@@ -13,6 +13,9 @@ Usage:
       print the release and commit that the site's status.json names
   checks.py snapshot <status.json>
       refuse a merge request snapshot that GitLab itself couldn't have sent
+  checks.py build <dist> <hosts>
+      refuse a built site holding a file type it never serves, a link to a
+      host not in the <hosts> file, or address-like text
   checks.py release <dir> <keyring> <version> <dest>
       verify that <dir>, holding ccs-site-v<version>.tar, SHA256SUMS and
       SHA256SUMS.asc, is that release, and unpack it into <dest>, which must
@@ -27,6 +30,7 @@ Exit: 0 accepted, 1 refused (with the reason on stderr), 2 usage.
 """
 
 import hashlib
+import html
 import json
 import os
 import re
@@ -35,6 +39,14 @@ import sys
 import tarfile
 import time
 from collections import Counter
+from pathlib import Path
+
+# the render's own address rule, from the same release. Nothing is cached in
+# __pycache__: the monitor compares releases file by file, and install.sh runs
+# this as root inside the installed release.
+sys.dont_write_bytecode = True
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "render"))
+from safety import has_address  # noqa: E402
 
 ADDRESS = r"[48][1-9A-HJ-NP-Za-km-z]{94}"
 VALUE = re.compile(
@@ -53,6 +65,11 @@ GITLAB_TIME = re.compile(
 SNAPSHOT_FIELDS = {"iid", "title", "author", "web_url", "created_at", "adds"}
 MAX_MERGE_REQUESTS = 1_000  # mrs.py reads at most ten pages of 100
 MAX_TEXT = 1_000  # GitLab allows 255 characters for a title or a username
+# what the built site holds: pages and templates, one stylesheet, fonts, images
+BUILD_SUFFIXES = {".html", ".css", ".woff2", ".avif", ".webp", ".png"}
+# the authority after // in a URL, absolute or protocol-relative
+URL_AUTHORITY = re.compile(r"//([^/\s\"'<>()\\?#]+)")
+TAG = re.compile(r"<[^>]*>")
 VALUES_CAP = LIST_CAP = 1_000_000
 SUMS_CAP = 10_000
 STATUS_CAP = 50_000_000
@@ -233,6 +250,52 @@ def release_name(version: int) -> str:
     return f"ccs-site-v{version}.tar"
 
 
+def url_host(authority: str) -> str:
+    """Return the host of a URL's authority, without user, port or case."""
+    host = authority.rsplit("@", 1)[-1].lower()
+    if host.startswith("["):
+        return host.split("]", 1)[0] + "]"
+    return host.split(":", 1)[0]
+
+
+def read_hosts(path: str) -> set[str]:
+    """Return the hosts a build may name, one a line; # starts a comment."""
+    rows = lines(read_capped(path, LIST_CAP, "hosts"), "hosts")
+    return {row.split("#", 1)[0].strip().lower() for row in rows} - {""}
+
+
+def check_build(dist: str, hosts_path: str) -> None:
+    """Refuse a built site holding anything a release may not.
+
+    Every file must be of a type the site serves, every host that a page or the
+    stylesheet names must be on the list, and no text may hold an address-like
+    run: donation addresses arrive only at render time, from the signed list.
+    Pages are read as a browser shows them: with entities decoded for the links,
+    and as visible text without tags for addresses, so neither can hide behind
+    an escape or a tag.
+    """
+    allowed = read_hosts(hosts_path)
+    for path in sorted(Path(dist).rglob("*")):
+        name = path.relative_to(dist)
+        if path.is_dir() and not path.is_symlink():
+            continue
+        if path.is_symlink() or path.suffix not in BUILD_SUFFIXES:
+            raise Reject(f"build: {name} isn't a file type the site serves")
+        if path.suffix not in (".html", ".css"):
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        visible = text
+        if path.suffix == ".html":
+            text = html.unescape(text)
+            visible = TAG.sub("", text)
+        for authority in URL_AUTHORITY.findall(text):
+            host = url_host(authority)
+            if host not in allowed:
+                raise Reject(f"build: {name} names {host}, not a listed host")
+        if has_address(visible, ignore_spaces=True):
+            raise Reject(f"build: {name} holds address-like text")
+
+
 def signed_digest(folder: str, keyring: str, version: int) -> str:
     """Return the sha256 of release `version`'s archive, as two signers vouch for it.
 
@@ -311,6 +374,8 @@ def main(argv: list[str]) -> int:
                 print(" ".join(fields))
             case ["snapshot", path]:
                 check_snapshot(read_capped(path, STATUS_CAP, "snapshot"))
+            case ["build", dist, hosts]:
+                check_build(dist, hosts)
             case ["release", folder, keyring, version, dest]:
                 install_release(folder, keyring, int(version), dest)
             case _:
