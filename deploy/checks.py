@@ -14,8 +14,9 @@ Usage:
   checks.py snapshot <status.json>
       refuse a merge request snapshot that GitLab itself couldn't have sent
   checks.py release <dir> <keyring> <version> <dest>
-      verify that <dir>, holding release.tar, release.sha256 and its .asc, is
-      release <version>, and unpack it into <dest>, which must not exist yet
+      verify that <dir>, holding ccs-site-v<version>.tar, SHA256SUMS and
+      SHA256SUMS.asc, is that release, and unpack it into <dest>, which must
+      not exist yet
 
 Each pushed or signed input is read once, with a size cap, and the decision is
 made on those bytes: gpgv checks the signatures over the same bytes, and a
@@ -42,8 +43,8 @@ VALUE = re.compile(
 SEEN = re.compile(r"seen [0-9a-f]{64}")
 UPDATED = re.compile(r"updated ([0-9]{10})")
 LISTED = re.compile(rf"{ADDRESS}|general-fund {ADDRESS}")
-VERSION = re.compile(r"version ([1-9][0-9]{0,5})")
-SHA256 = re.compile(r"sha256 ([0-9a-f]{64})")
+# a line of sha256sum's output: the hash, two spaces, the file name
+SUM_LINE = re.compile(r"([0-9a-f]{64})  ([A-Za-z0-9._-]{1,200})")
 COMMIT = re.compile(r"[0-9a-f]{40}")
 GITLAB_URL = re.compile(r"https://[!-~]{1,500}")
 GITLAB_TIME = re.compile(
@@ -89,22 +90,29 @@ def lines(data: bytes, what: str) -> list[str]:
 
 
 def signers(keyring: str, signature: str, signed: bytes) -> set[str] | None:
-    """Return the primary fingerprints with a good signature, or None if any is bad.
+    """Return the primary fingerprints of the keyring's keys that signed the bytes.
 
-    A signature counts only when gpgv calls it GOODSIG: a revoked or expired key
-    still gets a VALIDSIG line, after REVKEYSIG or EXPKEYSIG. The keyring path is
-    made absolute, since gpgv looks up a bare name in ~/.gnupg.
+    The signature file may hold signatures from many builders, as Bitcoin Core's
+    SHA256SUMS.asc does. One from a key the keyring lacks is skipped, so a new
+    builder's signature never breaks a check, and so is one from an expired or
+    revoked key. A bad signature from a key in the keyring means the bytes
+    changed, so then it returns None.
+
+    A signature counts only when gpgv calls it GOODSIG, then names its primary
+    key in VALIDSIG. gpgv fails whenever one signature can't be checked, so its
+    status lines decide, not its exit status. The keyring path is made absolute,
+    since gpgv looks up a bare name in ~/.gnupg.
     """
     keyring = os.path.abspath(keyring)
     command = ["gpgv", "--status-fd", "1", "--keyring", keyring, signature, "-"]
     run = subprocess.run(command, input=signed, capture_output=True, check=False)
-    if run.returncode != 0:
-        return None
     good, found = False, set()
     for line in run.stdout.decode("ascii", "replace").split("\n"):
         fields = line.split(" ")
         if len(fields) < 2 or fields[0] != "[GNUPG:]":
             continue
+        if fields[1] == "BADSIG":
+            return None
         if fields[1] in VERDICTS:
             good = fields[1] == "GOODSIG"
         elif fields[1] == "VALIDSIG" and good:
@@ -220,27 +228,33 @@ def check_snapshot(data: bytes) -> None:
             raise Reject("snapshot: a merge request time is malformed")
 
 
-def signed_digest(folder: str, keyring: str, version: int) -> str:
-    """Return the sha256 of release.tar that two distinct signers vouch for.
+def release_name(version: int) -> str:
+    """Return the file name of release `version`'s archive."""
+    return f"ccs-site-v{version}.tar"
 
-    release.sha256 must carry good signatures from two keys in the keyring, and
-    name release `version` on its first line and the hash on its third.
+
+def signed_digest(folder: str, keyring: str, version: int) -> str:
+    """Return the sha256 of release `version`'s archive, as two signers vouch for it.
+
+    SHA256SUMS is sha256sum's own output. It must carry good signatures from two
+    distinct keys in the keyring, and name this release's archive on exactly one
+    line: the version is in the signed file name, so an older release can't pass
+    as a newer one.
     """
-    sums_path = os.path.join(folder, "release.sha256")
+    sums_path = os.path.join(folder, "SHA256SUMS")
     sums = read_capped(sums_path, SUMS_CAP, "release")
     who = signers(keyring, sums_path + ".asc", sums)
     if who is None:
-        raise Reject("release: a signature is bad or missing")
+        raise Reject("release: a release signer's signature is bad")
     if len(who) < 2:
-        raise Reject("release: needs two signers")
-    rows = lines(sums, "release")
-    signed = VERSION.fullmatch(rows[0]) if rows else None
-    if not signed or int(signed[1]) != version:
+        raise Reject("release: needs good signatures from two release signers")
+    rows = [SUM_LINE.fullmatch(row) for row in lines(sums, "release")]
+    if not rows or not all(rows):
+        raise Reject("release: SHA256SUMS isn't sha256sum's output")
+    digests = [row[1] for row in rows if row[2] == release_name(version)]
+    if len(digests) != 1:
         raise Reject(f"release: this isn't release {version}")
-    digest = SHA256.fullmatch(rows[2]) if len(rows) > 2 else None
-    if not digest:
-        raise Reject("release: release.sha256 has no sha256 line")
-    return digest[1]
+    return digests[0]
 
 
 def install_release(folder: str, keyring: str, version: int, dest: str) -> None:
@@ -252,9 +266,9 @@ def install_release(folder: str, keyring: str, version: int, dest: str) -> None:
     yet; on a refusal, the caller drops it.
     """
     digest = signed_digest(folder, keyring, version)
-    with open(os.path.join(folder, "release.tar"), "rb") as tar_file:
+    with open(os.path.join(folder, release_name(version)), "rb") as tar_file:
         if hashlib.file_digest(tar_file, "sha256").hexdigest() != digest:
-            raise Reject("release: release.tar doesn't match its hash")
+            raise Reject("release: the archive doesn't match its hash")
         tar_file.seek(0)
         try:
             with tarfile.open(fileobj=tar_file, mode="r:") as tar:
@@ -264,14 +278,14 @@ def install_release(folder: str, keyring: str, version: int, dest: str) -> None:
                     unsafe = member.name.startswith("/") or ".." in parts
                     if unsafe or not (member.isreg() or member.isdir()):
                         raise Reject(
-                            "release: release.tar holds a link, a device or an unsafe path"
+                            "release: the archive holds a link, a device or an unsafe path"
                         )
                 if sum(m.size for m in members if m.isreg()) > TAR_CAP:
-                    raise Reject("release: release.tar is too big")
+                    raise Reject("release: the archive is too big")
                 os.makedirs(dest)
                 tar.extractall(dest, members=members, filter="data")
         except tarfile.TarError:
-            raise Reject("release: release.tar doesn't list") from None
+            raise Reject("release: the archive doesn't list") from None
 
 
 def main(argv: list[str]) -> int:

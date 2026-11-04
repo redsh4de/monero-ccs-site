@@ -1,15 +1,21 @@
 #!/bin/sh
 # shellcheck shell=dash
-# Builds a release from a tag the same way on every signer's machine, shows
-# what changed since the last release, and signs it. See deploy/RELEASING.md.
+# Builds a release from a tag the same way on every builder's machine,
+# compares it with each attestation already made, shows what changed since
+# the last release, and attests it: a signature over SHA256SUMS. Once two
+# release signers have attested, it also joins their signatures into the
+# release's SHA256SUMS.asc. See deploy/RELEASING.md.
 #
-#   KEYRING=~/release-signers.gpg deploy/release.sh site-vN
+#   KEYRING=~/release-signers.gpg deploy/release.sh site-vN <your name>
 #
-# Runs as: a signer, by hand, from a checkout of the tag, in an account
-#          with rootless Podman (or Docker, with CONTAINER=docker).
-# Reads:   the tag, release N-1 from GitHub, and the release signers'
-#          keyring in KEYRING.
-# Writes:  release-site-vN/: release.tar, release.sha256, and the signature.
+# Runs as: a builder, anyone, by hand, from a checkout of the tag, in an
+#          account with rootless Podman (or Docker, with CONTAINER=docker).
+# Reads:   the tag; its attestations on ATTESTATIONS_REF, origin/main unless
+#          set; release N-1 from GitHub; and the release signers' keyring in
+#          KEYRING.
+# Writes:  release-site-vN/: ccs-site-vN.tar, SHA256SUMS, the attestation to
+#          add to the repository, and SHA256SUMS.asc once two release
+#          signers have attested.
 # Trust:   only the tag's own scripts run, in a pinned container that builds
 #          offline; deploy/ comes from the tag.
 # Exit:    0 signed or declined, 1 on any failure.
@@ -34,12 +40,24 @@ readonly PNPM_SHA512=f0febc7e37552ab485494a914241b338e0b3580b93d54ce31f009330158
 readonly NODE=docker.io/stagex/pallet-nodejs@sha256:2a555068fb2e4c9a6fc3bec8fdce265a1ea1206a67ad3dc71083ef7b6f091501
 readonly GCC=docker.io/stagex/core-gcc@sha256:396679821776a7da0e5806e9ce78fd92113452a0977d90956f62a7caa32520db
 readonly CONTAINER="${CONTAINER:-podman}"
-readonly KEYRING="${KEYRING:-$HOME/release-signers.gpg}"
+# made absolute in main, since gpgv looks a bare name up in ~/.gnupg
+KEYRING="${KEYRING:-$HOME/release-signers.gpg}"
+readonly ATTESTATIONS_REF="${ATTESTATIONS_REF:-origin/main}"
+readonly USAGE="usage: release.sh site-vN <your name, in a-z 0-9 . _ ->"
 
 # main sets these two once: the scratch folder, and the tag's commit time,
 # which every file in the build gets
 WORK=""
 EPOCH=""
+
+# is_builder_name <name>: true for a name that is safe as a folder name.
+is_builder_name() {
+  local name="$1"
+
+  case $name in
+    "" | .* | *[!a-z0-9._-]*) return 1 ;;
+  esac
+}
 
 # check_gnu_tar: stops unless tar is GNU tar, whose options make the
 # archive byte-identical on every machine.
@@ -183,62 +201,108 @@ build_site() {
   fi
 }
 
-# pack_release <out-dir> <version> <commit>: writes release.tar and
-# release.sha256 into a new folder <out-dir>. One already there, even one the
-# tag holds, stops the run.
+# pack_release <out-dir> <tag>: writes the release's archive and SHA256SUMS
+# into a new folder <out-dir>. One already there, even one the tag holds,
+# stops the run. SHA256SUMS is sha256sum's own output, so anyone can check
+# the archive with sha256sum --check.
 pack_release() {
   local out_dir="$1"
-  local version="$2"
-  local commit="$3"
-  local sum=""
+  local tag="$2"
+  local archive="ccs-$tag.tar"
 
   mkdir -- "$out_dir" || stop "$out_dir already exists; move it away first"
   tar --sort=name --mtime="@$EPOCH" --owner=0 --group=0 --numeric-owner \
-    --mode=u=rwX,go=rX --format=gnu -cf "$out_dir/release.tar" \
+    --mode=u=rwX,go=rX --format=gnu -cf "$out_dir/$archive" \
     -C "$WORK/src" dist deploy
-  sum=$(sha256sum <"$out_dir/release.tar" | cut -d' ' -f1)
-  printf 'version %s\ncommit %s\nsha256 %s\n' "$version" "$commit" "$sum" \
-    >"$out_dir/release.sha256"
-  cat -- "$out_dir/release.sha256"
+  (cd -- "$out_dir" && sha256sum -- "$archive") >"$out_dir/SHA256SUMS"
+  cat -- "$out_dir/SHA256SUMS"
 }
 
-# check_published <tag> <out-dir>: when the first signer published this tag
-# already, stops unless this build matches theirs, and downloads their
-# signature. Only a missing file means nothing is published; any other
-# answer stops.
-check_published() {
+# get_attestations <tag> <dir>: copies each builder's attestation of the tag
+# into <dir>/<builder>/. They live in this repository's attestations/ folder,
+# on ATTESTATIONS_REF. Moving them to a repository of their own, with the
+# same <tag>/<builder>/ layout, changes only this function: it would clone
+# that repository and copy its <tag>/ folder instead.
+get_attestations() {
   local tag="$1"
-  local out_dir="$2"
-  local url="$RELEASES/download/$tag"
-  local code=""
+  local dir="$2"
 
-  code=$(curl -sS -L -o "$WORK/published/release.sha256" -w '%{http_code}' \
-    "$url/release.sha256") || stop "can't reach $RELEASES"
-  case $code in
-    404) ;;
-    200)
-      if ! cmp -s "$WORK/published/release.sha256" "$out_dir/release.sha256"; then
-        stop "this build differs from the published $tag; don't sign it"
-      fi
-      curl -fsS -L -o "$WORK/published/release.sha256.asc" \
-        "$url/release.sha256.asc" \
-        || stop "can't download the published signature"
-      ;;
-    *) stop "$RELEASES answered $code for $tag" ;;
-  esac
+  mkdir -p -- "$dir"
+  if ! git cat-file -e "$ATTESTATIONS_REF:attestations/$tag" 2>/dev/null; then
+    return 0
+  fi
+  git archive "$ATTESTATIONS_REF" "attestations/$tag" \
+    | tar -x -C "$dir" --strip-components=2
 }
 
-# show_changes <out-dir> <previous-tag>: shows what changed since the release
-# before, in less. deploy/ runs as root, so it is compared line by line.
-# dist/ is compared word by word, so a planted CSS declaration stands out in
-# a minified stylesheet, and the low rename threshold pairs a stylesheet
-# with its renamed successor. cat -v shows control and non-ASCII bytes as
-# text, so nothing in the build can hide itself on the terminal.
+# is_plain_attestation <folder>: true when the folder holds SHA256SUMS and
+# SHA256SUMS.asc as plain files. Anyone adds attestations, so a link, which
+# could point anywhere on this machine, is never followed.
+is_plain_attestation() {
+  local folder="${1%/}"
+  local name=""
+
+  if [ -L "$folder" ]; then
+    return 1
+  fi
+  for name in SHA256SUMS SHA256SUMS.asc; do
+    if [ -L "$folder/$name" ] || [ ! -f "$folder/$name" ]; then
+      return 1
+    fi
+  done
+}
+
+# is_release_signer <folder>: true when the attestation in the folder carries
+# a good signature from a key in KEYRING.
+is_release_signer() {
+  local folder="$1"
+
+  gpgv --keyring "$KEYRING" "$folder/SHA256SUMS.asc" "$folder/SHA256SUMS" \
+    >/dev/null 2>&1
+}
+
+# compare_attestations <out-dir> <attestations>: compares this build with
+# each builder's attestation. A release signer whose build differs stops the
+# run; anyone else's is only reported. The signatures of the release signers
+# who built the same bytes are collected in WORK/trusted.asc.
+compare_attestations() {
+  local out_dir="$1"
+  local attestations="$2"
+  local folder=""
+  local builder=""
+
+  : >"$WORK/trusted.asc"
+  for folder in "$attestations"/*/; do
+    if ! is_plain_attestation "$folder"; then
+      continue
+    fi
+    builder=$(basename -- "$folder")
+    if is_release_signer "$folder"; then
+      if ! cmp -s "$folder/SHA256SUMS" "$out_dir/SHA256SUMS"; then
+        stop "this build differs from $builder's; don't sign it"
+      fi
+      cat -- "$folder/SHA256SUMS.asc" >>"$WORK/trusted.asc"
+      printf 'The same bytes as %s, a release signer.\n' "$builder"
+    elif cmp -s "$folder/SHA256SUMS" "$out_dir/SHA256SUMS"; then
+      printf 'The same bytes as %s.\n' "$builder"
+    else
+      log "$builder, who isn't a release signer, built different bytes"
+    fi
+  done
+}
+
+# show_changes <out-dir> <tag> <previous-tag>: shows what changed since the
+# release before, in less. deploy/ runs as root, so it is compared line by
+# line. dist/ is compared word by word, so a planted CSS declaration stands out
+# in a minified stylesheet, and the low rename threshold pairs a stylesheet
+# with its renamed successor. cat -v shows control and non-ASCII bytes as text,
+# so nothing in the build can hide itself on the terminal.
 show_changes() {
   local out_dir="$1"
-  local previous_tag="$2"
+  local tag="$2"
+  local previous_tag="$3"
 
-  tar -xf "$out_dir/release.tar" -C "$WORK/new"
+  tar -xf "$out_dir/ccs-$tag.tar" -C "$WORK/new"
   printf 'Changes since %s:\n' "${previous_tag:-nothing}"
   # a signer may quit less before the end, which stops the commands
   # writing to it; the run carries on to the question
@@ -251,18 +315,18 @@ show_changes() {
   } | cat -v | LESSSECURE=1 less || true
 }
 
-# sign_release <tag> <out-dir> <version>: asks the signer, signs release.sha256,
-# and checks the signatures before anything is uploaded. The second signer's
-# joined file must pass exactly what install.sh checks: two signers in the
-# keyring, this version.
+# sign_release <tag> <out-dir> <version> <builder>: asks the builder, signs
+# SHA256SUMS, and checks the signature before anything leaves this machine.
+# It then writes the attestation, and joins the release signers' signatures.
 sign_release() {
   local tag="$1"
   local out_dir="$2"
   local version="$3"
+  local builder="$4"
   local answer=""
-  local keyring=""
+  local folder="$out_dir/attestations/$tag/$builder"
 
-  printf 'Sign %s? [y/N] ' "$out_dir/release.sha256"
+  printf 'Sign %s? [y/N] ' "$out_dir/SHA256SUMS"
   read -r answer || answer=""
   case $answer in
     y | Y) ;;
@@ -271,53 +335,70 @@ sign_release() {
       exit 0
       ;;
   esac
-  gpg --detach-sign --armor -o "$WORK/mine.asc" "$out_dir/release.sha256"
+  gpg --detach-sign --armor -o "$WORK/mine.asc" "$out_dir/SHA256SUMS"
+  if ! gpg --verify "$WORK/mine.asc" "$out_dir/SHA256SUMS" \
+    >/dev/null 2>&1; then
+    stop "your signature doesn't verify with your own key"
+  fi
+  if ! gpgv --keyring "$KEYRING" "$WORK/mine.asc" "$out_dir/SHA256SUMS" \
+    >/dev/null 2>&1; then
+    log "your key isn't in $KEYRING, so this attests the build," \
+      "but doesn't count towards the two release signers"
+  fi
 
-  if [ -s "$WORK/published/release.sha256.asc" ]; then
-    cat -- "$WORK/published/release.sha256.asc" "$WORK/mine.asc" \
-      >"$out_dir/release.sha256.asc"
-    if ! "$DEPLOY/checks.py" release "$out_dir" "$KEYRING" "$version" \
-      "$WORK/verify"; then
-      rm -- "$out_dir/release.sha256.asc"
-      stop "the joined signatures don't verify against $KEYRING"
-    fi
-    printf 'Replace release.sha256.asc on the %s release with %s.\n' \
-      "$tag" "$out_dir/release.sha256.asc"
+  mkdir -p -- "$folder"
+  cp -- "$out_dir/SHA256SUMS" "$folder/SHA256SUMS"
+  cp -- "$WORK/mine.asc" "$folder/SHA256SUMS.asc"
+  printf 'Your attestation is in %s/. Add it to the repository under %s.\n' \
+    "$folder" "attestations/$tag/$builder/"
+  join_signatures "$tag" "$out_dir" "$version"
+}
+
+# join_signatures <tag> <out-dir> <version>: joins the release signers'
+# signatures over this build, and this one, into SHA256SUMS.asc. It keeps
+# the file only when it passes exactly what install.sh checks: two release
+# signers, this version.
+join_signatures() {
+  local tag="$1"
+  local out_dir="$2"
+  local version="$3"
+
+  cat -- "$WORK/trusted.asc" "$WORK/mine.asc" >"$out_dir/SHA256SUMS.asc"
+  if "$DEPLOY/checks.py" release "$out_dir" "$KEYRING" "$version" \
+    "$WORK/verify"; then
+    printf 'Create the GitHub release %s with ccs-%s.tar, SHA256SUMS and %s\n' \
+      "$tag" "$tag" "SHA256SUMS.asc, from $out_dir/."
   else
-    keyring=$(realpath -- "$KEYRING")
-    if ! gpgv --keyring "$keyring" "$WORK/mine.asc" "$out_dir/release.sha256" \
-      >/dev/null 2>&1; then
-      stop "your signature doesn't verify against $KEYRING:" \
-        "sign with your key in it"
-    fi
-    cp -- "$WORK/mine.asc" "$out_dir/release.sha256.asc"
-    printf 'Create the GitHub release %s, and upload the three files in %s/.\n' \
-      "$tag" "$out_dir"
+    rm -- "$out_dir/SHA256SUMS.asc"
+    echo "Not ready to publish: the release needs two release signers'" \
+      "attestations."
   fi
 }
 
 main() {
   local tag="${1:-}"
+  local builder="${2:-}"
   local version=""
-  local commit=""
   local previous_tag=""
   local previous_version=0
   local image=""
   local out_dir=""
 
-  version=$(release_tag "$tag") || stop "usage: release.sh site-vN"
+  version=$(release_tag "$tag") || stop "$USAGE"
+  is_builder_name "$builder" || stop "$USAGE"
   check_gnu_tar
   if [ ! -e "$KEYRING" ]; then
     stop "set KEYRING to the release signers' keyring"
   fi
-  commit=$(git rev-parse --verify "$tag^{commit}")
+  KEYRING=$(realpath -- "$KEYRING")
+  readonly KEYRING
   EPOCH=$(git log -1 --format=%ct "$tag")
   readonly EPOCH
   WORK=$(mktemp -d)
   readonly WORK
   trap 'rm -rf -- "$WORK"' EXIT
   mkdir -p -- "$WORK/src" "$WORK/pnpm" "$WORK/image" "$WORK/new" \
-    "$WORK/old" "$WORK/published"
+    "$WORK/old" "$WORK/attestations"
 
   # 1. Only the tag's scripts, and the tag's pnpm.
   check_same_scripts "$tag"
@@ -334,16 +415,18 @@ main() {
     get_previous_release "$previous_tag" "$previous_version"
   fi
 
-  # 3. The build, and the release's two files.
+  # 3. The build: the archive and SHA256SUMS.
   image=$(build_image) || stop "can't build the image to build in"
   build_site "$tag" "$image"
   out_dir="release-$tag"
-  pack_release "$out_dir" "$version" "$commit"
+  pack_release "$out_dir" "$tag"
 
-  # 4. The same bytes as the first signer's, the review, and the signature.
-  check_published "$tag" "$out_dir"
-  show_changes "$out_dir" "$previous_tag"
-  sign_release "$tag" "$out_dir" "$version"
+  # 4. The same bytes as every release signer who attested already, the
+  #    review, and the attestation.
+  get_attestations "$tag" "$WORK/attestations"
+  compare_attestations "$out_dir" "$WORK/attestations"
+  show_changes "$out_dir" "$tag" "$previous_tag"
+  sign_release "$tag" "$out_dir" "$version" "$builder"
 }
 
 main "$@"

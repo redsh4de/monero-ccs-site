@@ -180,13 +180,14 @@ release_tag() {
   printf '%s\n' "$number"
 }
 
-# get_release <tag> <dir>: downloads a release's three files into <dir>.
+# get_release <tag> <dir>: downloads a release's three files into <dir>: the
+# archive ccs-<tag>.tar, SHA256SUMS, and the signatures in SHA256SUMS.asc.
 get_release() {
   local tag="$1"
   local dir="$2"
   local name=""
 
-  for name in release.sha256 release.sha256.asc release.tar; do
+  for name in SHA256SUMS SHA256SUMS.asc "ccs-$tag.tar"; do
     curl -fsS -L --max-time 600 --max-filesize 200000000 \
       -o "$dir/$name" "$RELEASES/download/$tag/$name" || return 1
   done
