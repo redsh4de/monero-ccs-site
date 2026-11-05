@@ -1,0 +1,5 @@
+FROM localhost/ccs-render
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3-pytest python3-hypothesis \
+    gpg gpg-agent gpgv \
+  && rm -rf /var/lib/apt/lists/*
