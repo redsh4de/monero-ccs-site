@@ -6,7 +6,7 @@ lead: The CCS utilizes git, and Monero’s Gitlab instance for proposal tracking
 
 import { Image } from "astro:assets";
 
-import newBranchSuccess from "@/assets/how-to/new-branch-success.png";
+import newBranchSuccess from "@/assets/how-to/new-branch-success.webp";
 import CodeSample from "@/components/pages/how-to-ccs/CodeSample.astro";
 import Field from "@/components/pages/how-to-ccs/Field.astro";
 import AccordionItem from "@/components/ui/accordion/AccordionItem.astro";
@@ -29,11 +29,11 @@ export const components = { a: ProseLink };
 
 First things first, you're going to need an account on [Monero's Gitlab instance.](https://repo.getmonero.org) Following the provided link will bring to the sign up page. Register for an account (use a strong password), and then navigate to the [CCS Proposals repo](https://repo.getmonero.org/monero-project/ccs-proposals). Click the "Fork" button and select your name on the subsequent screen.
 
-![Click this fork button](../../assets/how-to/fork.png)
+![Click this fork button](../../assets/how-to/fork.webp)
 
 You should see a blue success bar, along with your new repository.
 
-![Fork success](../../assets/how-to/fork-success.png)
+![Fork success](../../assets/how-to/fork-success.webp)
 
 </AccordionItem>
 <AccordionItem title="2. Branches" variant="card" headingLevel={2} open>
@@ -42,11 +42,11 @@ If you're not familiar with git, then this next step might not make a lot of sen
 
 Click on Branches.
 
-![Click on Branches](../../assets/how-to/branches.png)
+![Click on Branches](../../assets/how-to/branches.webp)
 
 Then click on New Branch.
 
-![Click on New Branch](../../assets/how-to/new-branch.png)
+![Click on New Branch](../../assets/how-to/new-branch.webp)
 
 Fill in the "Branch Name" on the next screen by naming it something similar to your proposal. No spaces are allowed though. Leave the other field as is (it should say "Master") and click Create Branch. You should be taken back to your repository, but now on the new branch, as evidenced by seeing the name of your new branch on the screen. A screenshot is provided below to show where you would see it.
 
@@ -61,7 +61,7 @@ Fill in the "Branch Name" on the next screen by naming it something similar to y
 
 From here, you're going to click on the + button near the top center of your screen, and click "New File" on the subsequent dropdown.
 
-![Plus button](../../assets/how-to/new-file.png)
+![Plus button](../../assets/how-to/new-file.webp)
 
 On this new screen, fill in the File Name field with a descriptive title that includes your name, or online handle, is relevant to your proposal, and ends in `.md`. As an example, if Diego "rehrar" Salazar was to make a proposal asking for funding so I can make videos for Monero, I might title the file `rehrar-make-videos-for-monero.md`.
 
@@ -200,11 +200,11 @@ After you click Commit Changes, you will be taken to your newly created file in 
 
 Click on the blue button in the upper right to start this process.
 
-![File creation success and merge request button](../../assets/how-to/mr.png)
+![File creation success and merge request button](../../assets/how-to/mr.webp)
 
 You will see a screen with a few things to fill out. In the Title field, put the same title that you used in the front matter of your proposal. In the Description text box, paste in the proposal EXACTLY AS IT APPEARS IN YOUR .md file, minus the front matter. If you followed Step 5, you should have it in a notepad program of some sort.
 
-![Fill in title and description fields](../../assets/how-to/submit-mr.png)
+![Fill in title and description fields](../../assets/how-to/submit-mr.webp)
 
 After this is done, scroll down, and click the green Submit Merge Request button at the bottom left of the page. You should be taken to the Merge Request page for your proposal.
 
@@ -272,7 +272,7 @@ From the homepage of repo.getmonero.org, once you're logged in, you should see a
 
 Locate the dropdown with all of your active branches, click it, and select the branch on which your proposal was made.
 
-![Branches dropdown](../../assets/how-to/edit-find-branch.png)
+![Branches dropdown](../../assets/how-to/edit-find-branch.webp)
 
 Once you are on the page with the correct branch, as evidenced by the name of the branch showing (see [the last screenshot in step 2](#new-branch-success) of the step-by-step instruction to see where) find and select the file of your proposal (this is why descriptive branch and file names are important).
 
@@ -280,7 +280,7 @@ Once you are on the page with the correct branch, as evidenced by the name of th
 
 Once you are on the page of your file, on the upper right corner should be an Edit button.
 
-![Edit button](../../assets/how-to/edit-edit-button.png)
+![Edit button](../../assets/how-to/edit-edit-button.webp)
 
 Select this and you should be taken to the editing screen. Amend the proposal as needed (remember to edit the front matter too if any of those variables are changing), and press the green Commit Changes button at the bottom.
 
@@ -290,6 +290,6 @@ Select this and you should be taken to the editing screen. Amend the proposal as
   transparency. See the screenshot below.
 </Callout>
 
-![Edits seen](../../assets/how-to/edit-editing-seen.png)
+![Edits seen](../../assets/how-to/edit-editing-seen.webp)
 
 </PageSection>
