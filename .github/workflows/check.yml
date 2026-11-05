@@ -24,6 +24,7 @@ jobs:
       - run: pnpm check
       - name: build and render the example data
         run: pnpm build && pnpm render
+      - run: pnpm test
       - name: no inline styles, which the CSP blocks
         run: |
           if grep -rlE '<style|[[:space:]]style="' dist --include='*.html'; then

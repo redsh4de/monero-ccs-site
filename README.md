@@ -18,6 +18,7 @@ dependencies' code as you, so read "Maintainer setup" in
 | `pnpm dev`     | Start a local live-reload server, with the data pages unfilled           |
 | `pnpm build`   | Build the static pages and templates                                     |
 | `pnpm render`  | Render `example-data/` into `dist/`, in the render container             |
+| `pnpm test`    | Lint the deploy's Python and shell, then run `tests/`, in a container    |
 | `pnpm preview` | Build, render, and serve `dist/` as plain files on http://localhost:4321 |
 | `pnpm check`   | Type check, lint, and check the formatting                               |
 | `pnpm format`  | Format with Prettier                                                     |

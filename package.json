@@ -10,6 +10,7 @@
     "dev": "astro dev",
     "build": "astro build",
     "render": "podman build -q -t ccs-render -f deploy/Containerfile.render deploy >/dev/null && mkdir -p .render-cache && podman run --rm --network=none -v \"$PWD\":/w:ro,z -v \"$PWD/dist\":/w/dist:z -v \"$PWD/.render-cache\":/w/.render-cache:z -w /w ccs-render python3 -B deploy/render/render.py example-data dist/templates dist .render-cache",
+    "test": "podman build -q -t ccs-render -f deploy/Containerfile.render deploy >/dev/null && podman build -q -t ccs-tests tests >/dev/null && podman run --rm --network=none -v \"$PWD\":/w:ro,z -w /w ccs-tests sh -c 'black -q --check deploy tests && pydocstyle --convention=pep257 --add-ignore=D100,D101,D102,D103,D105,D107 deploy tests && shellcheck -x -P deploy deploy/*.sh deploy/*/*.sh && python3 -B -m pytest -q tests'",
     "preview": "pnpm build && pnpm render && podman run --rm -p 127.0.0.1:4321:4321 -v \"$PWD\":/w:ro,z -w /w ccs-render python3 -B deploy/web/preview.py",
     "check": "astro check && eslint . && stylelint \"src/**/*.{css,astro}\" && prettier --check .",
     "format": "prettier --write ."
