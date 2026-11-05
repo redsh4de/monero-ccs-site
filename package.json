@@ -10,13 +10,12 @@
     "dev": "astro dev",
     "build": "astro build",
     "render": "podman build -q -t ccs-render -f deploy/Containerfile.render deploy >/dev/null && mkdir -p .render-cache && podman run --rm --network=none -v \"$PWD\":/w:ro,z -v \"$PWD/dist\":/w/dist:z -v \"$PWD/.render-cache\":/w/.render-cache:z -w /w ccs-render python3 -B deploy/render/render.py example-data dist/templates dist .render-cache",
-    "preview": "pnpm build && pnpm render && podman run --rm -p 127.0.0.1:4321:4321 -v \"$PWD/dist\":/srv:ro,z ccs-render python3 -m http.server 4321 -d /srv",
+    "preview": "pnpm build && pnpm render && podman run --rm -p 127.0.0.1:4321:4321 -v \"$PWD\":/w:ro,z -w /w ccs-render python3 -B deploy/web/preview.py",
     "check": "astro check && eslint . && stylelint \"src/**/*.{css,astro}\" && prettier --check .",
     "format": "prettier --write ."
   },
   "dependencies": {
     "@astrojs/mdx": "^8.1.0",
-    "@fontsource-variable/dm-sans": "^5.3.0",
     "astro": "^7.3.2"
   },
   "packageManager": "pnpm@11.4.0",
