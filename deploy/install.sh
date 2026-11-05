@@ -169,7 +169,7 @@ make_keyrings_readable() {
 install_packages() {
   local role="$1"
 
-  set -- ca-certificates curl git gpgv qrencode python3-yaml \
+  set -- ca-certificates curl git gpgv qrencode python3-zbar python3-yaml \
     python3-markdown-it python3-mdit-py-plugins python3-jinja2
   if [ "$role" = web ]; then
     set -- "$@" nginx openssh-server rsync

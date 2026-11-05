@@ -20,7 +20,6 @@ renders them, so a donation only re-fills the templates.
 
 import json
 import os
-import subprocess
 import sys
 from dataclasses import replace
 from hashlib import sha256
@@ -40,6 +39,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bodies  # noqa: E402
 import content  # noqa: E402
 import inputs  # noqa: E402
+import qr  # noqa: E402
 import safety  # noqa: E402
 
 
@@ -130,10 +130,9 @@ def main() -> None:
     write(out / "donate" / "index.html", donate)
     write(out / "index.php" / "projects", json.dumps({"data": site.projects}))
     for address in sorted(site.addresses_shown):
-        qr = out / "qr" / f"{address}.png"
-        qr.parent.mkdir(exist_ok=True)
-        qrencode = ["qrencode", "-s", "8", "-m", "4", "-o", str(qr)]
-        subprocess.run([*qrencode, f"monero:{address}"], check=True)
+        path = out / "qr" / f"{address}.png"
+        path.parent.mkdir(exist_ok=True)
+        qr.write(address, path)
 
     # Prune what no proposal used this time, half-written files included.
     if cache is not None:
