@@ -1,6 +1,5 @@
-# no package runs code at install; the git hooks are installed by hand, once
+# no package runs code at install
 allowBuilds:
-  lefthook: false
   esbuild: false
 # astro lists sharp as optional; its images come optimised from src/assets
 ignoredOptionalDependencies:
