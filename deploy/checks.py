@@ -17,6 +17,9 @@ Usage:
       refuse a built site holding a file type it never serves, a link to a
       host not in the <hosts> file, address-like text, or a font or image
       that isn't byte for byte a file in <tag-files>, the tag's own tree
+  checks.py site <site> <verified-list>
+      refuse a rendered site that holds an address the verified list lacks,
+      in its text or its attributes
   checks.py release <dir> <keyring> <version> <dest>
       verify that <dir>, holding ccs-site-v<version>.tar, SHA256SUMS and
       SHA256SUMS.asc, is that release, and unpack it into <dest>, which must
@@ -47,7 +50,7 @@ from pathlib import Path
 # this as root inside the installed release.
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "render"))
-from safety import has_address  # noqa: E402
+from safety import ADDRESS_RUN, has_address, visible  # noqa: E402
 
 ADDRESS = r"[48][1-9A-HJ-NP-Za-km-z]{94}"
 VALUE = re.compile(
@@ -69,7 +72,8 @@ SNAPSHOT_FIELDS = {"iid", "title", "author", "web_url", "created_at", "adds"}
 MAX_MERGE_REQUESTS = 1_000  # mrs.py reads at most ten pages of 100
 MAX_TEXT = 1_000  # GitLab allows 255 characters for a title or a username
 # what the built site holds: pages and templates, one stylesheet, fonts, images
-BUILD_SUFFIXES = {".html", ".css", ".woff2", ".avif", ".webp", ".png"}
+BINARY_SUFFIXES = {".woff2", ".avif", ".webp", ".png"}
+BUILD_SUFFIXES = {".html", ".css"} | BINARY_SUFFIXES
 # the authority after // in a URL, absolute or protocol-relative
 URL_AUTHORITY = re.compile(r"//([^/\s\"'<>()\\?#]+)")
 TAG = re.compile(r"<[^>]*>")
@@ -321,6 +325,41 @@ def check_build(dist: str, hosts_path: str, tag_files: str) -> None:
             raise Reject(f"build: {name} holds address-like text")
 
 
+def unlisted_run(text: str, listed: set[str]) -> str | None:
+    """Return an address-like run in the text that isn't a listed address, if any.
+
+    Each listed address is cut out of a run first, so text next to one, such as
+    a button's label once tags are dropped, isn't taken for an address.
+    """
+    for run in ADDRESS_RUN.findall(visible(text)):
+        rest = run
+        for address in listed & {run[i : i + 95] for i in range(len(run) - 94)}:
+            rest = rest.replace(address, " ")
+        if ADDRESS_RUN.search(rest):
+            return run
+    return None
+
+
+def check_site(site: str, list_path: str) -> None:
+    """Refuse a rendered site that holds an address the signed list lacks.
+
+    This catches a bug in the render or a template. Each file is read with its
+    entities decoded, and without format characters or combining marks:
+    - as it is, for its attributes;
+    - without its tags, for its text as it shows.
+    """
+    rows = lines(read_capped(list_path, LIST_CAP, "address list"), "address list")
+    listed = {row.split(" ")[-1] for row in rows}
+    for path in sorted(Path(site).rglob("*")):
+        if not path.is_file() or path.suffix in BINARY_SUFFIXES:
+            continue
+        text = html.unescape(path.read_text(encoding="utf-8", errors="replace"))
+        run = unlisted_run(text, listed) or unlisted_run(TAG.sub("", text), listed)
+        if run:
+            shown = f"{path.relative_to(site)} shows {run[:12]}..."
+            raise Reject(f"site: {shown}, which isn't on the signed list")
+
+
 def signed_digest(folder: str, keyring: str, version: int) -> str:
     """Return the sha256 of release `version`'s archive, as two signers vouch for it.
 
@@ -401,6 +440,8 @@ def main(argv: list[str]) -> int:
                 check_snapshot(read_capped(path, STATUS_CAP, "snapshot"))
             case ["build", dist, hosts, tag_files]:
                 check_build(dist, hosts, tag_files)
+            case ["site", folder, list_path]:
+                check_site(folder, list_path)
             case ["release", folder, keyring, version, dest]:
                 install_release(folder, keyring, int(version), dest)
             case _:

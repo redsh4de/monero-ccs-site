@@ -40,6 +40,7 @@ KNOWN_ATTACKS = {
     "table alignment": "| a |\n|:-:|\n| 1 |",
     "address": ADDRESS,
     "address split by markup": f"{ADDRESS[:47]}**{ADDRESS[47:]}**",
+    "address in a link": f"[explorer](https://example.com/{ADDRESS})",
     "address split by a zero-width space": (
         f"{ADDRESS[:47]}\N{ZERO WIDTH SPACE}{ADDRESS[47:]}"
     ),
@@ -65,6 +66,7 @@ class Page(HTMLParser):
         self.tags = set()
         self.attributes = set()
         self.schemes = set()
+        self.links = []
         self.text = ""
         self.feed(html)
         self.close()
@@ -75,6 +77,7 @@ class Page(HTMLParser):
             self.attributes.add(name)
             if name == "href":
                 self.schemes.add(urllib.parse.urlsplit(value).scheme)
+                self.links.append(value)
 
     def handle_data(self, data):
         self.text += data
@@ -96,6 +99,7 @@ def assert_safe(markdown):
     assert page.attributes <= ALLOWED_ATTRIBUTES
     assert page.schemes <= SAFE_SCHEMES
     assert not shows_address(page.text)
+    assert not any(shows_address(link) for link in page.links)
 
 
 @pytest.mark.parametrize("markdown", KNOWN_ATTACKS.values(), ids=KNOWN_ATTACKS.keys())

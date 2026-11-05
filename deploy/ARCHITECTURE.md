@@ -42,8 +42,8 @@ result.
    changes, or once an hour. `seen` is a hash of ccs-back's proposals commit and of its
    Ideas stage, which lists the open merge requests.
 3. `update.sh` runs after each fetch, and checks the values and the address list. When
-   something changed, it renders the site with [the render](render/README.md), and
-   switches to it.
+   something changed, it renders the site with [the render](render/README.md). It
+   switches to the new site only if no page shows an address the list lacks.
 4. nginx serves the site.
 5. The monitor renders the site again, and compares it with the live site over Tor, byte
    for byte.

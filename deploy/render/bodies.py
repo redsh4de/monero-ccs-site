@@ -7,8 +7,8 @@ links) plus footnotes. On the way, the token stream is narrowed:
 - images become links, since inline images from other hosts would leak every
   visitor's IP;
 - raw HTML is escaped, comments dropped, and only six tags turned back;
-- any block whose text holds an address-like run is replaced, and so is any
-  link title, which would show on hover.
+- any block whose text or links hold an address-like run is replaced, and any
+  link title, which would show on hover, is dropped.
 """
 
 import html
@@ -77,7 +77,8 @@ def narrow_inline(token: Token) -> None:
         children.append(child)
     # Check the text as shown: markup and the allowed tags add no characters.
     shown = "".join(child.content for child in children if child.type != "html_inline")
-    if has_address(shown):
+    hrefs = " ".join(c.attrs["href"] for c in children if c.type == "link_open")
+    if has_address(shown) or has_address(hrefs):
         children = [Token("text", "", 0, content=REMOVED)]
     token.children = children
 

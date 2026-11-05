@@ -478,7 +478,12 @@ main() {
   # 7. Every proposal that takes donations shows a signed address.
   check_addresses
 
-  # 8. The live site shows the same pages.
+  # 8. The pages as they should be show only listed addresses.
+  failing=0
+  "$DEPLOY/checks.py" site "$EXPECTED_DIR" "$RUN_DIR/addresses" || failing=1
+  check unlisted "$failing" "the render shows an address the signed list lacks"
+
+  # 9. The live site shows the same pages.
   compare_pages "$page_circuit"
 
   end_run
