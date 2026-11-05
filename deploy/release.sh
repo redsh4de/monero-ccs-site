@@ -32,8 +32,8 @@ readonly DEPLOY
 export GIT_CONFIG_GLOBAL=/dev/null
 export GIT_CONFIG_NOSYSTEM=1
 
-# pinned: pnpm as packageManager names it, and StageX's Node and C++ runtime
-# of one StageX release
+# pinned: pnpm as packageManager names it, and StageX's Node and GCC, of one
+# StageX release
 readonly PNPM_VERSION=11.4.0
 readonly PNPM_URL="https://registry.npmjs.org/pnpm/-/pnpm-$PNPM_VERSION.tgz"
 readonly PNPM_SHA512=f0febc7e37552ab485494a914241b338e0b3580b93d54ce31f00933015880863129038a1b4ae4e414a0ee63ac35bf21197e990172c4a68256450b5636310968f
@@ -132,13 +132,13 @@ get_previous_release() {
 }
 
 # build_image: builds the image the site is built in, and prints its ID.
-# StageX's Node lacks the two libraries that npm's prebuilt native modules
-# load, so they are copied in from StageX's GCC.
+# lightningcss, which minifies the CSS, loads libgcc_s, and StageX's Node
+# lacks it, so it is copied in from StageX's GCC.
 build_image() {
   printf 'FROM %s AS gcc\nFROM %s\n' "$GCC" "$NODE" \
     >"$WORK/image/Containerfile" || return 1
-  printf 'COPY --from=gcc %s %s /usr/lib/\n' /usr/lib/libgcc_s.so.1 \
-    /usr/lib/libstdc++.so.6 >>"$WORK/image/Containerfile" || return 1
+  printf 'COPY --from=gcc /usr/lib/libgcc_s.so.1 /usr/lib/\n' \
+    >>"$WORK/image/Containerfile" || return 1
   "$CONTAINER" build -q -f "$WORK/image/Containerfile" "$WORK/image"
 }
 

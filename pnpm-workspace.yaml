@@ -2,8 +2,9 @@
 allowBuilds:
   lefthook: false
   esbuild: false
-  "@parcel/watcher": false
-  sharp: false
+# astro lists sharp as optional; its images come optimised from src/assets
+ignoredOptionalDependencies:
+  - sharp
 minimumReleaseAge: 20160 # minutes (14 days)
 blockExoticSubdeps: true
 trustPolicy: no-downgrade

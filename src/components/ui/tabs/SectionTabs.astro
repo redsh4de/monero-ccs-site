@@ -15,8 +15,8 @@ interface Props {
 
 const { tabs, class: className } = Astro.props;
 
-if (!tabs || tabs.length === 0) {
-  throw new Error("<SectionTabs> requires at least one tab");
+if (!tabs || tabs.length === 0 || tabs.length > 5) {
+  throw new Error("<SectionTabs> takes one to five tabs");
 }
 
 const uid = `stabs-${stableId(tabs.map((t) => t.label))}`;
@@ -117,7 +117,7 @@ const close = (tab?: Tab) => (tab?.when ? "[% endif %]" : "");
   </div>
 </div>
 
-<style lang="scss">
+<style>
   .section-tabs {
     position: relative;
   }
@@ -149,10 +149,10 @@ const close = (tab?: Tab) => (tab?.when ? "[% endif %]" : "");
     transition:
       color 0.15s ease,
       border-color 0.15s ease;
+  }
 
-    &:hover {
-      color: var(--heading-color);
-    }
+  .tab-label:hover {
+    color: var(--heading-color);
   }
 
   .tab-count {
@@ -179,42 +179,68 @@ const close = (tab?: Tab) => (tab?.when ? "[% endif %]" : "");
     }
   }
 
-  @for $i from 1 through 5 {
-    .tab-input:nth-of-type(#{$i}):checked
-      ~ .tab-labels
-      .tab-label:nth-child(#{$i}) {
-      color: var(--orange-text);
-      border-bottom-color: var(--orange-text);
-
-      .tab-count {
-        background: color-mix(in srgb, var(--monero-orange) 15%, transparent);
-        color: var(--monero-orange);
-      }
-    }
-
-    .tab-input:nth-of-type(#{$i}):focus-visible
-      ~ .tab-labels
-      .tab-label:nth-child(#{$i}) {
-      outline: 2px solid var(--orange-text);
-      outline-offset: -2px;
-    }
-
-    .tab-input:nth-of-type(#{$i}):checked
-      ~ .tab-panels
-      .tab-panel:nth-child(#{$i}) {
-      display: block;
-    }
+  /* one selector for each tab, up to the five that <SectionTabs> allows */
+  .tab-input:nth-of-type(1):checked ~ .tab-labels .tab-label:nth-child(1),
+  .tab-input:nth-of-type(2):checked ~ .tab-labels .tab-label:nth-child(2),
+  .tab-input:nth-of-type(3):checked ~ .tab-labels .tab-label:nth-child(3),
+  .tab-input:nth-of-type(4):checked ~ .tab-labels .tab-label:nth-child(4),
+  .tab-input:nth-of-type(5):checked ~ .tab-labels .tab-label:nth-child(5) {
+    color: var(--orange-text);
+    border-bottom-color: var(--orange-text);
   }
 
-  @media (max-width: 600px) {
+  .tab-input:nth-of-type(1):checked
+    ~ .tab-labels
+    .tab-label:nth-child(1)
+    .tab-count,
+  .tab-input:nth-of-type(2):checked
+    ~ .tab-labels
+    .tab-label:nth-child(2)
+    .tab-count,
+  .tab-input:nth-of-type(3):checked
+    ~ .tab-labels
+    .tab-label:nth-child(3)
+    .tab-count,
+  .tab-input:nth-of-type(4):checked
+    ~ .tab-labels
+    .tab-label:nth-child(4)
+    .tab-count,
+  .tab-input:nth-of-type(5):checked
+    ~ .tab-labels
+    .tab-label:nth-child(5)
+    .tab-count {
+    background: color-mix(in srgb, var(--monero-orange) 15%, transparent);
+    color: var(--monero-orange);
+  }
+
+  .tab-input:nth-of-type(1):focus-visible ~ .tab-labels .tab-label:nth-child(1),
+  .tab-input:nth-of-type(2):focus-visible ~ .tab-labels .tab-label:nth-child(2),
+  .tab-input:nth-of-type(3):focus-visible ~ .tab-labels .tab-label:nth-child(3),
+  .tab-input:nth-of-type(4):focus-visible ~ .tab-labels .tab-label:nth-child(4),
+  .tab-input:nth-of-type(5):focus-visible
+    ~ .tab-labels
+    .tab-label:nth-child(5) {
+    outline: 2px solid var(--orange-text);
+    outline-offset: -2px;
+  }
+
+  .tab-input:nth-of-type(1):checked ~ .tab-panels .tab-panel:nth-child(1),
+  .tab-input:nth-of-type(2):checked ~ .tab-panels .tab-panel:nth-child(2),
+  .tab-input:nth-of-type(3):checked ~ .tab-panels .tab-panel:nth-child(3),
+  .tab-input:nth-of-type(4):checked ~ .tab-panels .tab-panel:nth-child(4),
+  .tab-input:nth-of-type(5):checked ~ .tab-panels .tab-panel:nth-child(5) {
+    display: block;
+  }
+
+  @media (width <= 600px) {
     .tab-labels {
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
       scrollbar-width: none;
+    }
 
-      &::-webkit-scrollbar {
-        display: none;
-      }
+    .tab-labels::-webkit-scrollbar {
+      display: none;
     }
 
     .tab-label {
