@@ -53,6 +53,8 @@ ADDRESS = r"[48][1-9A-HJ-NP-Za-km-z]{94}"
 VALUE = re.compile(
     rf"[0-9a-f]{{16}} [0-9]{{1,12}}(\.[0-9]{{1,12}})? [0-9]{{1,9}} ({ADDRESS}|-)"
 )
+# the hash of an address's QR code, once the backend read the code back
+QR = re.compile(rf"qr [0-9a-f]{{64}} {ADDRESS}")
 SEEN = re.compile(r"seen [0-9a-f]{64}")
 UPDATED = re.compile(r"updated ([0-9]{10})")
 LISTED = re.compile(rf"{ADDRESS}|general-fund {ADDRESS}")
@@ -154,7 +156,7 @@ def check_values(data: bytes, last: int, now: int) -> str:
         raise Reject("values: the updated line is missing or in the future")
     if int(updated[1]) <= last:
         raise Reject(None)
-    patterns = (VALUE, SEEN, UPDATED)
+    patterns = (VALUE, QR, SEEN, UPDATED)
     matched = all(any(p.fullmatch(row) for p in patterns) for row in rows)
     seen = sum(row.startswith("seen ") for row in rows)
     times = sum(row.startswith("updated ") for row in rows)
@@ -178,15 +180,21 @@ def check_addresses(keyring: str, path: str) -> str:
 
 
 def apply_list(values: str, listed: set[str]) -> str:
-    """Return the values with every address that isn't a line of the list as -.
+    """Return the values with only the addresses that are lines of the list.
 
-    Fields split on single spaces only, so a tab can't hide an address.
+    A proposal's address that isn't listed becomes -, and the QR line of an
+    address the list lacks is dropped; the list names the General Fund on a
+    general-fund line. Fields split on single spaces only, so a tab can't hide
+    an address.
     """
     rows = []
     for row in values.split("\n"):
         fields = row.split(" ")
         if len(fields) == 4 and fields[3] not in listed:
             fields[3] = "-"
+        if len(fields) == 3 and fields[0] == "qr":
+            if not {fields[2], f"general-fund {fields[2]}"} & listed:
+                continue
         rows.append(" ".join(fields))
     return "\n".join(rows)
 

@@ -35,7 +35,8 @@ result.
 ```
 
 1. `values.py` reads ccs-back's JSON about once a minute, and writes the values: each
-   proposal's amount raised, contribution count and donation address. The push sends
+   proposal's amount raised, contribution count and donation address. It also reads
+   each address's QR code back with zbar, and adds the hash of the code. The push sends
    them to the web server over SSH.
 2. Each push starts `fetch.sh`. It calls GitLab only when the push's `seen` line
    changes, or once an hour. `seen` is a hash of ccs-back's proposals commit and of its

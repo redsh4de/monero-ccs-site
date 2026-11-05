@@ -106,13 +106,36 @@ def write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def build_site(given: inputs.Inputs) -> content.Site:
+    """Build the site, and close each donation box whose code wasn't read back.
+
+    Such a box shows no address, as when its address isn't on the signed list.
+    The rest of the site still updates, and the monitor's addresses alert names
+    the proposal.
+    """
+    site = content.build(given)
+    hashes = given.qr_hashes
+    unread = {a for a in site.addresses_shown if not qr.is_read_back(a, hashes.get(a))}
+    if not unread:
+        return site
+    listed = " ".join(sorted(unread))
+    print(f"render: no QR code read back for {listed}", file=sys.stderr)
+    wallets = {
+        ident: replace(wallet, address="") if wallet.address in unread else wallet
+        for ident, wallet in given.wallets.items()
+    }
+    fund = "" if given.general_fund in unread else given.general_fund
+    return content.build(replace(given, wallets=wallets, general_fund=fund))
+
+
 def main() -> None:
     if len(sys.argv) not in (4, 5):
         sys.exit(__doc__)
     in_dir, template_dir, out = (Path(arg) for arg in sys.argv[1:4])
     cache = Path(sys.argv[4]) if len(sys.argv) == 5 else None
 
-    site = content.build(inputs.read(in_dir))
+    given = inputs.read(in_dir)
+    site = build_site(given)
     names = ["home", "proposal", "donate", *site.stage_pages]
     pages = templates(template_dir, names)
     shared = {"counts": site.counts, "home": site.home}
@@ -132,7 +155,7 @@ def main() -> None:
     for address in sorted(site.addresses_shown):
         path = out / "qr" / f"{address}.png"
         path.parent.mkdir(exist_ok=True)
-        qr.write(address, path)
+        qr.write(address, path, given.qr_hashes.get(address))
 
     # Prune what no proposal used this time, half-written files included.
     if cache is not None:

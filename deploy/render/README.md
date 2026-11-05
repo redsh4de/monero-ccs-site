@@ -10,14 +10,14 @@ python3 deploy/render/render.py <input-dir> <templates-dir> <out-dir> [<cache-di
 
 The cache folder is optional, and speeds up later renders. The input folder holds:
 
-| Path             | Contents                                    | Source                   |
-| :--------------- | :------------------------------------------ | :----------------------- |
-| `proposals/*.md` | The proposal files                          | ccs-proposals repository |
-| `mr/open.json`   | The open merge requests                     | GitLab API               |
-| `mr/open.tsv`    | The files that open merge requests add      | GitLab API               |
-| `mr/merged.tsv`  | The merge request that added each file      | ccs-proposals history    |
-| `values`         | Amounts raised, contributions and addresses | Backend                  |
-| `general-fund`   | The General Fund address                    | Address list             |
+| Path             | Contents                                                    | Source                   |
+| :--------------- | :---------------------------------------------------------- | :----------------------- |
+| `proposals/*.md` | The proposal files                                          | ccs-proposals repository |
+| `mr/open.json`   | The open merge requests                                     | GitLab API               |
+| `mr/open.tsv`    | The files that open merge requests add                      | GitLab API               |
+| `mr/merged.tsv`  | The merge request that added each file                      | ccs-proposals history    |
+| `values`         | Amounts raised, contributions, addresses and QR code hashes | Backend                  |
+| `general-fund`   | The General Fund address                                    | Address list             |
 
 The render needs Python 3 and the Debian 13 packages in `deploy/Containerfile.render`.
 `pnpm render` runs the render in that image, so a preview uses production's versions.
