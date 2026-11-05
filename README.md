@@ -7,10 +7,9 @@ runs on neither server.
 
 ## Development
 
-Requires Node 22 or later, pnpm 11.4 or later, and podman. Run
-`pnpm exec lefthook install` once, then `pnpm preview` to see the site with the sample
-data in `example-data/`. Every pnpm command and git hook runs the dependencies' code as
-you, so read "Maintainer setup" in
+Requires Node 22 or later, pnpm 11.4 or later, and podman. Run `pnpm preview` to see
+the site with the sample data in `example-data/`. Every pnpm command runs the
+dependencies' code as you, so read "Maintainer setup" in
 [deploy/RELEASING.md](deploy/RELEASING.md#maintainer-setup) first.
 
 | Command        | Action                                                                   |

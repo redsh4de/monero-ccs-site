@@ -9,8 +9,8 @@ and the install.
 
 ## Maintainer setup
 
-**Keep development and signing apart.** Every pnpm command, git hook and editor
-extension runs dependency code with your account's rights.
+**Keep development and signing apart.** Every pnpm command and editor extension runs
+dependency code with your account's rights.
 
 ### Development account
 
@@ -18,7 +18,7 @@ extension runs dependency code with your account's rights.
 - Keep your account out of the `docker` and `libvirt` groups. Either gives root to any
   code it runs.
 - Read a change to `package.json`, `pnpm-workspace.yaml`, `pnpm-lock.yaml`,
-  `lefthook.yml`, `astro.config.mjs` or `.vscode/` as code that runs on your machine.
+  `astro.config.mjs` or `.vscode/` as code that runs on your machine.
 - Run an outside contributor's branch only in a container or a throwaway virtual
   machine.
 - Update dependencies in their own pull request. Never allow a package's build scripts
