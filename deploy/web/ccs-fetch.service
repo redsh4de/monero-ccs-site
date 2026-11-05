@@ -1,0 +1,20 @@
+[Unit]
+Description=Fetch the CCS site's proposals and merge requests
+Wants=network-online.target
+After=network-online.target
+# the update runs after every fetch, whatever the fetch found
+OnSuccess=ccs-update.service
+OnFailure=ccs-update.service
+
+[Service]
+Type=oneshot
+User=ccs-fetch
+# git reads its config from HOME, and ProtectHome hides /home
+Environment=HOME=/var/lib/ccs/fetch
+ExecStart=/usr/local/lib/ccs/current/deploy/web/fetch.sh
+# the alert URL, handed to this unit alone, never to the render
+LoadCredential=alert_url:/etc/ccs/alert_url
+ReadWritePaths=/var/lib/ccs/in /var/lib/ccs/fetch
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryMax=512M
+TimeoutStartSec=900

@@ -1,0 +1,12 @@
+# /etc/ccs/config on both machines, readable by root only: systemd passes it to
+# each service. KEY=value lines, no quotes or spaces.
+
+# backend: the web server to push to, and ccs-back's storage folder. install.sh
+# backend sets both from its arguments; run it again with new ones to change
+# them.
+WEB_HOST=
+CCS_BACK=/var/www/ccs-back/storage/app
+
+# optional, to move the release host or the site; the defaults are in lib.sh
+#RELEASES=
+#SITE=

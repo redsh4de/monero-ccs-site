@@ -23,7 +23,6 @@ REPO = f"{GITLAB}monero-project/ccs-proposals"
 
 @dataclass(frozen=True)
 class Stage:
-    name: str
     page: str  # Path of the stage's page
     label: str
     summary: str  # Heading of the summary card
@@ -31,24 +30,13 @@ class Stage:
 
 
 STAGES = {
-    stage.name: stage
-    for stage in (
-        Stage(
-            "funding-required",
-            "funding-required",
-            "Funding Required",
-            "Contribute",
-            "FUNDING-REQUIRED",
-        ),
-        Stage(
-            "work-in-progress",
-            "work-in-progress",
-            "Work in Progress",
-            "Progress",
-            "WORK-IN-PROGRESS",
-        ),
-        Stage("completed", "completed-proposals", "Completed", "Funded", "COMPLETED"),
-    )
+    "funding-required": Stage(
+        "funding-required", "Funding Required", "Contribute", "FUNDING-REQUIRED"
+    ),
+    "work-in-progress": Stage(
+        "work-in-progress", "Work in Progress", "Progress", "WORK-IN-PROGRESS"
+    ),
+    "completed": Stage("completed-proposals", "Completed", "Funded", "COMPLETED"),
 }
 LAYOUTS = {"fr": "funding-required", "wip": "work-in-progress", "cp": "completed"}
 

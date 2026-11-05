@@ -1,0 +1,8 @@
+[Unit]
+Description=Write the CCS values when ccs-back rewrites its JSON
+
+[Path]
+PathChanged=/var/www/ccs-back/storage/app/proposals.json
+
+[Install]
+WantedBy=multi-user.target
