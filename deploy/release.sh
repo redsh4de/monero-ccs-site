@@ -185,6 +185,8 @@ build_site() {
   local bad=""
 
   git archive "$tag" | tar -x -C "$WORK/src"
+  # the tag's files again, out of the build's reach, for the build check
+  git archive "$tag" | tar -x -C "$WORK/tag"
   run_node "$image" online /pnpm/package/bin/pnpm.cjs install \
     --frozen-lockfile --prod --ignore-scripts
   # the build needs no network, so no dependency can reach out while it runs
@@ -199,10 +201,10 @@ build_site() {
   if [ -n "$bad" ]; then
     stop "a control byte in a text file, so this build isn't signed: $bad"
   fi
-  # a dependency can't slip a script file, a link elsewhere or an address
-  # into the site: checks.py refuses the build before anyone reads it
+  # checks.py refuses what a dependency could plant: a script file, a link
+  # elsewhere, an address, or a swapped font or image
   "$DEPLOY/checks.py" build "$WORK/src/dist" "$WORK/src/deploy/build-hosts" \
-    || stop "the build holds what a release may not, so it isn't signed"
+    "$WORK/tag" || stop "the build holds what a release may not, so it isn't signed"
 }
 
 # pack_release <out-dir> <tag>: writes the release's archive and SHA256SUMS
@@ -443,7 +445,7 @@ main() {
   WORK=$(mktemp -d)
   readonly WORK
   trap 'rm -rf -- "$WORK"' EXIT
-  mkdir -p -- "$WORK/src" "$WORK/pnpm" "$WORK/image" "$WORK/new" \
+  mkdir -p -- "$WORK/src" "$WORK/tag" "$WORK/pnpm" "$WORK/image" "$WORK/new" \
     "$WORK/old" "$WORK/attestations"
 
   # 1. Only the tag's scripts, and the tag's pnpm.
