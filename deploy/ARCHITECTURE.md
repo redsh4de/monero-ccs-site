@@ -82,6 +82,7 @@ from the keys in `release-signers.gpg`, and skips any other.
 - checks release N-1 before it shows the changes since then;
 - refuses a build holding a file type the site never serves, a link to a host not in
   `deploy/build-hosts`, or address-like text;
+- refuses a font or image that is not byte for byte a file of the tag;
 - stops when the build differs from a release signer's attestation.
 
 `install.sh` switches a machine to a release only after it checks it. It:

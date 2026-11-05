@@ -13,9 +13,10 @@ Usage:
       print the release and commit that the site's status.json names
   checks.py snapshot <status.json>
       refuse a merge request snapshot that GitLab itself couldn't have sent
-  checks.py build <dist> <hosts>
+  checks.py build <dist> <hosts> <tag-files>
       refuse a built site holding a file type it never serves, a link to a
-      host not in the <hosts> file, or address-like text
+      host not in the <hosts> file, address-like text, or a font or image
+      that isn't byte for byte a file in <tag-files>, the tag's own tree
   checks.py release <dir> <keyring> <version> <dest>
       verify that <dir>, holding ccs-site-v<version>.tar, SHA256SUMS and
       SHA256SUMS.asc, is that release, and unpack it into <dest>, which must
@@ -264,17 +265,31 @@ def read_hosts(path: str) -> set[str]:
     return {row.split("#", 1)[0].strip().lower() for row in rows} - {""}
 
 
-def check_build(dist: str, hosts_path: str) -> None:
-    """Refuse a built site holding anything a release may not.
+def sha256(path: Path) -> str:
+    """Return the sha256 of a file's bytes."""
+    with open(path, "rb") as file:
+        return hashlib.file_digest(file, "sha256").hexdigest()
 
-    Every file must be of a type the site serves, every host that a page or the
-    stylesheet names must be on the list, and no text may hold an address-like
-    run: donation addresses arrive only at render time, from the signed list.
-    Pages are read as a browser shows them: with entities decoded for the links,
-    and as visible text without tags for addresses, so neither can hide behind
-    an escape or a tag.
+
+def check_build(dist: str, hosts_path: str, tag_files: str) -> None:
+    """Refuse a built site that holds anything a release may not.
+
+    The build is refused when it holds:
+    - a file of a type the site never serves;
+    - a font or image that isn't byte for byte a file of the tag. The build
+      copies these unchanged, so a dependency can't swap one for a picture of
+      another address;
+    - a link to a host that isn't on the list;
+    - address-like text. Donation addresses come only from the signed list,
+      at render time.
+
+    Pages are read as a browser shows them. Links are read with entities
+    decoded, and addresses from the visible text without tags, so neither can
+    hide behind an escape or a tag.
     """
     allowed = read_hosts(hosts_path)
+    paths = Path(tag_files).rglob("*")
+    tag = {sha256(p) for p in paths if p.is_file() and not p.is_symlink()}
     for path in sorted(Path(dist).rglob("*")):
         name = path.relative_to(dist)
         if path.is_dir() and not path.is_symlink():
@@ -282,6 +297,8 @@ def check_build(dist: str, hosts_path: str) -> None:
         if path.is_symlink() or path.suffix not in BUILD_SUFFIXES:
             raise Reject(f"build: {name} isn't a file type the site serves")
         if path.suffix not in (".html", ".css"):
+            if sha256(path) not in tag:
+                raise Reject(f"build: {name} isn't byte for byte a file of the tag")
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
         visible = text
@@ -374,8 +391,8 @@ def main(argv: list[str]) -> int:
                 print(" ".join(fields))
             case ["snapshot", path]:
                 check_snapshot(read_capped(path, STATUS_CAP, "snapshot"))
-            case ["build", dist, hosts]:
-                check_build(dist, hosts)
+            case ["build", dist, hosts, tag_files]:
+                check_build(dist, hosts, tag_files)
             case ["release", folder, keyring, version, dest]:
                 install_release(folder, keyring, int(version), dest)
             case _:

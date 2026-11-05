@@ -123,13 +123,18 @@ then, `release.sh` cannot see it, and says the release needs two attestations.
 lockfile dropped (`-`) and added (`+`) since release N-1. It then shows every change:
 `deploy/` line by line, and `dist/` word by word. Release 1 compares with nothing.
 
-`release.sh` also refuses some builds on its own. It stops when `dist/` holds a file
-type the site never serves, a host not in `deploy/build-hosts`, or address-like text.
+`release.sh` also refuses some builds on its own. It stops when `dist/` holds:
+
+- a file type the site never serves;
+- a link to a host not in `deploy/build-hosts`;
+- address-like text;
+- a font or image that is not byte for byte a file of the tag.
+
 When the site really links to a new host, add it to `deploy/build-hosts`, where the
 change shows in the review.
 
-A font or image shows only as `Bin`. It may change only when the fonts, `src/assets` or
-the image tools did.
+A font or image shows only as `Bin`. Each one is a file of the tag, so it changes only
+when that file did.
 
 ---
 
