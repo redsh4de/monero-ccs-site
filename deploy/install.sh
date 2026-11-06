@@ -77,6 +77,26 @@ load_config() {
   chmod 600 /etc/ccs/alert_url
 }
 
+# check_keys_only: stops while sshd's global settings let a password alone log
+# in. They don't when both password methods are off, or when each
+# AuthenticationMethods list holds publickey. sshd -T reads the files, not the
+# running sshd, and skips most Match blocks. sshd's config stays the
+# operator's, second factor and all.
+check_keys_only() {
+  if ! sshd -T | awk '
+    $1 == "passwordauthentication" { password = $2 }
+    $1 == "kbdinteractiveauthentication" { kbd = $2 }
+    $1 == "authenticationmethods" {
+      keyed = 1
+      for (i = 2; i <= NF; i++) if ($i !~ /(^|,)publickey(,|$)/) keyed = 0
+    }
+    END { exit (password != "no" || kbd != "no") && !keyed }'; then
+    stop "sshd may take passwords: turn PasswordAuthentication and" \
+      "KbdInteractiveAuthentication off in /etc/ssh/sshd_config.d/," \
+      "reload ssh, then run this again"
+  fi
+}
+
 # check_tls_key: stops when the TLS private key, or the file a link points
 # it at, can be read by other users. nginx reads it as root; nothing else
 # should.
@@ -410,6 +430,9 @@ main() {
   fi
   make_keyrings_readable
   install_packages "$role"
+  if [ "$role" = web ]; then
+    check_keys_only
+  fi
 
   # 2. The release: newer than the installed one, or already on disk, which
   #    was checked when it arrived. The installed version may come again;
