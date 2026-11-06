@@ -100,7 +100,7 @@ Run these steps as root on the web server, in the release's folder.
    first time, copy the current site's, since ccs.getmonero.org still points at the old
    site.
 2. Run the command that the backend's install printed, with the backend's IP address. It
-   checks the nginx site and reloads nginx:
+   checks the nginx site and restarts nginx in its sandbox:
 
    ```sh
    deploy/install.sh web site-vN <backend IP address> '<push key>'

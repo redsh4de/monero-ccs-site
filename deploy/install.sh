@@ -204,9 +204,9 @@ download_release() {
   mv -- "$download/tree" "$release_dir"
 }
 
-# install_files <release-dir> <role>: installs that release's units, the
-# sandbox beside each service by name, and its users, folders and nginx site,
-# named by role so one machine can hold both.
+# install_files <release-dir> <role>: installs the role's units, sandboxes,
+# users, folders and nginx site from that release, named by role so one
+# machine can hold both.
 install_files() {
   local release="$1"
   local role="$2"
@@ -222,6 +222,8 @@ install_files() {
   if [ "$role" = web ]; then
     install -m 0644 "$from/sysusers.conf" /etc/sysusers.d/ccs-web.conf
     install -m 0644 "$from/nginx.conf" /etc/nginx/sites-enabled/ccs.conf
+    install -D -m 0644 "$from/nginx-sandbox.conf" \
+      "$UNITS/nginx.service.d/ccs-sandbox.conf"
   fi
 }
 
@@ -306,10 +308,12 @@ start_web() {
       "the site and the release stay as they were"
   fi
   if [ -e "$CERT" ]; then
-    systemctl reload nginx
+    systemctl restart nginx
+    # an nginx from before its sandbox takes the pid file link as it stops
+    systemd-tmpfiles --create /etc/tmpfiles.d/ccs-web.conf
   else
     echo "Put the certificate in /etc/ssl/ccs/ (fullchain.pem," \
-      "privkey.pem), then reload nginx."
+      "privkey.pem), then run this command again."
   fi
 }
 
