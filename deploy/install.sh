@@ -175,7 +175,7 @@ install_packages() {
     set -- "$@" nginx openssh-server rsync
   else
     # zbar reads back each QR code, so only the backend needs it
-    set -- "$@" openssh-client tor libnss-systemd python3-zbar
+    set -- "$@" openssh-client tor libnss-systemd python3-zbar gpg
   fi
   apt-get install -y --no-upgrade --no-install-recommends "$@"
 }

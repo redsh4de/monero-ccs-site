@@ -424,7 +424,14 @@ main() {
 
   begin_run
 
-  # 1. What the site says it was built from. status.json and the pages are
+  # 1. No signer's key stops signing within 30 days. It doesn't depend on the
+  #    site, so it runs before anything can end the run.
+  failing=0
+  text=$("$DEPLOY/checks.py" expiring /etc/ccs/release-signers.gpg \
+    /etc/ccs/address-signers.gpg 2>&1) || failing=1
+  check key-expiry "$failing" "${text:-a signing key expires within 30 days}"
+
+  # 2. What the site says it was built from. status.json and the pages are
   #    fetched over two new circuits, so the web server can't tie the pages
   #    to the request that marks the monitor.
   status_circuit=$(new_circuit)
@@ -435,7 +442,7 @@ main() {
   version="${status% *}"
   commit="${status#* }"
 
-  # 2. The release it names, and that it is no older than ours.
+  # 3. The release it names, and that it is no older than ours.
   failing=0
   release=$(get_verified_release "$version") || failing=1
   require release "$failing" "release $version doesn't download or verify"
@@ -445,7 +452,7 @@ main() {
   text="the site runs release $version, older than release $INSTALLED_VERSION"
   require old-release "$failing" "$text here"
 
-  # 3. The proposals commit is ccs-back's, and not an hour behind it.
+  # 4. The proposals commit is ccs-back's, and not an hour behind it.
   failing=0
   git -C "$PROPOSALS_CHECKOUT" cat-file -e "$commit^{commit}" 2>/dev/null \
     || failing=1
@@ -453,7 +460,7 @@ main() {
     "the site's commit $commit isn't in ccs-back's checkout"
   check_stall "$commit"
 
-  # 4. The merge requests match GitLab's. The web server can lag GitLab by up
+  # 5. The merge requests match GitLab's. The web server can lag GitLab by up
   #    to an hour, so only a mismatch lasting 75 minutes alerts.
   failing=0
   "$DEPLOY/checks.py" snapshot "$RUN_DIR/status.json" || failing=1
@@ -467,23 +474,23 @@ main() {
     || failing=1
   alert merge-requests "$failing" 4500 86400 "$MESSAGE_PREFIX $text"
 
-  # 5. The backend's latest values, built as the web server builds them.
+  # 6. The backend's latest values, built as the web server builds them.
   values_sum=$(build_values)
 
-  # 6. The pages as they should be.
+  # 7. The pages as they should be.
   inputs_hash=$(printf '%s\n' "$version" "$commit" "$snapshot_sum" "$values_sum" \
     | sha256sum | cut -c1-64)
   render_expected "$release" "$commit" "$inputs_hash"
 
-  # 7. Every proposal that takes donations shows a signed address.
+  # 8. Every proposal that takes donations shows a signed address.
   check_addresses
 
-  # 8. The pages as they should be show only listed addresses.
+  # 9. The pages as they should be show only listed addresses.
   failing=0
   "$DEPLOY/checks.py" site "$EXPECTED_DIR" "$RUN_DIR/addresses" || failing=1
   check unlisted "$failing" "the render shows an address the signed list lacks"
 
-  # 9. The live site shows the same pages.
+  # 10. The live site shows the same pages.
   compare_pages "$page_circuit"
 
   end_run

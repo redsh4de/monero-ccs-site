@@ -20,6 +20,9 @@ Usage:
   checks.py site <site> <verified-list>
       refuse a rendered site that holds an address the verified list lacks,
       in its text or its attributes
+  checks.py expiring <keyring>...
+      refuse when a signing key in the keyrings expires within 30 days, or
+      has, naming each
   checks.py release <dir> <keyring> <version> <dest>
       verify that <dir>, holding ccs-site-v<version>.tar, SHA256SUMS and
       SHA256SUMS.asc, is that release, and unpack it into <dest>, which must
@@ -41,6 +44,7 @@ import re
 import subprocess
 import sys
 import tarfile
+import tempfile
 import time
 from collections import Counter
 from pathlib import Path
@@ -81,6 +85,8 @@ VALUES_CAP = LIST_CAP = 1_000_000
 SUMS_CAP = 10_000
 STATUS_CAP = 50_000_000
 TAR_CAP = 200_000_000
+EXPIRY_NOTICE = 30 * 86_400
+NEVER = 2**62
 # gpgv status lines that start or settle one signature's verdict
 VERDICTS = {"NEWSIG", "GOODSIG", "EXPSIG", "EXPKEYSIG", "REVKEYSIG", "BADSIG", "ERRSIG"}
 
@@ -256,6 +262,40 @@ def check_snapshot(data: bytes) -> None:
             raise Reject("snapshot: a merge request address is malformed")
         if not blank_or_matches(GITLAB_TIME, mr["created_at"]):
             raise Reject("snapshot: a merge request time is malformed")
+
+
+def expiring(keyrings: list[str]) -> None:
+    """Refuse when a key in the keyrings can sign for 30 more days at most."""
+    # a keyring not placed yet is left to the checks that need it
+    placed = [keyring for keyring in keyrings if os.path.exists(keyring)]
+    if not placed:
+        return
+    # the monitor has no home gpg could write to
+    with tempfile.TemporaryDirectory() as home:
+        command = ["gpg", "--homedir", home, "--batch", "--with-colons"]
+        command += ["--show-keys", *placed]
+        run = subprocess.run(command, capture_output=True, text=True, check=False)
+    if run.returncode != 0:
+        raise Reject("keys: gpg can't read the keyrings")
+    soon = []
+    for block in re.split(r"\n(?=pub:)", run.stdout):
+        rows = [line.split(":") for line in block.splitlines()]
+        if not rows or rows[0][0] != "pub" or rows[0][1] == "r":
+            continue
+        keys = [row for row in rows if row[0] in ("pub", "sub") and row[1] != "r"]
+        signing = [row for row in keys if "s" in row[11]]
+        if not signing:
+            continue
+        # a signature stops verifying when its signing key or the primary key
+        # expires; a rotation leaves expired subkeys behind, which sign no more
+        valid = [row for row in signing if row[1] != "e"]
+        until = min(int(row[6] or NEVER) for row in [rows[0], *(valid or signing)])
+        if until < time.time() + EXPIRY_NOTICE:
+            owner = next((row[9] for row in rows if row[0] == "uid"), "?")
+            day = time.strftime("%Y-%m-%d", time.gmtime(until))
+            soon.append(f"{owner}: {day}")
+    if soon:
+        raise Reject("keys expire: " + "; ".join(soon))
 
 
 def release_name(version: int) -> str:
@@ -442,6 +482,8 @@ def main(argv: list[str]) -> int:
                 check_build(dist, hosts, tag_files)
             case ["site", folder, list_path]:
                 check_site(folder, list_path)
+            case ["expiring", *keyrings] if keyrings:
+                expiring(keyrings)
             case ["release", folder, keyring, version, dest]:
                 install_release(folder, keyring, int(version), dest)
             case _:
