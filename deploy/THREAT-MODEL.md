@@ -53,6 +53,7 @@ the render, which escapes everything it shows, or the fetch schedule.
 | A merged proposal                                     | Add raw HTML, a `javascript:` link, an image or an address | The render keeps only `details`, `summary` and `sup`, and replaces any block with an address by `[address removed]`                                                                                                                    | The render                                       |
 | `qrencode`, through a bug or a planted change         | Show a QR code for another address                         | Refused: the backend reads each code back with zbar, an unrelated decoder, and pushes its hash; each machine draws the code itself, and closes the box of one with another hash                                                        | The render                                       |
 | A bug in `markdown-it-py`                             | Emit unexpected HTML                                       | Contained, not detected: the CSP allows no script, and the monitor renders the same HTML                                                                                                                                               | nginx                                            |
+| A bug in nginx                                        | Take over the web server                                   | Contained: nginx runs in its own sandbox                                                                                                                                                                                               | `web/nginx-sandbox.conf`                         |
 | A bug in the render or a template                     | Show an address the list lacks                             | Refused: before the switch, `checks.py site` scans every rendered file, links and attributes included; the monitor scans its own render too                                                                                            | `update.sh`, the `unlisted` alert                |
 | A stale cache entry                                   | Serve an outdated proposal                                 | Detected: the monitor renders without the cache                                                                                                                                                                                        | `monitor.sh`                                     |
 | The network to GitLab                                 | Change fetched content                                     | Refused: `git` and `curl` verify TLS                                                                                                                                                                                                   | `fetch.sh`                                       |
@@ -62,8 +63,8 @@ the render, which escapes everything it shows, or the fetch schedule.
 `status.json` and the pages over two new Tor circuits each run, and asks for each page
 as Tor Browser does. But curl's TLS still differs from a browser's.
 
-The alert URL reaches only the two units that send alerts, as a systemd credential. The
-render never sees it.
+The alert URL reaches only the two units that send alerts, as a systemd credential, and
+`install.sh`, which posts each install. The render never sees it.
 
 The monitor renders the merge requests that the web server sends. `checks.py snapshot`
 first limits them to what GitLab itself could send, so a web server can feed the monitor

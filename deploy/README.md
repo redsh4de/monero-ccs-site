@@ -100,7 +100,7 @@ Run these steps as root on the web server, in the release's folder.
    first time, copy the current site's, since ccs.getmonero.org still points at the old
    site.
 2. Run the command that the backend's install printed, with the backend's IP address. It
-   checks the nginx site and reloads nginx:
+   checks the nginx site and restarts nginx in its sandbox:
 
    ```sh
    deploy/install.sh web site-vN <backend IP address> '<push key>'
@@ -132,6 +132,9 @@ Once both machines run the release:
 
 3. Put the same URL in the backend's `/etc/ccs/alert_url`. Leave it empty until now: the
    monitor finds no `status.json` on the old site, so it would alert.
+
+From then on, each install posts a line to the channel. A channel that stops working
+shows at the next install.
 
 ---
 

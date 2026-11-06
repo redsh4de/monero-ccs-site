@@ -175,7 +175,7 @@ install_packages() {
     set -- "$@" nginx openssh-server rsync
   else
     # zbar reads back each QR code, so only the backend needs it
-    set -- "$@" openssh-client tor libnss-systemd python3-zbar
+    set -- "$@" openssh-client tor libnss-systemd python3-zbar gpg
   fi
   apt-get install -y --no-upgrade --no-install-recommends "$@"
 }
@@ -204,9 +204,9 @@ download_release() {
   mv -- "$download/tree" "$release_dir"
 }
 
-# install_files <release-dir> <role>: installs that release's units, the
-# sandbox beside each service by name, and its users, folders and nginx site,
-# named by role so one machine can hold both.
+# install_files <release-dir> <role>: installs the role's units, sandboxes,
+# users, folders and nginx site from that release, named by role so one
+# machine can hold both.
 install_files() {
   local release="$1"
   local role="$2"
@@ -222,6 +222,9 @@ install_files() {
   if [ "$role" = web ]; then
     install -m 0644 "$from/sysusers.conf" /etc/sysusers.d/ccs-web.conf
     install -m 0644 "$from/nginx.conf" /etc/nginx/sites-enabled/ccs.conf
+    rm -f /etc/nginx/sites-enabled/default
+    install -D -m 0644 "$from/nginx-sandbox.conf" \
+      "$UNITS/nginx.service.d/ccs-sandbox.conf"
   fi
 }
 
@@ -306,10 +309,12 @@ start_web() {
       "the site and the release stay as they were"
   fi
   if [ -e "$CERT" ]; then
-    systemctl reload nginx
+    systemctl restart nginx
+    # an nginx from before its sandbox takes the pid file link as it stops
+    systemd-tmpfiles --create /etc/tmpfiles.d/ccs-web.conf
   else
     echo "Put the certificate in /etc/ssl/ccs/ (fullchain.pem," \
-      "privkey.pem), then reload nginx."
+      "privkey.pem), then run this command again."
   fi
 }
 
@@ -322,6 +327,33 @@ trial_render() {
   if [ -e "$CERT" ]; then
     nginx -t || return 1
   fi
+}
+
+# announce <role> <tag>: posts the install to the alert channel, so a wrong
+# alert URL shows now, and every install leaves a record there. The backend
+# posts through Tor, so the alert service never learns its address.
+announce() {
+  local role="$1"
+  local tag="$2"
+  local message=""
+
+  if [ ! -s /etc/ccs/alert_url ]; then
+    echo "/etc/ccs/alert_url is empty, so no alert reaches anyone yet."
+    return 0
+  fi
+  message=$(mktemp)
+  printf 'ccs install: %s, %s role\n' "$tag" "$role" >"$message"
+  if (
+    if [ "$role" = backend ]; then
+      export ALL_PROXY=socks5h://localhost/run/tor/socks
+    fi
+    CREDENTIALS_DIRECTORY=/etc/ccs post_alerts "$message"
+  ); then
+    echo "The alert channel has the install."
+  else
+    echo "The install's alert didn't arrive; ALERTS.md lists the usual causes."
+  fi
+  rm -f -- "$message"
 }
 
 # print_next_steps <role> <tag>: names the files still to place, and on the
@@ -410,6 +442,7 @@ main() {
   if [ "$old_release" != "$new_release" ]; then
     keep "$LIB/releases/" "$new_release" "$old_release"
   fi
+  announce "$role" "$tag"
   print_next_steps "$role" "$tag"
 }
 

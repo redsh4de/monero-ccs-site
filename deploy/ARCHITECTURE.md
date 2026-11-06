@@ -115,6 +115,16 @@ It takes away every privilege, device and namespace, and limits the system calls
 unit opens only the sockets it needs, and the monitor only Tor's.
 `systemd-analyze security` rates each service 0.4 to 1.2 out of 10: SAFE or OK.
 
+nginx, which serves every visitor, gets a sandbox of its own,
+`web/nginx-sandbox.conf`:
+
+- it keeps only the rights to bind ports 80 and 443, drop to www-data, and open its
+  logs;
+- it writes only its logs and temporary files;
+- it sees its own folder as `/run`, so it cannot reach systemd.
+
+It rates 2.5, where Debian's own unit rates 9.4.
+
 ---
 
 ## What the monitor checks
