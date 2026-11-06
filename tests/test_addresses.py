@@ -7,26 +7,52 @@ from hypothesis import strategies as st
 
 import checks
 
-ADDRESS = re.compile(r"[48][1-9A-HJ-NP-Za-km-z]{94}")
+BASE58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+ADDRESS = re.compile(rf"[48][{BASE58}]{{94}}")
 LISTED = "8" + "A" * 94
 UNLISTED = "4" + "B" * 94
 NOW = 1_800_000_000
-any_address = st.from_regex(ADDRESS, fullmatch=True)
+
+
+def fixed(alphabet, size):
+    """Return a strategy for text of that many characters from the alphabet."""
+    return st.text(alphabet, min_size=size, max_size=size)
+
+
+any_address = st.builds(str.__add__, st.sampled_from("48"), fixed(BASE58, 94))
+addresses = st.sampled_from([LISTED, UNLISTED]) | any_address
 
 
 @st.composite
 def value_line(draw):
     """One line as the backend pushes it: id, amount raised, contributions, address."""
-    proposal = draw(st.from_regex(r"[0-9a-f]{16}", fullmatch=True))
-    raised = draw(st.from_regex(r"[0-9]{1,12}(\.[0-9]{1,12})?", fullmatch=True))
+    proposal = draw(fixed("0123456789abcdef", 16))
+    whole, fraction = draw(st.integers(0, 10**12 - 1)), draw(st.integers(0, 10**12 - 1))
+    raised = draw(st.sampled_from([f"{whole}", f"{whole}.{fraction}"]))
     contributions = draw(st.integers(0, 999_999_999))
-    address = draw(st.sampled_from([LISTED, UNLISTED, "-"]) | any_address)
+    address = draw(addresses | st.just("-"))
     return f"{proposal} {raised} {contributions} {address}"
 
 
-@given(st.lists(value_line(), max_size=8))
+@st.composite
+def qr_line(draw):
+    """One QR line as the backend pushes it: the hash of a code, then its address."""
+    code = draw(fixed("0123456789abcdef", 64))
+    return f"qr {code} {draw(addresses)}"
+
+
+@given(st.lists(value_line() | qr_line(), max_size=8))
 def test_no_unlisted_address_reaches_a_page(lines):
     pushed = "".join(f"{line}\n" for line in lines) + f"updated {NOW}\n"
     values = checks.check_values(pushed.encode(), last=0, now=NOW)
     shown = checks.apply_list(values, listed={LISTED})
     assert set(ADDRESS.findall(shown)) <= {LISTED}
+
+
+def test_general_funds_qr_line_survives_the_list(tmp_path, capsys):
+    fund = "4" + "C" * 94
+    line = f"qr {'a' * 64} {fund}\n"
+    (tmp_path / "list").write_text(f"{LISTED}\ngeneral-fund {fund}\n")
+    (tmp_path / "values").write_text(line)
+    assert checks.main(["apply", str(tmp_path / "values"), str(tmp_path / "list")]) == 0
+    assert capsys.readouterr().out == line

@@ -19,16 +19,20 @@ def is_address(value: str) -> bool:
     return ADDRESS.fullmatch(value) is not None
 
 
-def has_address(text: str, ignore_spaces: bool = False) -> bool:
-    """Return True if the text holds an address-like run.
+def visible(text: str) -> str:
+    """Return the text as it copies, without format characters or combining marks.
 
-    Format characters (such as a zero-width space) and combining marks are
-    ignored, since an address split by them still copies as one.
+    An address split by them, such as by a zero-width space, still copies as one.
     """
-    visible = "".join(ch for ch in text if unicodedata.category(ch) not in ("Cf", "Mn"))
+    return "".join(ch for ch in text if unicodedata.category(ch) not in ("Cf", "Mn"))
+
+
+def has_address(text: str, ignore_spaces: bool = False) -> bool:
+    """Return True if the text, as it copies, holds an address-like run."""
+    shown = visible(text)
     if ignore_spaces:
-        visible = "".join(visible.split())
-    return ADDRESS_RUN.search(visible) is not None
+        shown = "".join(shown.split())
+    return ADDRESS_RUN.search(shown) is not None
 
 
 def redact(text: str, ignore_spaces: bool = False) -> str:

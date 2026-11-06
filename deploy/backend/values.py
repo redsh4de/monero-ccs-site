@@ -1,12 +1,20 @@
 #!/usr/bin/python3 -I
 """Print the values the backend pushes.
 
-One line per proposal with an id, the amount raised, the contributions and the
-address, then what ccs-back sees of GitLab, then the time. It reads only
-ccs-back's JSON and its checkout of ccs-proposals, in the CCS_BACK folder that
-systemd passes from /etc/ccs/config, and never reaches the network.
+The values are, in order:
+- one line per proposal: an id, the amount raised, the contributions and the
+  address;
+- a QR line for each address and the General Fund's: the hash of its code, once
+  zbar read the code back;
+- what ccs-back sees of GitLab;
+- the time.
 
-Exit: 0 printed, 1 when ccs-back's files can't be read.
+It reads only ccs-back's JSON and its checkout of ccs-proposals, in the CCS_BACK
+folder that systemd passes from /etc/ccs/config, and the address list. It never
+reaches the network.
+
+Exit: 0 printed, 1 when ccs-back's files can't be read or a code doesn't read
+back.
 """
 
 import hashlib
@@ -23,10 +31,13 @@ from pathlib import Path
 # over one line that doesn't match VALUE, so such a line is left out here.
 # Nothing is cached in __pycache__, where the monitor compares releases.
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+DEPLOY = Path(__file__).resolve().parent.parent
+sys.path[:0] = [str(DEPLOY), str(DEPLOY / "render")]
+import qr  # noqa: E402
 from checks import ADDRESS, VALUE  # noqa: E402
 
 URL = re.compile(r"/proposals/(.+)\.html")
+ADDRESS_LIST = Path("/etc/ccs/addresses.txt")
 
 
 def amount(value: object) -> str | None:
@@ -81,6 +92,19 @@ def value_line(row: dict) -> str | None:
     return line
 
 
+def general_fund() -> str | None:
+    """Return the General Fund's address from the address list, if it has one."""
+    try:
+        text = ADDRESS_LIST.read_text(encoding="ascii")
+    except (OSError, UnicodeDecodeError):
+        return None
+    for line in text.splitlines():
+        name, _, address = line.partition(" ")
+        if name == "general-fund" and re.fullmatch(ADDRESS, address):
+            return address
+    return None
+
+
 def seen_line(commit: str, groups: list) -> str:
     """Return the "seen" line: a hash of what ccs-back knows of GitLab.
 
@@ -109,8 +133,14 @@ def main() -> int:
             line = value_line(row)
             if line is not None:
                 lines.append(line)
+    addresses = {line.split(" ")[3] for line in lines} | {general_fund()}
+    try:
+        codes = [f"qr {qr.read_back(a)} {a}" for a in sorted(addresses - {"-", None})]
+    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        print(f"values: a QR code doesn't read back: {error}", file=sys.stderr)
+        return 1
 
-    for line in sorted(lines):
+    for line in [*sorted(lines), *codes]:
         print(line)
     print(seen_line(commit, groups))
     print(f"updated {int(time.time())}")

@@ -35,14 +35,15 @@ result.
 ```
 
 1. `values.py` reads ccs-back's JSON about once a minute, and writes the values: each
-   proposal's amount raised, contribution count and donation address. The push sends
+   proposal's amount raised, contribution count and donation address. It also reads
+   each address's QR code back with zbar, and adds the hash of the code. The push sends
    them to the web server over SSH.
 2. Each push starts `fetch.sh`. It calls GitLab only when the push's `seen` line
    changes, or once an hour. `seen` is a hash of ccs-back's proposals commit and of its
    Ideas stage, which lists the open merge requests.
 3. `update.sh` runs after each fetch, and checks the values and the address list. When
-   something changed, it renders the site with [the render](render/README.md), and
-   switches to it.
+   something changed, it renders the site with [the render](render/README.md). It
+   switches to the new site only if no page shows an address the list lacks.
 4. nginx serves the site.
 5. The monitor renders the site again, and compares it with the live site over Tor, byte
    for byte.

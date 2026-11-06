@@ -70,6 +70,9 @@ render_site() {
   timeout 300 python3 -I -B "$RELEASE_DIR/deploy/render/render.py" \
     "$WORK_DIR/in" "$RELEASE_DIR/dist/templates" "$WORK_DIR/out" \
     "$CCS_DIR/cache"
+  # whatever the render did, no page may show an address the list lacks
+  "$DEPLOY/checks.py" site "$WORK_DIR/out" "$WORK_DIR/addresses" \
+    || stop "the render shows an address the signed list lacks, so the site stays"
   python3 -I -B "$RELEASE_DIR/deploy/render/status.py" write \
     "$WORK_DIR/in" "$VERSION" "$commit" >"$WORK_DIR/out/status.json"
 }
