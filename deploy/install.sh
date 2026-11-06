@@ -222,6 +222,7 @@ install_files() {
   if [ "$role" = web ]; then
     install -m 0644 "$from/sysusers.conf" /etc/sysusers.d/ccs-web.conf
     install -m 0644 "$from/nginx.conf" /etc/nginx/sites-enabled/ccs.conf
+    rm -f /etc/nginx/sites-enabled/default
     install -D -m 0644 "$from/nginx-sandbox.conf" \
       "$UNITS/nginx.service.d/ccs-sandbox.conf"
   fi
