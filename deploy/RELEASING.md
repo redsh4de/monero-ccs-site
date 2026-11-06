@@ -83,10 +83,11 @@ goes out once two release signers have attested the same bytes.
    ```
 
 3. Read what changed in the scripts since the last release you signed, `site-vM`. If you
-   never signed one, read the three scripts whole:
+   never signed one, read the four scripts whole:
 
    ```sh
-   git diff site-vM site-vN -- deploy/release.sh deploy/lib.sh deploy/checks.py
+   git diff site-vM site-vN -- deploy/release.sh deploy/lib.sh deploy/checks.py \
+     deploy/render/safety.py
    ```
 
    These scripts run before their own review, so your reading is their only check.

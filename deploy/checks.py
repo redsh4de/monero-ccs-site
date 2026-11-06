@@ -41,6 +41,7 @@ import html
 import json
 import os
 import re
+import runpy
 import subprocess
 import sys
 import tarfile
@@ -49,12 +50,12 @@ import time
 from collections import Counter
 from pathlib import Path
 
-# the render's own address rule, from the same release. Nothing is cached in
-# __pycache__: the monitor compares releases file by file, and install.sh runs
-# this as root inside the installed release.
-sys.dont_write_bytecode = True
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "render"))
-from safety import ADDRESS_RUN, has_address, visible  # noqa: E402
+# the render's own address rule, from the same release, run from the file the
+# signers read: an import would take a safety/ folder or a cached .pyc first
+SAFETY = runpy.run_path(str(Path(__file__).resolve().parent / "render/safety.py"))
+ADDRESS_RUN = SAFETY["ADDRESS_RUN"]
+has_address = SAFETY["has_address"]
+visible = SAFETY["visible"]
 
 ADDRESS = r"[48][1-9A-HJ-NP-Za-km-z]{94}"
 VALUE = re.compile(
