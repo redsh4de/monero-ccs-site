@@ -329,6 +329,33 @@ trial_render() {
   fi
 }
 
+# announce <role> <tag>: posts the install to the alert channel, so a wrong
+# alert URL shows now, and every install leaves a record there. The backend
+# posts through Tor, so the alert service never learns its address.
+announce() {
+  local role="$1"
+  local tag="$2"
+  local message=""
+
+  if [ ! -s /etc/ccs/alert_url ]; then
+    echo "/etc/ccs/alert_url is empty, so no alert reaches anyone yet."
+    return 0
+  fi
+  message=$(mktemp)
+  printf 'ccs install: %s, %s role\n' "$tag" "$role" >"$message"
+  if (
+    if [ "$role" = backend ]; then
+      export ALL_PROXY=socks5h://localhost/run/tor/socks
+    fi
+    CREDENTIALS_DIRECTORY=/etc/ccs post_alerts "$message"
+  ); then
+    echo "The alert channel has the install."
+  else
+    echo "The install's alert didn't arrive; ALERTS.md lists the usual causes."
+  fi
+  rm -f -- "$message"
+}
+
 # print_next_steps <role> <tag>: names the files still to place, and on the
 # backend prints the command for the web server.
 print_next_steps() {
@@ -415,6 +442,7 @@ main() {
   if [ "$old_release" != "$new_release" ]; then
     keep "$LIB/releases/" "$new_release" "$old_release"
   fi
+  announce "$role" "$tag"
   print_next_steps "$role" "$tag"
 }
 

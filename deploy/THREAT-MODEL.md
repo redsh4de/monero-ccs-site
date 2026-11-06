@@ -63,8 +63,8 @@ the render, which escapes everything it shows, or the fetch schedule.
 `status.json` and the pages over two new Tor circuits each run, and asks for each page
 as Tor Browser does. But curl's TLS still differs from a browser's.
 
-The alert URL reaches only the two units that send alerts, as a systemd credential. The
-render never sees it.
+The alert URL reaches only the two units that send alerts, as a systemd credential, and
+`install.sh`, which posts each install. The render never sees it.
 
 The monitor renders the merge requests that the web server sends. `checks.py snapshot`
 first limits them to what GitLab itself could send, so a web server can feed the monitor
