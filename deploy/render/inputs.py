@@ -8,7 +8,6 @@ live in proposals.py and content.py.
 import json
 from collections.abc import Iterator
 from dataclasses import dataclass
-from hashlib import sha256
 from pathlib import Path
 
 from safety import is_address
@@ -80,29 +79,29 @@ def usable_name(stem: str) -> bool:
 
 
 def read_wallets(path: Path) -> dict[str, Wallet]:
-    """Read the values file, one line per proposal.
+    """Read the values file's proposal lines.
 
-    Each line is `<id> <raised> <contributions> <address or ->`. An address that
-    isn't well formed counts as none.
+    Each is `proposal <name> raised=<n> contributions=<n> address=<address or ->`.
+    An address that isn't well formed counts as none.
     """
     wallets = {}
     for line in read_text(path).splitlines():
         parts = line.split(" ")
-        if len(parts) == 4:
-            ident, raised, contributions, address = parts
-            wallets[ident] = Wallet(
+        if len(parts) == 5 and parts[0] == "proposal":
+            raised, contributions, address = (p.partition("=")[2] for p in parts[2:])
+            wallets[parts[1]] = Wallet(
                 raised, contributions, address if is_address(address) else ""
             )
     return wallets
 
 
 def read_qr_hashes(path: Path) -> dict[str, str]:
-    """Read the values file's QR lines, each `qr <hash> <address>`."""
+    """Read the values file's QR lines, each `qr <address> sha256=<hash>`."""
     hashes = {}
     for line in read_text(path).splitlines():
         parts = line.split(" ")
-        if len(parts) == 3 and parts[0] == "qr" and is_address(parts[2]):
-            hashes[parts[2]] = parts[1]
+        if len(parts) == 3 and parts[0] == "qr" and is_address(parts[1]):
+            hashes[parts[1]] = parts[2].removeprefix("sha256=")
     return hashes
 
 
@@ -130,8 +129,3 @@ def read_general_fund(path: Path) -> str:
         return ""
     address = read_text(path).strip()
     return address if is_address(address) else ""
-
-
-def proposal_id(slug: str) -> str:
-    """Return the id a proposal's line in the values file starts with."""
-    return sha256(slug.encode()).hexdigest()[:16]

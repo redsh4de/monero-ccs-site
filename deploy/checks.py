@@ -59,10 +59,11 @@ visible = SAFETY["visible"]
 
 ADDRESS = r"[48][1-9A-HJ-NP-Za-km-z]{94}"
 VALUE = re.compile(
-    rf"[0-9a-f]{{16}} [0-9]{{1,12}}(\.[0-9]{{1,12}})? [0-9]{{1,9}} ({ADDRESS}|-)"
+    rf"proposal [A-Za-z0-9._~%-]{{1,750}} raised=[0-9]{{1,12}}(\.[0-9]{{1,12}})?"
+    rf" contributions=[0-9]{{1,9}} address=({ADDRESS}|-)"
 )
 # the hash of an address's QR code, once the backend read the code back
-QR = re.compile(rf"qr [0-9a-f]{{64}} {ADDRESS}")
+QR = re.compile(rf"qr {ADDRESS} sha256=[0-9a-f]{{64}}")
 SEEN = re.compile(r"seen [0-9a-f]{64}")
 UPDATED = re.compile(r"updated ([0-9]{10})")
 LISTED = re.compile(rf"{ADDRESS}|general-fund {ADDRESS}")
@@ -155,7 +156,7 @@ def signers(keyring: str, signature: str, signed: bytes) -> set[str] | None:
 
 
 def check_values(data: bytes, last: int, now: int) -> str:
-    """Return the pushed values with every repeated id dropped.
+    """Return the pushed values with every repeated proposal dropped.
 
     The file must end with an updated time newer than the last one applied and at
     most five minutes ahead, hold only whole-line matches, at most one seen line and
@@ -173,8 +174,8 @@ def check_values(data: bytes, last: int, now: int) -> str:
     times = sum(row.startswith("updated ") for row in rows)
     if not matched or seen > 1 or times != 1:
         raise Reject("values: a line doesn't match")
-    ids = Counter(row.split(" ")[0] for row in rows if VALUE.fullmatch(row))
-    kept = [r for r in rows if not VALUE.fullmatch(r) or ids[r.split(" ")[0]] == 1]
+    names = Counter(row.split(" ")[1] for row in rows if VALUE.fullmatch(row))
+    kept = [r for r in rows if not VALUE.fullmatch(r) or names[r.split(" ")[1]] == 1]
     return "".join(row + "\n" for row in kept)
 
 
@@ -201,10 +202,11 @@ def apply_list(values: str, listed: set[str]) -> str:
     rows = []
     for row in values.split("\n"):
         fields = row.split(" ")
-        if len(fields) == 4 and fields[3] not in listed:
-            fields[3] = "-"
+        address = fields[-1].removeprefix("address=")
+        if fields[0] == "proposal" and address not in listed:
+            fields[-1] = "address=-"
         if len(fields) == 3 and fields[0] == "qr":
-            if not {fields[2], f"general-fund {fields[2]}"} & listed:
+            if not {fields[1], f"general-fund {fields[1]}"} & listed:
                 continue
         rows.append(" ".join(fields))
     return "\n".join(rows)

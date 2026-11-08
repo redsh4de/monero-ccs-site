@@ -2,8 +2,9 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+from urllib.parse import quote
 
-from inputs import Inputs, Wallet, proposal_id
+from inputs import Inputs, Wallet
 from proposals import GITLAB, STAGES, Proposal, shown_date
 from safety import redact
 
@@ -74,7 +75,7 @@ def build(inputs: Inputs) -> Site:
         Proposal.from_file(
             slug,
             source,
-            inputs.wallets.get(proposal_id(slug), Wallet()),
+            inputs.wallets.get(quote(slug, safe=""), Wallet()),
             inputs.merged.get(f"{slug}.md"),
         )
         for slug, source in inputs.proposals.items()

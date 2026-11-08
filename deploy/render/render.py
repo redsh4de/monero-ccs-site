@@ -121,8 +121,8 @@ def build_site(given: inputs.Inputs) -> content.Site:
     listed = " ".join(sorted(unread))
     print(f"render: no QR code read back for {listed}", file=sys.stderr)
     wallets = {
-        ident: replace(wallet, address="") if wallet.address in unread else wallet
-        for ident, wallet in given.wallets.items()
+        name: replace(wallet, address="") if wallet.address in unread else wallet
+        for name, wallet in given.wallets.items()
     }
     fund = "" if given.general_fund in unread else given.general_fund
     return content.build(replace(given, wallets=wallets, general_fund=fund))
