@@ -38,9 +38,8 @@ result.
    proposal's amount raised, contribution count and donation address. It also reads
    each address's QR code back with zbar, and adds the hash of the code. The push sends
    them to the web server over SSH.
-2. Each push starts `fetch.sh`. It calls GitLab only when the push's `seen` line
-   changes, or once an hour. `seen` is a hash of ccs-back's proposals commit and of its
-   Ideas stage, which lists the open merge requests.
+2. Each push starts `fetch.sh`. It calls GitLab only when the push's `gitlab` line
+   changes, or once an hour.
 3. `update.sh` runs after each fetch, and checks the values and the address list. When
    something changed, it renders the site with [the render](render/README.md). It
    switches to the new site only if no page shows an address the list lacks.
@@ -50,6 +49,28 @@ result.
 
 Astro builds the design as templates, and the render fills them on the web server. Node
 runs on neither machine.
+
+### The values
+
+`values.py` writes one line for each proposal, then the QR lines, then two closing
+lines:
+
+```
+proposal example-funding raised=10 contributions=3 address=888tNk…
+proposal Core%20website%20translation raised=0 contributions=0 address=-
+qr 888tNk… sha256=9ff6808f…
+gitlab sha256=1c0e…
+updated 1762600000
+```
+
+- `proposal`: one proposal, named as in its page's URL. It holds the amount raised, the
+  number of contributions and the donation address, or `-` for none.
+- `qr`: an address, and the hash of its QR code once zbar read the code back. The web
+  server shows a QR code only when its own drawing has this hash.
+- `gitlab`: a hash of ccs-back's proposals commit and of its Ideas stage, which lists
+  the open merge requests.
+- `updated`: when `values.py` wrote the file, in Unix time. The web server refuses a file
+  that is not newer than the last, or that is over 5 minutes ahead.
 
 ### Files
 

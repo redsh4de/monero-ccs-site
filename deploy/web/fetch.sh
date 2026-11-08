@@ -6,7 +6,7 @@
 # Runs as: ccs-fetch.service, as the ccs-fetch user, after each values push
 #          (ccs-fetch.path) and hourly (ccs-fetch.timer). systemd runs
 #          update.sh after it, whatever the result.
-# Reads:   the "seen" line of the latest push, in /var/lib/ccs/in/values, and
+# Reads:   the "gitlab" line of the latest push, in /var/lib/ccs/in/values, and
 #          the time of the values applied last, in /var/lib/ccs/state/values.
 # Writes:  /var/lib/ccs/fetch, and the links /var/lib/ccs/in/repo and in/mr.
 # Trust:   GitLab's content is only extracted here, and the render escapes it.
@@ -25,7 +25,7 @@ readonly DEPLOY
 readonly IN_DIR="$CCS_DIR/in"
 readonly FETCH_DIR="$CCS_DIR/fetch"
 readonly ALERTS_DIR="$FETCH_DIR/alerts"
-# GitLab is called when the "seen" line changes, or 55 minutes after the last
+# GitLab is called when the "gitlab" line changes, or 55 minutes after the last
 # call, so each hourly run calls it despite the timer's random delay
 readonly REFETCH_AFTER=3300
 NOW=$(date +%s)
@@ -54,16 +54,16 @@ check_values_age() {
     "ccs: no values from the backend applied for over 10 minutes"
 }
 
-# is_fetch_due <seen>: true when the backend's "seen" line changed since the
-# last good fetch, or the last attempt is old enough to try again.
+# is_fetch_due <gitlab>: true when the backend's "gitlab" line changed since
+# the last good fetch, or the last attempt is old enough to try again.
 is_fetch_due() {
-  local seen="$1"
-  local seen_last=""
+  local gitlab="$1"
+  local gitlab_last=""
   local tried_at=0
   local age=0
 
-  seen_last=$(cat "$FETCH_DIR/seen" 2>/dev/null) || seen_last=""
-  if [ "$seen" != "$seen_last" ]; then
+  gitlab_last=$(cat "$FETCH_DIR/gitlab" 2>/dev/null) || gitlab_last=""
+  if [ "$gitlab" != "$gitlab_last" ]; then
     return 0
   fi
   tried_at=$(cat "$FETCH_DIR/last-fetch" 2>/dev/null) || tried_at=0
@@ -132,7 +132,7 @@ fetch_merge_requests() {
 }
 
 main() {
-  local seen=""
+  local gitlab=""
   local failing=0
 
   mkdir -p -- "$FETCH_DIR"
@@ -141,12 +141,12 @@ main() {
   check_values_age
 
   # the push is unchecked here, and only decides when to call GitLab
-  seen=$(sed -n '/^seen [0-9a-f]\{64\}$/p' "$IN_DIR/values" 2>/dev/null \
-    | tail -n 1) || seen=""
-  if is_fetch_due "$seen"; then
+  gitlab=$(sed -n '/^gitlab sha256=[0-9a-f]\{64\}$/p' "$IN_DIR/values" \
+    2>/dev/null | tail -n 1) || gitlab=""
+  if is_fetch_due "$gitlab"; then
     printf '%s\n' "$NOW" >"$FETCH_DIR/last-fetch"
     if fetch_proposals && fetch_merge_requests; then
-      printf '%s\n' "$seen" >"$FETCH_DIR/seen"
+      printf '%s\n' "$gitlab" >"$FETCH_DIR/gitlab"
     else
       failing=1
       log "fetch: content failed"

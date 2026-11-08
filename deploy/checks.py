@@ -64,7 +64,7 @@ VALUE = re.compile(
 )
 # the hash of an address's QR code, once the backend read the code back
 QR = re.compile(rf"qr {ADDRESS} sha256=[0-9a-f]{{64}}")
-SEEN = re.compile(r"seen [0-9a-f]{64}")
+GITLAB = re.compile(r"gitlab sha256=[0-9a-f]{64}")
 UPDATED = re.compile(r"updated ([0-9]{10})")
 LISTED = re.compile(rf"{ADDRESS}|general-fund {ADDRESS}")
 # a line of sha256sum's output: the hash, two spaces, the file name
@@ -159,7 +159,7 @@ def check_values(data: bytes, last: int, now: int) -> str:
     """Return the pushed values with every repeated proposal dropped.
 
     The file must end with an updated time newer than the last one applied and at
-    most five minutes ahead, hold only whole-line matches, at most one seen line and
+    most five minutes ahead, hold only whole-line matches, at most one gitlab line and
     exactly one updated line. A file no newer than the last is refused silently.
     """
     rows = lines(data, "values")
@@ -168,11 +168,11 @@ def check_values(data: bytes, last: int, now: int) -> str:
         raise Reject("values: the updated line is missing or in the future")
     if int(updated[1]) <= last:
         raise Reject(None)
-    patterns = (VALUE, QR, SEEN, UPDATED)
+    patterns = (VALUE, QR, GITLAB, UPDATED)
     matched = all(any(p.fullmatch(row) for p in patterns) for row in rows)
-    seen = sum(row.startswith("seen ") for row in rows)
+    gitlab = sum(row.startswith("gitlab ") for row in rows)
     times = sum(row.startswith("updated ") for row in rows)
-    if not matched or seen > 1 or times != 1:
+    if not matched or gitlab > 1 or times != 1:
         raise Reject("values: a line doesn't match")
     names = Counter(row.split(" ")[1] for row in rows if VALUE.fullmatch(row))
     kept = [r for r in rows if not VALUE.fullmatch(r) or names[r.split(" ")[1]] == 1]

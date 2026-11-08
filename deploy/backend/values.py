@@ -105,16 +105,16 @@ def general_fund() -> str | None:
     return None
 
 
-def seen_line(commit: str, groups: list) -> str:
-    """Return the "seen" line: a hash of what ccs-back knows of GitLab.
+def gitlab_line(commit: str, groups: list) -> str:
+    """Return the "gitlab" line: a hash of what ccs-back knows of GitLab.
 
     That is the proposals commit and the Ideas stage, which lists the open merge
     requests. The web server calls GitLab when this changes.
     """
     ideas = [group for group in groups if group.get("stage") == "Ideas"]
     ideas_json = json.dumps(ideas, sort_keys=True, ensure_ascii=False, default=str)
-    seen = f"{commit}\n{ideas_json}"
-    return f"seen {hashlib.sha256(seen.encode()).hexdigest()}"
+    known = f"{commit}\n{ideas_json}"
+    return f"gitlab sha256={hashlib.sha256(known.encode()).hexdigest()}"
 
 
 def main() -> int:
@@ -143,7 +143,7 @@ def main() -> int:
 
     for line in [*sorted(lines), *codes]:
         print(line)
-    print(seen_line(commit, groups))
+    print(gitlab_line(commit, groups))
     print(f"updated {int(time.time())}")
     return 0
 

@@ -25,8 +25,8 @@ address.
 
 Some code only extracts data. `export_tree` in `lib.sh` reads the merge history, and
 `mrs.py` reads GitLab's JSON. `status.py restore` rebuilds the monitor's merge request
-input from `status.json`, and `fetch.sh` reads the `seen` line. Their output feeds only
-the render, which escapes everything it shows, or the fetch schedule.
+input from `status.json`, and `fetch.sh` reads the `gitlab` line. Their output feeds
+only the render, which escapes everything it shows, or the fetch schedule.
 
 ---
 
@@ -40,7 +40,7 @@ the render, which escapes everything it shows, or the fetch schedule.
 | The backend                                           | Change text, stage, percent or which box shows             | Not possible: the web server works all of it out                                                                                                                                                                                       | The render                                       |
 | The backend                                           | Swap two proposals' listed addresses                       | Possible, but every listed address pays the CCS wallet, whose books the backend keeps anyway                                                                                                                                           | Out of scope                                     |
 | The backend                                           | Stop sending                                               | The values go stale, and the web server alerts                                                                                                                                                                                         | The `stale-values` alert in `fetch.sh`           |
-| The backend                                           | Lie in `seen`                                              | Extra fetches, or content up to an hour late                                                                                                                                                                                           | `fetch.sh`, which fetches at least hourly        |
+| The backend                                           | Lie in the `gitlab` line                                   | Extra fetches, or content up to an hour late                                                                                                                                                                                           | `fetch.sh`, which fetches at least hourly        |
 | The backend                                           | Push a wrong QR hash                                       | Closes that donation box, and the monitor alerts: each machine draws the code itself, from the listed address, so a hash can close a box but never change a code                                                                       | The render, the `addresses` alert                |
 | One signer's key or machine                           | Ship a release                                             | Refused: a release needs two distinct signers                                                                                                                                                                                          | `checks.py release`                              |
 | Anyone adding an attestation                          | Count as a release signer                                  | Not possible: only the keys in `release-signers.gpg` count, and any other is skipped                                                                                                                                                   | `checks.py release`                              |
