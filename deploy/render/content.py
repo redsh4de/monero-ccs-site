@@ -18,6 +18,8 @@ class Idea:
     author: str
     url: str
     date: str
+    upvotes: int
+    downvotes: int
     created: str  # As GitLab sent it, for sorting
 
     # Read by the card template, like a proposal's fields.
@@ -124,6 +126,8 @@ def open_ideas(
                 author=redact(str(author.get("username") or ""), ignore_spaces=True),
                 url=url if url.startswith(GITLAB) else "",
                 date=shown_date(created),
+                upvotes=mr.get("upvotes", 0),
+                downvotes=mr.get("downvotes", 0),
                 created=mr["created_at"],
             )
         )

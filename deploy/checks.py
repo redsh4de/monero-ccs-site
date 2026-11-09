@@ -75,6 +75,7 @@ GITLAB_TIME = re.compile(
     r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,9})?(Z|[+-][0-9]{2}:[0-9]{2})"
 )
 SNAPSHOT_FIELDS = {"iid", "title", "author", "web_url", "created_at", "adds"}
+VOTES = ("upvotes", "downvotes")
 MAX_MERGE_REQUESTS = 1_000  # mrs.py reads at most ten pages of 100
 MAX_TEXT = 1_000  # GitLab allows 255 characters for a title or a username
 # what the built site holds: pages and templates, one stylesheet, fonts, images
@@ -251,10 +252,12 @@ def check_snapshot(data: bytes) -> None:
     if not isinstance(snapshot, list) or len(snapshot) > MAX_MERGE_REQUESTS:
         raise Reject("snapshot: not a list of at most 1,000 merge requests")
     for mr in snapshot:
-        if not isinstance(mr, dict) or set(mr) != SNAPSHOT_FIELDS:
+        if not isinstance(mr, dict) or set(mr) != SNAPSHOT_FIELDS | set(VOTES):
             raise Reject("snapshot: a merge request has other fields")
         if type(mr["iid"]) is not int or not 1 <= mr["iid"] <= 999_999_999:
             raise Reject("snapshot: a merge request number is malformed")
+        if not all(type(mr[k]) is int and 0 <= mr[k] <= 999_999_999 for k in VOTES):
+            raise Reject("snapshot: a vote count is malformed")
         adds = mr["adds"]
         if not isinstance(adds, list) or len(adds) > MAX_MERGE_REQUESTS:
             raise Reject("snapshot: a merge request's files are malformed")

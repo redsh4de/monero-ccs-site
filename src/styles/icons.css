@@ -43,6 +43,14 @@
   --icon-src: url("../assets/icons/mask/package.avif");
 }
 
+.icon-thumbs-down {
+  --icon-src: url("../assets/icons/mask/thumbs-down.avif");
+}
+
+.icon-thumbs-up {
+  --icon-src: url("../assets/icons/mask/thumbs-up.avif");
+}
+
 .icon-user {
   --icon-src: url("../assets/icons/mask/user.avif");
 }
