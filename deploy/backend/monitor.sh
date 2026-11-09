@@ -290,15 +290,14 @@ check_addresses() {
     "proposals take donations with no address on the list: $missing"
 }
 
-# list_always: prints the files compared on every run: the stage lists, the
-# donate page, index.php/projects, each QR code, and each page showing one.
+# list_always: prints the files compared on every run.
 list_always() {
   local qr=""
   local name=""
 
   printf '%s\n' index.html ideas/index.html funding-required/index.html \
     work-in-progress/index.html completed-proposals/index.html \
-    donate/index.html index.php/projects
+    donate/index.html index.php/projects feed.xml
   for qr in "$EXPECTED_DIR"/qr/*.png; do
     if [ ! -e "$qr" ]; then
       continue

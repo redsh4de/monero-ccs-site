@@ -1,8 +1,8 @@
 """Reading the render's input folder.
 
 The folder holds proposals/, mr/open.json, mr/open.tsv, mr/merged.tsv, values,
-with its QR lines, and general-fund. This module only parses them; the rules
-live in proposals.py and content.py.
+with its QR lines, general-fund, and site, the address the site is served at.
+This module only parses them; the rules live in proposals.py and content.py.
 """
 
 import json
@@ -30,6 +30,7 @@ class Inputs:
     added: dict[str, list[str]]  # Open merge request number, to the files it adds
     merge_requests: list[dict]  # GitLab's list of open merge requests
     general_fund: str  # The General Fund's address, or ""
+    site_url: str
     qr_hashes: dict[str, str]  # Address, to the hash the backend read back for its code
 
 
@@ -49,6 +50,7 @@ def read(folder: Path) -> Inputs:
         added=added,
         merge_requests=read_merge_requests(folder / "mr" / "open.json"),
         general_fund=read_general_fund(folder / "general-fund"),
+        site_url=read_text(folder / "site").strip(),
         qr_hashes=read_qr_hashes(folder / "values"),
     )
 

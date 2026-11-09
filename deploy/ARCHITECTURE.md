@@ -155,5 +155,6 @@ ccs-back's latest file, and the pages rendered again without the cache when an i
 changed. It compares them with the live site, byte for byte.
 [ALERTS.md](ALERTS.md#monitor-alerts) lists its checks in order, each with its alert.
 
-Each run compares the main pages, each page with a donation box, and each QR code. It
-also compares the next 10 files of the site in turn, and every page that failed before.
+Each run compares the main pages, the feed, each page with a donation box, and each QR
+code. It also compares the next 10 files of the site in turn, and every page that failed
+before.

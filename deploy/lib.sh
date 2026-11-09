@@ -193,10 +193,10 @@ get_release() {
   done
 }
 
-# render_values <values> <input-dir> <list>: writes the render's values and
-# general-fund into the render's input folder, with every address not on the
-# signed list as -, and prints a hash of both. The verified list goes to
-# <list>, outside the input folder.
+# render_values <values> <input-dir> <list>: writes the render's values,
+# general-fund and site into the render's input folder, with every address not
+# on the signed list as -, and prints a hash of all three. The verified list
+# goes to <list>, outside the input folder.
 #
 # A list that doesn't verify counts as empty, so every donation box closes
 # rather than show an address nobody signed. update.sh and the monitor both
@@ -211,10 +211,11 @@ render_values() {
     : >"$list" || return 1
   fi
   sed -n 's/^general-fund //p' "$list" >"$in_dir/general-fund" || return 1
+  printf '%s\n' "$SITE" >"$in_dir/site" || return 1
   "$DEPLOY/checks.py" apply "$values" "$list" >"$in_dir/values" || return 1
 
   # the values' time changes with every push, so it stays out of the hash
-  sed '/^updated /d' "$in_dir/values" "$in_dir/general-fund" \
+  sed '/^updated /d' "$in_dir/values" "$in_dir/general-fund" "$in_dir/site" \
     | sha256sum | cut -c1-64
 }
 

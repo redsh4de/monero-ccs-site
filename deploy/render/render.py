@@ -3,14 +3,15 @@
 
 Usage: render.py <input-dir> <templates-dir> <out-dir> [<cache-dir>]
 
-  <input-dir>      the render's input: proposals/, mr/, values and general-fund,
-                   as inputs.py describes them
+  <input-dir>      the render's input: proposals/, mr/, values, general-fund and
+                   site, as inputs.py describes them
   <templates-dir>  the Jinja templates, dist/templates in a release
   <out-dir>        where the pages go
   <cache-dir>      optional: rendered proposal bodies, kept between runs
 
 Writes the proposal pages, the home and stage pages, the donate page,
-/index.php/projects, and a QR code for every address shown into <out-dir>.
+/index.php/projects, the Funding Required feed, and a QR code for every address
+shown into <out-dir>.
 
 The templates are Jinja, written by Astro with [[ ]] and [% %] so they don't
 clash with Astro's own braces, and they escape everything they insert.
@@ -21,7 +22,9 @@ renders them, so a donation only re-fills the templates.
 import json
 import os
 import sys
+import xml.etree.ElementTree as ET
 from dataclasses import replace
+from email.utils import format_datetime
 from hashlib import sha256
 from pathlib import Path
 from types import ModuleType
@@ -106,6 +109,25 @@ def write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def feed(proposals: list[content.Proposal], site_url: str) -> str:
+    rss = ET.Element("rss", version="2.0")
+    channel = ET.SubElement(rss, "channel")
+    ET.SubElement(channel, "title").text = "Monero CCS: Funding Required"
+    ET.SubElement(channel, "link").text = f"{site_url}/funding-required/"
+    ET.SubElement(channel, "description").text = "Proposals that need funding"
+    for proposal in proposals:
+        item = ET.SubElement(channel, "item")
+        ET.SubElement(item, "title").text = proposal.title
+        ET.SubElement(item, "link").text = site_url + proposal.url
+        ET.SubElement(item, "guid").text = site_url + proposal.url
+        if proposal.day:
+            ET.SubElement(item, "pubDate").text = format_datetime(proposal.day)
+        ET.SubElement(item, "description").text = (
+            f"Raised {proposal.raised} of {proposal.amount} XMR, by {proposal.author}"
+        )
+    return ET.tostring(rss, encoding="unicode")
+
+
 def build_site(given: inputs.Inputs) -> content.Site:
     """Build the site, and close each donation box whose code wasn't read back.
 
@@ -152,6 +174,7 @@ def main() -> None:
     donate = pages["donate"].render(it={"address": site.general_fund})
     write(out / "donate" / "index.html", donate)
     write(out / "index.php" / "projects", json.dumps({"data": site.projects}))
+    write(out / "feed.xml", feed(site.stage_pages["funding-required"], given.site_url))
     for address in sorted(site.addresses_shown):
         path = out / "qr" / f"{address}.png"
         path.parent.mkdir(exist_ok=True)
