@@ -478,7 +478,7 @@ main() {
   values_sum=$(build_values)
 
   # 7. The pages as they should be.
-  inputs_hash=$(printf '%s\n' "$version" "$commit" "$snapshot_sum" "$values_sum" \
+  inputs_hash=$(printf '%s\n' "$(sha256sum <"$RUN_DIR/status.json")" "$values_sum" \
     | sha256sum | cut -c1-64)
   render_expected "$release" "$commit" "$inputs_hash"
 

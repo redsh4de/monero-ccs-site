@@ -2,7 +2,8 @@
 
 Usage:
   status.py write <input-dir> <version> <commit>  print status.json
-  status.py mrs <input-dir>                       print the merge request snapshot
+  status.py mrs <input-dir>                       print the merge request snapshot,
+                                                  without the vote counts
   status.py restore <status.json> <input-dir>     write <input-dir>/mr/open.json
                                                   and open.tsv
 
@@ -51,6 +52,8 @@ def snapshot(input_dir: Path) -> list[dict]:
                 "web_url": field_text(mr.get("web_url")),
                 "created_at": field_text(mr.get("created_at")),
                 "adds": added.get(str(mr.get("iid")), []),
+                "upvotes": mr.get("upvotes", 0),
+                "downvotes": mr.get("downvotes", 0),
             }
         )
     return entries
@@ -66,6 +69,8 @@ def restore(status: Path, input_dir: Path) -> None:
             "author": {"username": mr["author"]},
             "web_url": mr["web_url"],
             "created_at": mr["created_at"],
+            "upvotes": mr["upvotes"],
+            "downvotes": mr["downvotes"],
         }
         for mr in entries
     ]
@@ -86,7 +91,12 @@ def main(argv: list[str]) -> int:
             }
             print(canonical(status))
         case ["mrs", input_dir]:
-            print(canonical(snapshot(Path(input_dir))))
+            # votes change faster than the web server fetches them, so the
+            # monitor compares the rest with GitLab's list
+            mrs = snapshot(Path(input_dir))
+            for mr in mrs:
+                del mr["upvotes"], mr["downvotes"]
+            print(canonical(mrs))
         case ["restore", status, input_dir]:
             restore(Path(status), Path(input_dir))
         case _:

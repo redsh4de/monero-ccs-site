@@ -3,7 +3,7 @@ import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
 
 interface Props {
   // when: a template condition; the item shows only if it holds
-  items: { icon: string; text: string; when?: string }[];
+  items: { icon: string; label?: string; text: string; when?: string }[];
   class?: string;
 }
 
@@ -16,7 +16,7 @@ const { items, class: className, ...rest } = Astro.props;
       <>
         <Fragment set:html={item.when ? `[% if ${item.when} %]` : ""} />
         <div class="meta-item">
-          <MaskIcon name={item.icon} />
+          <MaskIcon name={item.icon} label={item.label} />
           <span>{item.text}</span>
         </div>
         <Fragment set:html={item.when ? "[% endif %]" : ""} />
