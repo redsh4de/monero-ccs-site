@@ -2,8 +2,8 @@
 """Print the values the backend pushes.
 
 The values are, in order:
-- one line per proposal: an id, the amount raised, the contributions and the
-  address;
+- one line per proposal: its name, the amount raised, the contributions and
+  the address;
 - a QR line for each address and the General Fund's: the hash of its code, once
   zbar read the code back;
 - what ccs-back sees of GitLab;
@@ -26,6 +26,7 @@ import sys
 import time
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from urllib.parse import quote
 
 # the web server's own patterns, from the same release: it refuses the whole file
 # over one line that doesn't match VALUE, so such a line is left out here.
@@ -71,11 +72,7 @@ def read_groups(folder: Path) -> list:
 
 
 def value_line(row: dict) -> str | None:
-    """Return one proposal's line, or None when it has no page or doesn't fit.
-
-    The id is a hash of the proposal's page name, so the web server matches the
-    line to its page without the backend naming it.
-    """
+    """Return one proposal's line, or None when it has no page or doesn't fit."""
     slug = URL.fullmatch(str(row.get("local-url", "")))
     if not slug:
         return None
@@ -84,8 +81,11 @@ def value_line(row: dict) -> str | None:
     address = row.get("donate-address")
     if not isinstance(address, str) or not re.fullmatch(ADDRESS, address):
         address = "-"
-    ident = hashlib.sha256(slug[1].encode()).hexdigest()[:16]
-    line = f"{ident} {raised} {contributions} {address}"
+    name = quote(slug[1], safe="")
+    line = (
+        f"proposal {name} raised={raised} contributions={contributions}"
+        f" address={address}"
+    )
     if not VALUE.fullmatch(line):
         print(f"values: left out {slug[1]}", file=sys.stderr)
         return None
@@ -105,16 +105,16 @@ def general_fund() -> str | None:
     return None
 
 
-def seen_line(commit: str, groups: list) -> str:
-    """Return the "seen" line: a hash of what ccs-back knows of GitLab.
+def gitlab_line(commit: str, groups: list) -> str:
+    """Return the "gitlab" line: a hash of what ccs-back knows of GitLab.
 
     That is the proposals commit and the Ideas stage, which lists the open merge
     requests. The web server calls GitLab when this changes.
     """
     ideas = [group for group in groups if group.get("stage") == "Ideas"]
     ideas_json = json.dumps(ideas, sort_keys=True, ensure_ascii=False, default=str)
-    seen = f"{commit}\n{ideas_json}"
-    return f"seen {hashlib.sha256(seen.encode()).hexdigest()}"
+    known = f"{commit}\n{ideas_json}"
+    return f"gitlab sha256={hashlib.sha256(known.encode()).hexdigest()}"
 
 
 def main() -> int:
@@ -133,16 +133,17 @@ def main() -> int:
             line = value_line(row)
             if line is not None:
                 lines.append(line)
-    addresses = {line.split(" ")[3] for line in lines} | {general_fund()}
+    addresses = {line.rpartition("=")[2] for line in lines} | {general_fund()}
     try:
-        codes = [f"qr {qr.read_back(a)} {a}" for a in sorted(addresses - {"-", None})]
+        shown = sorted(addresses - {"-", None})
+        codes = [f"qr {a} sha256={qr.read_back(a)}" for a in shown]
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         print(f"values: a QR code doesn't read back: {error}", file=sys.stderr)
         return 1
 
     for line in [*sorted(lines), *codes]:
         print(line)
-    print(seen_line(commit, groups))
+    print(gitlab_line(commit, groups))
     print(f"updated {int(time.time())}")
     return 0
 

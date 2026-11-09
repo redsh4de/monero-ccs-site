@@ -25,20 +25,23 @@ addresses = st.sampled_from([LISTED, UNLISTED]) | any_address
 
 @st.composite
 def value_line(draw):
-    """One line as the backend pushes it: id, amount raised, contributions, address."""
-    proposal = draw(fixed("0123456789abcdef", 16))
+    """One proposal's line as the backend pushes it."""
+    name = draw(st.text("abc%2B-", min_size=1, max_size=40))
     whole, fraction = draw(st.integers(0, 10**12 - 1)), draw(st.integers(0, 10**12 - 1))
     raised = draw(st.sampled_from([f"{whole}", f"{whole}.{fraction}"]))
     contributions = draw(st.integers(0, 999_999_999))
     address = draw(addresses | st.just("-"))
-    return f"{proposal} {raised} {contributions} {address}"
+    return (
+        f"proposal {name} raised={raised} contributions={contributions}"
+        f" address={address}"
+    )
 
 
 @st.composite
 def qr_line(draw):
-    """One QR line as the backend pushes it: the hash of a code, then its address."""
+    """One QR line as the backend pushes it: an address, then its code's hash."""
     code = draw(fixed("0123456789abcdef", 64))
-    return f"qr {code} {draw(addresses)}"
+    return f"qr {draw(addresses)} sha256={code}"
 
 
 @given(st.lists(value_line() | qr_line(), max_size=8))
@@ -51,7 +54,7 @@ def test_no_unlisted_address_reaches_a_page(lines):
 
 def test_general_funds_qr_line_survives_the_list(tmp_path, capsys):
     fund = "4" + "C" * 94
-    line = f"qr {'a' * 64} {fund}\n"
+    line = f"qr {fund} sha256={'a' * 64}\n"
     (tmp_path / "list").write_text(f"{LISTED}\ngeneral-fund {fund}\n")
     (tmp_path / "values").write_text(line)
     assert checks.main(["apply", str(tmp_path / "values"), str(tmp_path / "list")]) == 0
