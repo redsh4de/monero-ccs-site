@@ -2,7 +2,7 @@
 import type { HTMLAttributes } from "astro/types";
 
 type As = "button" | "a" | "span";
-type Variant = "primary" | "secondary" | "outline" | "danger";
+type Variant = "primary" | "secondary" | "outline" | "text" | "danger";
 
 interface Props extends HTMLAttributes<As> {
   variant?: Variant;
@@ -89,6 +89,17 @@ const {
       background: transparent;
       color: var(--monero-orange);
       border-color: var(--monero-orange);
+    }
+
+    &[data-variant="text"] {
+      padding-inline: 0;
+      background: transparent;
+      color: var(--text-secondary);
+      font-weight: var(--font-weight-normal);
+
+      &:hover {
+        text-decoration: underline;
+      }
     }
 
     &:hover,

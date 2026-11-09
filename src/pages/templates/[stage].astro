@@ -1,6 +1,7 @@
 ---
 import ProposalCard from "@/components/pages/proposals/ProposalCard.astro";
 import Button from "@/components/ui/Button.astro";
+import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
 import Layout from "@/layouts/Layout.astro";
 import StageLayout from "@/layouts/StageLayout.astro";
 import { type ProposalStatus, stages } from "@/lib/stages";
@@ -22,7 +23,17 @@ const { status, label } = Astro.props;
 
 <Layout title={label}>
   <StageLayout current={status}>
-    <h1>{label}</h1>
+    <div class="heading">
+      <h1>{label}</h1>
+      {
+        status === "funding-required" && (
+          <Button href="/feed.xml" variant="text" class="feed">
+            <MaskIcon name="rss" />
+            RSS feed
+          </Button>
+        )
+      }
+    </div>
 
     {
       status === "idea" && (
@@ -45,6 +56,20 @@ const { status, label } = Astro.props;
   h1 {
     margin: 0 0 var(--space-md);
     font-size: var(--font-size-2xl);
+  }
+
+  .heading {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-md);
+  }
+
+  .feed {
+    --icon-color: var(--monero-orange);
+    --icon-size: 1.25em;
+
+    gap: var(--space-xs);
+    margin-inline-start: auto;
   }
 
   .idea-intro {
@@ -79,6 +104,10 @@ const { status, label } = Astro.props;
       overflow: hidden;
       clip-path: inset(50%);
       white-space: nowrap;
+    }
+
+    .feed {
+      margin-block-end: var(--space-md);
     }
 
     .idea-intro {

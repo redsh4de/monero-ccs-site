@@ -43,6 +43,10 @@
   --icon-src: url("../assets/icons/mask/package.avif");
 }
 
+.icon-rss {
+  --icon-src: url("../assets/icons/mask/rss.avif");
+}
+
 .icon-thumbs-down {
   --icon-src: url("../assets/icons/mask/thumbs-down.avif");
 }
