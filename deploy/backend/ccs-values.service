@@ -1,5 +1,6 @@
 [Unit]
 Description=Write the CCS values from ccs-back's JSON
+After=ccs-push.service
 OnSuccess=ccs-push.service
 
 [Service]
