@@ -2,7 +2,6 @@
 Description=Fetch the CCS site's proposals and merge requests
 Wants=network-online.target
 After=network-online.target
-# the update runs after every fetch, whatever the fetch found
 OnSuccess=ccs-update.service
 OnFailure=ccs-update.service
 

@@ -23,8 +23,7 @@ set -eu
 # shellcheck disable=SC3040 # Debian 13's dash has pipefail
 set -o pipefail
 
-SCRIPT_DIR=$(dirname -- "$0")
-DEPLOY=$(cd -- "$SCRIPT_DIR" && pwd -P)
+DEPLOY=$(cd -- "$(dirname -- "$0")" && pwd -P)
 readonly DEPLOY
 # shellcheck source=lib.sh
 . "$DEPLOY/lib.sh"
@@ -62,10 +61,7 @@ is_builder_name() {
 # check_gnu_tar: stops unless tar is GNU tar, whose options make the
 # archive byte-identical on every machine.
 check_gnu_tar() {
-  local version=""
-
-  version=$(tar --version 2>/dev/null) || version=""
-  case $version in
+  case $(tar --version 2>/dev/null) in
     *"GNU tar"*) ;;
     *) stop "needs GNU tar, for a byte-identical archive" ;;
   esac
@@ -95,10 +91,8 @@ check_same_scripts() {
 # pinned here.
 check_pnpm_pin() {
   local tag="$1"
-  local package_json=""
 
-  package_json=$(git show "$tag:package.json")
-  case $package_json in
+  case $(git show "$tag:package.json") in
     *"\"packageManager\": \"pnpm@$PNPM_VERSION\""*) ;;
     *) stop "the packageManager of $tag isn't pnpm@$PNPM_VERSION" ;;
   esac
@@ -135,11 +129,11 @@ get_previous_release() {
 # lightningcss, which minifies the CSS, loads libgcc_s, and StageX's Node
 # lacks it, so it is copied in from StageX's GCC.
 build_image() {
-  printf 'FROM %s AS gcc\nFROM %s\n' "$GCC" "$NODE" \
-    >"$WORK/image/Containerfile" || return 1
-  printf 'COPY --from=gcc /usr/lib/libgcc_s.so.1 /usr/lib/\n' \
-    >>"$WORK/image/Containerfile" || return 1
-  "$CONTAINER" build -q -f "$WORK/image/Containerfile" "$WORK/image"
+  "$CONTAINER" build -q -f - "$WORK/image" <<EOF
+FROM $GCC AS gcc
+FROM $NODE
+COPY --from=gcc /usr/lib/libgcc_s.so.1 /usr/lib/
+EOF
 }
 
 # run_node <image> <network> <arguments...>: runs Node in the image, by its
@@ -220,20 +214,16 @@ pack_release() {
   tar --sort=name --mtime="@$EPOCH" --owner=0 --group=0 --numeric-owner \
     --mode=u=rwX,go=rX --format=gnu -cf "$out_dir/$archive" \
     -C "$WORK/src" dist deploy
-  (cd -- "$out_dir" && sha256sum -- "$archive") >"$out_dir/SHA256SUMS"
-  cat -- "$out_dir/SHA256SUMS"
+  (cd -- "$out_dir" && sha256sum -- "$archive") | tee "$out_dir/SHA256SUMS"
 }
 
 # get_attestations <tag> <dir>: copies each builder's attestation of the tag
 # into <dir>/<builder>/. They live in this repository's attestations/ folder,
-# on ATTESTATIONS_REF. Moving them to a repository of their own, with the
-# same <tag>/<builder>/ layout, changes only this function: it would clone
-# that repository and copy its <tag>/ folder instead.
+# on ATTESTATIONS_REF.
 get_attestations() {
   local tag="$1"
   local dir="$2"
 
-  mkdir -p -- "$dir"
   if ! git cat-file -e "$ATTESTATIONS_REF:attestations/$tag" 2>/dev/null; then
     return 0
   fi
@@ -303,8 +293,7 @@ list_packages() {
   local tag="$1"
 
   git show "$tag:pnpm-lock.yaml" \
-    | sed -n '/^packages:$/,/^[^ ]/p' \
-    | sed -n "s/^  '\{0,1\}\([^' ]*\)'\{0,1\}:\$/\1/p" \
+    | sed -n "/^packages:\$/,/^[^ ]/s/^  '\{0,1\}\([^' ]*\)'\{0,1\}:\$/\1/p" \
     | LC_ALL=C sort
 }
 
@@ -314,8 +303,7 @@ list_packages() {
 show_packages() {
   local tag="$1"
   local previous_tag="$2"
-  local dropped=""
-  local added=""
+  local changes=""
 
   if [ -z "$previous_tag" ]; then
     return 0
@@ -327,15 +315,11 @@ show_packages() {
   fi
   list_packages "$previous_tag" >"$WORK/packages.old"
   list_packages "$tag" >"$WORK/packages.new"
-  dropped=$(LC_ALL=C comm -23 "$WORK/packages.old" "$WORK/packages.new")
-  added=$(LC_ALL=C comm -13 "$WORK/packages.old" "$WORK/packages.new")
-  printf 'Packages since %s:\n' "$previous_tag"
-  if [ -z "$dropped$added" ]; then
-    printf '  none changed\n'
-    return 0
-  fi
-  printf '%s\n' "$dropped" | sed '/^$/d; s/^/  - /'
-  printf '%s\n' "$added" | sed '/^$/d; s/^/  + /'
+  changes=$(LC_ALL=C comm -23 "$WORK/packages.old" "$WORK/packages.new" \
+    | sed 's/^/  - /'
+    LC_ALL=C comm -13 "$WORK/packages.old" "$WORK/packages.new" \
+    | sed 's/^/  + /')
+  printf 'Packages since %s:\n%s\n' "$previous_tag" "${changes:-  none changed}"
 }
 
 # show_changes <out-dir> <tag> <previous-tag>: shows what changed since the
@@ -388,15 +372,14 @@ sign_release() {
     >/dev/null 2>&1; then
     stop "your signature doesn't verify with your own key"
   fi
-  if ! gpgv --keyring "$KEYRING" "$WORK/mine.asc" "$out_dir/SHA256SUMS" \
-    >/dev/null 2>&1; then
+  mkdir -p -- "$folder"
+  cp -- "$out_dir/SHA256SUMS" "$folder/SHA256SUMS"
+  cp -- "$WORK/mine.asc" "$folder/SHA256SUMS.asc"
+  if ! is_release_signer "$folder"; then
     log "your key isn't in $KEYRING, so this attests the build," \
       "but doesn't count towards the two release signers"
   fi
 
-  mkdir -p -- "$folder"
-  cp -- "$out_dir/SHA256SUMS" "$folder/SHA256SUMS"
-  cp -- "$WORK/mine.asc" "$folder/SHA256SUMS.asc"
   printf 'Your attestation is in %s/. Add it to the repository under %s.\n' \
     "$folder" "attestations/$tag/$builder/"
   join_signatures "$tag" "$out_dir" "$version"

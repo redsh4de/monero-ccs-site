@@ -15,9 +15,8 @@ set -eu
 # shellcheck disable=SC3040 # Debian 13's dash has pipefail
 set -o pipefail
 
-SCRIPT_DIR=$(dirname -- "$0")
 # the physical path, so a run that overlaps an install stays in one release
-DEPLOY=$(cd -- "$SCRIPT_DIR/.." && pwd -P)
+DEPLOY=$(cd -- "$(dirname -- "$0")/.." && pwd -P)
 readonly DEPLOY
 # shellcheck source=lib.sh
 . "$DEPLOY/lib.sh"
@@ -135,7 +134,6 @@ main() {
   local gitlab=""
   local failing=0
 
-  mkdir -p -- "$FETCH_DIR"
   alerts_begin
   drop_cut_off_pushes
   check_values_age
