@@ -6,7 +6,6 @@ from urllib.parse import quote
 
 from inputs import Inputs, Wallet
 from proposals import GITLAB, STAGES, Proposal, shown_date
-from safety import redact
 
 HOME_CARDS = 4
 
@@ -114,8 +113,8 @@ def open_ideas(merge_requests: list[dict], slugs: set[str]) -> list[Idea]:
         taken.add(name)
         ideas.append(
             Idea(
-                title=redact(mr["title"], ignore_spaces=True),
-                author=redact(mr["author"], ignore_spaces=True),
+                title=mr["title"],
+                author=mr["author"],
                 url=mr["web_url"] if mr["web_url"].startswith(GITLAB) else "",
                 date=shown_date(created),
                 upvotes=mr["upvotes"],

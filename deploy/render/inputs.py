@@ -10,7 +10,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
-from safety import is_address
+from safety import is_address, redact
 
 
 @dataclass(frozen=True)
@@ -112,7 +112,8 @@ def read_pairs(path: Path) -> Iterator[tuple[str, str]]:
 def read_merge_requests(folder: Path) -> list[dict]:
     """Return what the render reads of each open merge request, in GitLab's order.
 
-    Anything but a list in open.json, such as an error object, counts as none.
+    Anyone can open one, so any address in its text is removed. Anything but a list
+    in open.json, such as an error object, counts as none.
     """
     added: dict[str, list[str]] = {}
     for number, name in read_pairs(folder / "open.tsv"):
@@ -129,11 +130,14 @@ def read_merge_requests(folder: Path) -> list[dict]:
         mrs.append(
             {
                 "iid": mr.get("iid"),
-                "title": str(mr.get("title") or ""),
-                "author": str(username or ""),
+                "title": redact(str(mr.get("title") or ""), ignore_spaces=True),
+                "author": redact(str(username or ""), ignore_spaces=True),
                 "web_url": str(mr.get("web_url") or ""),
                 "created_at": str(mr.get("created_at") or ""),
-                "adds": added.get(str(mr.get("iid")), []),
+                "adds": [
+                    redact(name, ignore_spaces=True)
+                    for name in added.get(str(mr.get("iid")), [])
+                ],
                 "upvotes": mr.get("upvotes", 0),
                 "downvotes": mr.get("downvotes", 0),
             }
