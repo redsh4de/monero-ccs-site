@@ -55,6 +55,7 @@ from pathlib import Path
 SAFETY = runpy.run_path(str(Path(__file__).resolve().parent / "render/safety.py"))
 ADDRESS_RUN = SAFETY["ADDRESS_RUN"]
 has_address = SAFETY["has_address"]
+grouped_addresses = SAFETY["grouped_addresses"]
 visible = SAFETY["visible"]
 
 ADDRESS = SAFETY["ADDRESS"].pattern
@@ -354,7 +355,7 @@ def check_build(dist: str, hosts_path: str, tag_files: str) -> None:
 
 
 def unlisted_run(text: str, listed: set[str]) -> str | None:
-    """Return an address-like run in the text that isn't a listed address, if any.
+    """Return an unlisted address-like run, or valid address in groups, if any.
 
     Each listed address is cut out of a run first, so text next to one, such as
     a button's label once tags are dropped, isn't taken for an address.
@@ -365,7 +366,7 @@ def unlisted_run(text: str, listed: set[str]) -> str | None:
             rest = rest.replace(address, " ")
         if ADDRESS_RUN.search(rest):
             return run
-    return None
+    return min(grouped_addresses(visible(text)) - listed, default=None)
 
 
 def check_site(site: str, list_path: str) -> None:

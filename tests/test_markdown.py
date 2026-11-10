@@ -11,7 +11,7 @@ from hypothesis import strategies as st
 
 import bodies
 
-ADDRESS = "8" + "A" * 94
+ADDRESS = "888tNkZrPN6JsEgekjMnABU4TBzc2Dt29EPAvkRxbANsAnjyPbb3iQ1YBRk1UXcdRsiKc9dhwMVgN5S9cQUiyoogDavup3H"
 
 # fmt: off
 # what markdown-it renders, and the raw tags a proposal may use
@@ -44,6 +44,8 @@ KNOWN_ATTACKS = {
     "address split by a zero-width space": (
         f"{ADDRESS[:47]}\N{ZERO WIDTH SPACE}{ADDRESS[47:]}"
     ),
+    "address in groups": " ".join(ADDRESS[i : i + 4] for i in range(0, 95, 4)),
+    "address split across paragraphs": f"{ADDRESS[:47]}\n\n{ADDRESS[47:]}",
 }
 # fmt: off
 # Markdown and raw HTML to mix the attacks with
@@ -85,10 +87,12 @@ def shows_address(text):
     """Whether a visitor could copy an address out of the text.
 
     Copying drops format characters, such as a zero-width space, and combining
-    marks, so they can't split an address.
+    marks, so they can't split an address, and a wallet may drop spaces.
     """
     visible = "".join(c for c in text if unicodedata.category(c) not in ("Cf", "Mn"))
-    return re.search(r"[1-9A-HJ-NP-Za-km-z]{90,}", visible) is not None
+    return bool(re.search(r"[1-9A-HJ-NP-Za-km-z]{90,}", visible)) or ADDRESS in "".join(
+        visible.split()
+    )
 
 
 def assert_safe(markdown):
