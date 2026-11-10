@@ -2,7 +2,6 @@
 import Header from "@/components/ui/header/Header.astro";
 import Footer from "@/components/ui/Footer.astro";
 import "@/styles/global.css";
-import "@/styles/external-links.css";
 
 import "@/styles/dm-sans.css";
 import dmSansFont from "@/assets/fonts/dm-sans-latin-wght-normal.woff2?url";
@@ -39,7 +38,6 @@ const fullTitle = title ? `${title} | Monero CCS` : "Monero CCS";
     />
 
     <title>{fullTitle}</title>
-    <slot name="head" />
   </head>
   <body>
     <Header />
@@ -51,7 +49,6 @@ const fullTitle = title ? `${title} | Monero CCS` : "Monero CCS";
 </html>
 
 <style>
-  html,
   body {
     margin: 0;
     min-height: 100vh;
@@ -63,15 +60,11 @@ const fullTitle = title ? `${title} | Monero CCS` : "Monero CCS";
   }
 
   main {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2xl);
     padding: var(--page-top-margin) var(--mobile-padding-inline)
       var(--space-2xl);
     margin: 0 auto;
     width: 100%;
     max-width: var(--content-max-width);
-    flex: 1 0 auto;
     box-sizing: border-box;
   }
 

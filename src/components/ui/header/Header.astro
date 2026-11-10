@@ -109,7 +109,6 @@ import moneroLogo from "@/assets/monerologo.avif";
     text-decoration: none;
     font-weight: var(--font-weight-bold);
     letter-spacing: 0.02em;
-    justify-self: start;
     padding-block: var(--space-xs);
   }
 
@@ -120,8 +119,6 @@ import moneroLogo from "@/assets/monerologo.avif";
 
   .utils {
     display: inline-flex;
-    align-items: center;
-    gap: var(--space-md);
     justify-self: end;
   }
 
@@ -131,14 +128,7 @@ import moneroLogo from "@/assets/monerologo.avif";
 
     color: var(--paragraph-main);
     display: inline-flex;
-    align-items: center;
-    justify-content: center;
     cursor: pointer;
-    line-height: 1;
-  }
-
-  .hamburger {
-    font-size: var(--font-size-xl);
   }
 
   .nav-toggle {
@@ -148,7 +138,7 @@ import moneroLogo from "@/assets/monerologo.avif";
   .nav {
     position: fixed;
     inset-block: 0;
-    inset-inline-end: -100%;
+    inset-inline-end: 0;
     inline-size: min(26.25rem, calc(100vw - var(--drawer-gap)));
     box-sizing: border-box;
     background: var(--bg-color);
@@ -157,33 +147,25 @@ import moneroLogo from "@/assets/monerologo.avif";
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    opacity: 0;
     visibility: hidden;
-    pointer-events: none;
   }
 
   .drawer-header {
     display: flex;
-    align-items: center;
     justify-content: flex-end;
     padding-block: var(--space-xs);
-    background: inherit;
-    flex-shrink: 0;
   }
 
   .nav-list {
     display: flex;
     flex-direction: column;
-    align-items: stretch;
     margin: var(--space-md) 0 0;
     padding: 0;
     list-style: none;
     flex: 1 1 auto;
     overflow-y: auto;
     overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    -ms-overflow-style: none;
   }
 
   .nav-item:not(:last-child) {
@@ -193,14 +175,12 @@ import moneroLogo from "@/assets/monerologo.avif";
   .link {
     color: var(--paragraph-main);
     text-decoration: none;
-    font-weight: var(--font-weight-medium);
     display: block;
     padding-block: var(--space-md);
     white-space: nowrap;
 
     &:hover {
       color: var(--heading-color);
-      text-decoration: none;
     }
   }
 
@@ -234,10 +214,7 @@ import moneroLogo from "@/assets/monerologo.avif";
 
   .nav-toggle:checked {
     & ~ .nav {
-      inset-inline-end: 0;
-      opacity: 1;
       visibility: visible;
-      pointer-events: auto;
     }
 
     & ~ .scrim {
@@ -271,14 +248,11 @@ import moneroLogo from "@/assets/monerologo.avif";
 
     .nav {
       position: static;
-      inset: auto;
       inline-size: auto;
       padding: 0;
       background: unset;
       overflow: visible;
-      opacity: 1;
       visibility: visible;
-      pointer-events: auto;
       display: block;
     }
 
@@ -288,21 +262,14 @@ import moneroLogo from "@/assets/monerologo.avif";
 
     .nav-list {
       flex-direction: row;
-      align-items: center;
       justify-content: flex-end;
       gap: var(--space-2xl);
       margin: 0;
-      flex: unset;
       overflow: visible;
     }
 
     .nav-item:not(:last-child) {
       border-bottom: none;
-    }
-
-    .nav-toggle:checked ~ .nav {
-      inset: unset;
-      opacity: unset;
     }
 
     body:has(#nav-toggle:checked) {
@@ -313,14 +280,12 @@ import moneroLogo from "@/assets/monerologo.avif";
     .drawer-header,
     .external-item,
     .scrim,
-    .hamburger,
     .utils {
       display: none;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .nav,
     .scrim {
       transition: none;
     }
