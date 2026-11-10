@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -I
-"""Print the values the backend pushes.
+"""Write the values the backend pushes to a file, replacing it whole.
 
 The values are, in order:
 - one line per proposal: its name, the amount raised, the contributions and
@@ -13,8 +13,10 @@ It reads only ccs-back's JSON and its checkout of ccs-proposals, in the CCS_BACK
 folder that systemd passes from /etc/ccs/config, and the address list. It never
 reaches the network.
 
-Exit: 0 printed, 1 when ccs-back's files can't be read or a code doesn't read
-back.
+Usage: values.py <file>
+
+Exit: 0 written, 1 when ccs-back's files can't be read or a code doesn't read
+back, 2 usage.
 """
 
 import hashlib
@@ -117,8 +119,11 @@ def gitlab_line(commit: str, groups: list) -> str:
     return f"gitlab sha256={hashlib.sha256(known.encode()).hexdigest()}"
 
 
-def main() -> int:
-    """Print the values, and return the exit status."""
+def main(argv: list[str]) -> int:
+    """Write the values, and return the exit status."""
+    if len(argv) != 1:
+        print("usage: values.py <file>", file=sys.stderr)
+        return 2
     folder = Path(os.environ["CCS_BACK"])
     try:
         commit = proposals_commit(folder / "proposals")
@@ -137,12 +142,21 @@ def main() -> int:
         print(f"values: a QR code doesn't read back: {error}", file=sys.stderr)
         return 1
 
-    for line in [*sorted(lines), *codes]:
-        print(line)
-    print(gitlab_line(commit, groups))
-    print(f"updated {int(time.time())}")
+    closing = [gitlab_line(commit, groups), f"updated {int(time.time())}"]
+    text = "".join(f"{line}\n" for line in [*sorted(lines), *codes, *closing])
+    write_whole(Path(argv[0]), text)
     return 0
 
 
+def write_whole(path: Path, text: str) -> None:
+    """Replace the file in one rename, so no reader ever sees part of it."""
+    new = path.with_name(f"{path.name}.new")
+    with open(new, "w", encoding="utf-8") as file:
+        file.write(text)
+        os.fchmod(file.fileno(), 0o644)
+        os.fsync(file.fileno())
+    os.replace(new, path)
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))

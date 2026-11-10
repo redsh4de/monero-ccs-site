@@ -230,8 +230,8 @@ install_files() {
     install -D -m 0644 "$release/deploy/sandbox.conf" \
       "$UNITS/${service##*/}.d/sandbox.conf"
   done
-  install -D -m 0644 "$from/tmpfiles.conf" "/etc/tmpfiles.d/ccs-$role.conf"
   if [ "$role" = web ]; then
+    install -D -m 0644 "$from/tmpfiles.conf" /etc/tmpfiles.d/ccs-web.conf
     install -D -m 0644 "$from/sysusers.conf" /etc/sysusers.d/ccs-web.conf
     install -m 0644 "$from/nginx.conf" /etc/nginx/sites-enabled/ccs.conf
     rm -f /etc/nginx/sites-enabled/default
@@ -436,11 +436,11 @@ main() {
   # 3. Scripts, render, design and units switch together.
   swap "$new_release" "$LIB/current"
   install_files "$new_release" "$role"
-  systemd-sysusers
-  systemd-tmpfiles --create "/etc/tmpfiles.d/ccs-$role.conf"
   if [ "$role" = backend ]; then
     start_backend
   else
+    systemd-sysusers
+    systemd-tmpfiles --create /etc/tmpfiles.d/ccs-web.conf
     if [ "$new_key" = yes ]; then
       write_push_key "${3:-}" "${4:-}"
     fi
