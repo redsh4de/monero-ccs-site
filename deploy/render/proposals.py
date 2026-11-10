@@ -46,6 +46,7 @@ NOT_DONE = {"", "false", "no", "null", "~", "0"}
 
 LEADING_NUMBER = re.compile(r"\s*[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?")
 ORDINAL = re.compile(r"(\d)(st|nd|rd|th)\b")
+FINISHED = re.compile(r"finished|completed|done", re.I)
 # The date formats proposals use, all of which ccs-back's strtotime reads.
 DATE_FORMS = ("%B %d %Y", "%d %B %Y", "%b %d %Y", "%d %b %Y", "%m/%d/%Y", "%B %Y")
 
@@ -70,7 +71,7 @@ class Proposal:
     stage: str  # A key of STAGES, or "unlisted"
     title: str
     author: str
-    day: datetime | None  # For sorting
+    day: datetime | None
     date: str
     goal: float
     amount: str
@@ -245,8 +246,7 @@ def milestone(item: dict) -> Milestone:
         name=redact(field(item, "name")),
         funds=redact(field(item, "funds")),
         done=redact(field(item, "done")),
-        finished=re.fullmatch(r"finished|completed|done", field(item, "status"), re.I)
-        is not None,
+        finished=FINISHED.fullmatch(field(item, "status")) is not None,
     )
 
 

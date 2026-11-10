@@ -15,7 +15,6 @@ NOW = 1_800_000_000
 
 
 def fixed(alphabet, size):
-    """Return a strategy for text of that many characters from the alphabet."""
     return st.text(alphabet, min_size=size, max_size=size)
 
 

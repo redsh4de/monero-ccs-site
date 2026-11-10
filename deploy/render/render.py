@@ -1,10 +1,8 @@
-#!/usr/bin/env python3
 """Render the site's data pages from the input folder.
 
 Usage: render.py <input-dir> <templates-dir> <out-dir> [<cache-dir>]
 
-  <input-dir>      the render's input: proposals/, mr/, values, general-fund and
-                   site, as inputs.py describes them
+  <input-dir>      the render's input, as inputs.py describes it
   <templates-dir>  the Jinja templates, dist/templates in a release
   <out-dir>        where the pages go
   <cache-dir>      optional: rendered proposal bodies, kept between runs

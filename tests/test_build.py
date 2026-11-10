@@ -9,7 +9,6 @@ LOGO = b"\x89PNG the logo as committed"
 
 @pytest.fixture
 def tag(tmp_path):
-    """The tag's own files, with the logo in src/assets."""
     folder = tmp_path / "tag"
     (folder / "src/assets").mkdir(parents=True)
     (folder / "src/assets/logo.png").write_bytes(LOGO)

@@ -59,13 +59,12 @@ proposals = st.lists(
 
 
 class Page(HTMLParser):
-    """What a browser makes of some HTML: its tags, attributes, link schemes, text."""
+    """What a browser makes of some HTML: its tags, attributes, links, text."""
 
     def __init__(self, html):
         super().__init__()
         self.tags = set()
         self.attributes = set()
-        self.schemes = set()
         self.links = []
         self.text = ""
         self.feed(html)
@@ -76,7 +75,6 @@ class Page(HTMLParser):
         for name, value in attrs:
             self.attributes.add(name)
             if name == "href":
-                self.schemes.add(urllib.parse.urlsplit(value).scheme)
                 self.links.append(value)
 
     def handle_data(self, data):
@@ -97,7 +95,7 @@ def assert_safe(markdown):
     page = Page(bodies.render(markdown))
     assert page.tags <= ALLOWED_TAGS
     assert page.attributes <= ALLOWED_ATTRIBUTES
-    assert page.schemes <= SAFE_SCHEMES
+    assert {urllib.parse.urlsplit(link).scheme for link in page.links} <= SAFE_SCHEMES
     assert not shows_address(page.text)
     assert not any(shows_address(link) for link in page.links)
 

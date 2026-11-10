@@ -127,12 +127,8 @@ def main() -> int:
         print(f"values: can't read ccs-back's files: {error}", file=sys.stderr)
         return 1
 
-    lines = []
-    for group in groups:
-        for row in group.get("proposals", []):
-            line = value_line(row)
-            if line is not None:
-                lines.append(line)
+    rows = [row for group in groups for row in group.get("proposals", [])]
+    lines = [line for line in map(value_line, rows) if line]
     addresses = {line.rpartition("=")[2] for line in lines} | {general_fund()}
     try:
         shown = sorted(addresses - {"-", None})

@@ -21,7 +21,6 @@ def gpg(tmp_path_factory):
 
     def run(*args):
         command = ["gpg", "--homedir", home, "--batch", "--quiet"]
-        # the keys have no passphrase
         command += ["--pinentry-mode", "loopback", "--passphrase", ""]
         return subprocess.run([*command, *args], check=True, capture_output=True)
 

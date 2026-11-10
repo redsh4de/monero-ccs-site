@@ -30,10 +30,6 @@ CHANGES_CAP = 20_000_000
 SHA = re.compile(r"[0-9a-f]{40}")
 
 
-class Unreadable(Exception):
-    """GitLab's list of open merge requests can't be read whole."""
-
-
 def get(url: str, cap: int) -> object:
     """Return the JSON at a URL, fetched with curl, at most `cap` bytes."""
     command = ["curl", "-fsS", "--max-time", "60", "--max-filesize", str(cap), url]
@@ -61,11 +57,11 @@ def open_merge_requests(api: str) -> list:
         url = f"{api}/merge_requests?state=opened&per_page={PAGE}&page={page}"
         batch = get(url, LIST_CAP)
         if not isinstance(batch, list):
-            raise Unreadable("merge requests: GitLab didn't send a list")
+            sys.exit("merge requests: GitLab didn't send a list")
         entries += batch
         if len(batch) < PAGE:
             return entries
-    raise Unreadable(f"merge requests: more than {PAGE * MAX_PAGES} are open")
+    sys.exit(f"merge requests: more than {PAGE * MAX_PAGES} are open")
 
 
 def new_files(changes: object) -> list[str]:
@@ -108,9 +104,6 @@ def main(argv: list[str]) -> int:
 
     try:
         entries = open_merge_requests(api)
-    except Unreadable as error:
-        print(error, file=sys.stderr)
-        return 1
     except (subprocess.CalledProcessError, ValueError):
         print("merge requests: GitLab's list didn't load", file=sys.stderr)
         return 1

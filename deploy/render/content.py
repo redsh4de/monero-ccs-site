@@ -8,7 +8,6 @@ from inputs import Inputs, Wallet
 from proposals import GITLAB, STAGES, Proposal, shown_date
 from safety import redact
 
-IDEAS_PAGE = "ideas"
 HOME_CARDS = 4
 
 
@@ -41,7 +40,7 @@ class Site:
     @property
     def stage_pages(self) -> dict[str, list[Proposal] | list[Idea]]:
         """Each stage page's path, also its template's name, mapped to its cards."""
-        pages = {IDEAS_PAGE: self.ideas}
+        pages = {"ideas": self.ideas}
         for name, stage in STAGES.items():
             pages[stage.page] = [p for p in self.listed if p.stage == name]
         return pages
@@ -54,9 +53,7 @@ class Site:
     def home(self) -> dict:
         funding = [proposal for proposal in self.listed if proposal.funding]
         return {
-            "needs_funding": [proposal for proposal in funding if proposal.open][
-                :HOME_CARDS
-            ],
+            "needs_funding": [p for p in funding if p.open][:HOME_CARDS],
             "funding_count": len(funding),
             "see_all": len(funding) > HOME_CARDS,
         }
@@ -84,7 +81,7 @@ def build(inputs: Inputs) -> Site:
     ]
     return Site(
         proposals=sorted(proposals, key=newest_first),
-        ideas=open_ideas(inputs.merge_requests, inputs.added, set(inputs.proposals)),
+        ideas=open_ideas(inputs.merge_requests, set(inputs.proposals)),
         general_fund=inputs.general_fund,
     )
 
@@ -96,38 +93,33 @@ def newest_first(proposal: Proposal) -> tuple[int, int, str]:
     return (0, -proposal.day.toordinal(), proposal.slug)
 
 
-def open_ideas(
-    merge_requests: list[dict], added: dict[str, list[str]], slugs: set[str]
-) -> list[Idea]:
+def open_ideas(merge_requests: list[dict], slugs: set[str]) -> list[Idea]:
     """Return the ideas among the open merge requests, newest first.
 
-    `added` maps a merge request's number to the files it adds, and `slugs`
-    holds the proposals already in the repo. If two merge requests add the same
-    file, the first in GitLab's list wins.
+    `slugs` holds the proposals already in the repo. If two merge requests add
+    the same file, the first in GitLab's list wins.
     """
     ideas, taken = [], set()
     for mr in merge_requests:
-        files = added.get(str(mr.get("iid")), [])
-        if len(files) != 1:
+        if len(mr["adds"]) != 1:
             continue
-        name = files[0]
+        name = mr["adds"][0]
         slug = name.removesuffix(".md")
         if not is_new_proposal(name) or slug in slugs or name in taken:
             continue
-        created = parse_created(mr.get("created_at"))
-        if created is None:
+        try:
+            created = datetime.fromisoformat(mr["created_at"])
+        except ValueError:
             continue
         taken.add(name)
-        author = mr.get("author") if isinstance(mr.get("author"), dict) else {}
-        url = str(mr.get("web_url") or "")
         ideas.append(
             Idea(
-                title=redact(str(mr.get("title") or ""), ignore_spaces=True),
-                author=redact(str(author.get("username") or ""), ignore_spaces=True),
-                url=url if url.startswith(GITLAB) else "",
+                title=redact(mr["title"], ignore_spaces=True),
+                author=redact(mr["author"], ignore_spaces=True),
+                url=mr["web_url"] if mr["web_url"].startswith(GITLAB) else "",
                 date=shown_date(created),
-                upvotes=mr.get("upvotes", 0),
-                downvotes=mr.get("downvotes", 0),
+                upvotes=mr["upvotes"],
+                downvotes=mr["downvotes"],
                 created=mr["created_at"],
             )
         )
@@ -136,10 +128,3 @@ def open_ideas(
 
 def is_new_proposal(name: str) -> bool:
     return name.endswith(".md") and len(name) > 3 and "/" not in name
-
-
-def parse_created(value: object) -> datetime | None:
-    try:
-        return datetime.fromisoformat(str(value))
-    except ValueError:
-        return None
