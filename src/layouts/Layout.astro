@@ -1,6 +1,7 @@
 ---
 import Header from "@/components/ui/header/Header.astro";
 import Footer from "@/components/ui/Footer.astro";
+import Button from "@/components/ui/Button.astro";
 import "@/styles/global.css";
 
 import "@/styles/dm-sans.css";
@@ -40,8 +41,9 @@ const fullTitle = title ? `${title} | Monero CCS` : "Monero CCS";
     <title>{fullTitle}</title>
   </head>
   <body>
+    <Button href="#main" class="skip-link">Skip to content</Button>
     <Header />
-    <main>
+    <main id="main">
       <slot />
     </main>
     <Footer />
@@ -57,6 +59,19 @@ const fullTitle = title ? `${title} | Monero CCS` : "Monero CCS";
     color: var(--text-primary);
     display: flex;
     flex-direction: column;
+  }
+
+  .skip-link {
+    position: absolute;
+    inset-block-start: var(--space-sm);
+    inset-inline-start: var(--space-sm);
+    z-index: var(--z-modal-content);
+    transform: translateY(-200%);
+
+    &:focus {
+      transform: none;
+      opacity: 1;
+    }
   }
 
   main {
