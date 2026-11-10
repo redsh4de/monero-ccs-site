@@ -37,6 +37,7 @@ class Unreadable(Exception):
 def get(url: str, cap: int) -> object:
     """Return the JSON at a URL, fetched with curl, at most `cap` bytes."""
     command = ["curl", "-fsS", "--max-time", "60", "--max-filesize", str(cap), url]
+    command += ["--retry", "3"]
     return json.loads(subprocess.run(command, capture_output=True, check=True).stdout)
 
 
