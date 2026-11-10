@@ -26,7 +26,7 @@ from pathlib import Path
 PAGE = 100
 MAX_PAGES = 10
 LIST_CAP = 100_000_000
-CHANGES_CAP = 20_000_000
+DIFFS_CAP = 20_000_000
 SHA = re.compile(r"[0-9a-f]{40}")
 
 
@@ -40,7 +40,7 @@ def get(url: str, cap: int) -> object:
 def write(path: Path, text: str) -> None:
     """Write a file whole, through a temporary name.
 
-    It is on disk before the name appears: a later run trusts a cached change set
+    It is on disk before the name appears: a later run trusts a cached file list
     by its name, so a crash must not leave an empty one.
     """
     tmp = path.with_name(path.name + ".tmp")
@@ -50,31 +50,28 @@ def write(path: Path, text: str) -> None:
     tmp.rename(path)
 
 
-def open_merge_requests(api: str) -> list:
-    """Return every open merge request, page by page, as GitLab lists them."""
+def pages(url: str, cap: int) -> list:
+    """Return a GitLab list whole, its pages joined, or raise ValueError."""
     entries: list = []
     for page in range(1, MAX_PAGES + 1):
-        url = f"{api}/merge_requests?state=opened&per_page={PAGE}&page={page}"
-        batch = get(url, LIST_CAP)
+        batch = get(f"{url}per_page={PAGE}&page={page}", cap)
         if not isinstance(batch, list):
-            sys.exit("merge requests: GitLab didn't send a list")
+            raise ValueError("GitLab didn't send a list")
         entries += batch
         if len(batch) < PAGE:
             return entries
-    sys.exit(f"merge requests: more than {PAGE * MAX_PAGES} are open")
+    raise ValueError(f"more than {PAGE * MAX_PAGES} entries")
 
 
-def new_files(changes: object) -> list[str]:
-    """Return the paths a change set adds, skipping any with a tab or a line break."""
-    if not isinstance(changes, dict) or not isinstance(changes.get("changes"), list):
-        return []
+def new_files(diffs: list) -> list[str]:
+    """Return the paths a merge request adds, skipping any with a tab or a line break."""
     return [
-        change["new_path"]
-        for change in changes["changes"]
-        if isinstance(change, dict)
-        and change.get("new_file") is True
-        and isinstance(change.get("new_path"), str)
-        and not {"\t", "\n", "\r"} & set(change["new_path"])
+        diff["new_path"]
+        for diff in diffs
+        if isinstance(diff, dict)
+        and diff.get("new_file") is True
+        and isinstance(diff.get("new_path"), str)
+        and not {"\t", "\n", "\r"} & set(diff["new_path"])
     ]
 
 
@@ -86,9 +83,8 @@ def cached_files(api: str, iid: int, path: Path) -> list[str] | None:
     say, and caches nothing then.
     """
     if not path.exists():
-        url = f"{api}/merge_requests/{iid}/changes"
         try:
-            files = new_files(get(url, CHANGES_CAP))
+            files = new_files(pages(f"{api}/merge_requests/{iid}/diffs?", DIFFS_CAP))
         except (subprocess.CalledProcessError, ValueError):
             return None
         write(path, "".join(f"{name}\n" for name in files))
@@ -103,9 +99,9 @@ def main(argv: list[str]) -> int:
     api, out, cache = argv[0], Path(argv[1]), Path(argv[2])
 
     try:
-        entries = open_merge_requests(api)
-    except (subprocess.CalledProcessError, ValueError):
-        print("merge requests: GitLab's list didn't load", file=sys.stderr)
+        entries = pages(f"{api}/merge_requests?state=opened&", LIST_CAP)
+    except (subprocess.CalledProcessError, ValueError) as error:
+        print(f"merge requests: GitLab's list didn't load: {error}", file=sys.stderr)
         return 1
 
     cache.mkdir(parents=True, exist_ok=True)
