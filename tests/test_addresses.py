@@ -42,3 +42,37 @@ def test_no_unlisted_address_reaches_a_page(lines):
     values = checks.check_values(pushed.encode(), last=0, now=NOW)
     shown = checks.apply_list(values, {LISTED})
     assert set(ADDRESS.findall(shown)) <= {LISTED}
+
+
+FIRST, BOTH, LAST = ("8" + c * 94 for c in "CDE")
+OLD_LIST, NEW_LIST = {FIRST, BOTH}, {BOTH, LAST}
+NAMES = ["x", "y"]
+pair = st.tuples(st.sampled_from(NAMES), st.sampled_from([FIRST, BOTH, LAST, "-"]))
+
+
+@given(st.lists(st.lists(pair, max_size=3), max_size=6), st.integers(0, 6))
+def test_a_shown_address_stays_with_its_proposal(pushes, new_list_from):
+    """A push is accepted only when every address shown has one proposal, and
+    every proposal has at most one address that the list still holds."""
+    pins, shown = {}, set()
+    for i, push in enumerate(pushes):
+        listed = OLD_LIST if i < new_list_from else NEW_LIST
+        lines = [f"proposal {n} raised=0 contributions=0 address={a}" for n, a in push]
+        values = checks.check_values(
+            "".join(f"{line}\n" for line in [*lines, f"updated {NOW}"]).encode(),
+            last=0,
+            now=NOW,
+        )
+        rows = [row.split(" ") for row in values.splitlines()[:-1]]
+        pairs = {(r[1], r[-1].removeprefix("address=")) for r in rows}
+        seen = shown | {(n, a) for n, a in pairs if a in listed}
+        allowed = len({a for _, a in seen}) == len(seen) and all(
+            len({a for m, a in seen if m == n and a in listed}) <= 1 for n in NAMES
+        )
+        try:
+            pins = checks.keep_pins(values, listed, pins)
+        except checks.Reject:
+            assert not allowed
+            continue
+        assert allowed
+        shown = seen

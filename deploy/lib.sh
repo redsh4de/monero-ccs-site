@@ -191,23 +191,26 @@ get_release() {
   done
 }
 
+# verify_list <list>: writes the signed address list to <list> once it
+# verifies. A list that doesn't verify counts as empty, so every donation box
+# closes rather than show an address nobody signed.
+verify_list() {
+  if ! "$DEPLOY/checks.py" addresses /etc/ccs/address-signers.gpg \
+    /etc/ccs/addresses.txt >"$1"; then
+    : >"$1" || return 1
+  fi
+}
+
 # render_values <values> <input-dir> <list>: writes the render's values,
-# general-fund, qr and site into the render's input folder, with every address
-# not on the signed list as -, and prints a hash of all four. The verified list
-# goes to <list>, outside the input folder.
-#
-# A list that doesn't verify counts as empty, so every donation box closes
-# rather than show an address nobody signed. update.sh and the monitor both
-# build the render's input this way, so they agree.
+# general-fund, qr and site into the render's input folder from the verified
+# <list>, with every address not on it as -, and prints a hash of all four.
+# update.sh and the monitor both build the render's input this way, so they
+# agree.
 render_values() {
   local values="$1"
   local in_dir="$2"
   local list="$3"
 
-  if ! "$DEPLOY/checks.py" addresses /etc/ccs/address-signers.gpg \
-    /etc/ccs/addresses.txt >"$list"; then
-    : >"$list" || return 1
-  fi
   sed -n 's/^general-fund \([^ ]*\) .*/\1/p' "$list" >"$in_dir/general-fund" \
     || return 1
   sed 's/^general-fund //' "$list" >"$in_dir/qr" || return 1

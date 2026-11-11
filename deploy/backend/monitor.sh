@@ -231,7 +231,9 @@ verify_merge_requests() {
 # as the web server builds them, and prints their hash. A site showing other
 # values fails the page compare, index.php/projects first.
 build_values() {
-  if ! "$DEPLOY/checks.py" values "$BACKEND_VALUES" 0 >"$RUN_DIR/checked"; then
+  verify_list "$RUN_DIR/addresses"
+  if ! "$DEPLOY/checks.py" values "$BACKEND_VALUES" /dev/null \
+    "$RUN_DIR/addresses" >"$RUN_DIR/checked"; then
     : >"$RUN_DIR/checked"
   fi
   render_values "$RUN_DIR/checked" "$RUN_DIR/in" "$RUN_DIR/addresses"

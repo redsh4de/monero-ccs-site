@@ -201,12 +201,15 @@ When a release on disk is damaged:
 
 ### Rebuild a machine
 
-**To rebuild the web server, save `/etc/ccs/` and the certificate.** Nothing else on it
-matters.
+**To rebuild the web server, save `/etc/ccs/`, the certificate and
+`/var/lib/ccs/state/values`.** That file holds each proposal's pinned address. Nothing
+else on the machine matters.
 
 1. Set it up again, as in [The web server](#the-web-server). The push key is in the
    backend's `/etc/ccs/push_key.pub`.
-2. On the backend, read the new host key, as in
+2. Put the saved `values` back:
+   `install -o ccs-update -g ccs-update -m 644 values /var/lib/ccs/state/`.
+3. On the backend, read the new host key, as in
    [SSH keys and addresses](#ssh-keys-and-addresses).
 
 **To rebuild the backend, you need only its `/etc/ccs/`.**
@@ -222,7 +225,8 @@ Rebuild a compromised machine, and replace the secrets it held.
 A compromised web server:
 
 1. Take the web server offline.
-2. Rebuild the web server, as in [Rebuild a machine](#rebuild-a-machine).
+2. Rebuild the web server, as in [Rebuild a machine](#rebuild-a-machine), with a
+   `values` file saved before the compromise.
 3. Replace the certificate.
 4. Replace the alert URL in `/etc/ccs/alert_url` on both machines.
 5. On the backend, delete the monitor's state, which read the web server's
@@ -236,7 +240,8 @@ A compromised backend:
 3. Rebuild the backend without its old `/etc/ccs/push_key`, so the install makes a new
    one.
 
-The site keeps the last values meanwhile, and all their addresses are on the list.
+The site keeps the last values meanwhile. All their addresses are on the list, and each
+stays pinned to its proposal.
 
 ---
 
