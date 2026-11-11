@@ -192,8 +192,8 @@ get_release() {
 }
 
 # render_values <values> <input-dir> <list>: writes the render's values,
-# general-fund and site into the render's input folder, with every address not
-# on the signed list as -, and prints a hash of all three. The verified list
+# general-fund, qr and site into the render's input folder, with every address
+# not on the signed list as -, and prints a hash of all four. The verified list
 # goes to <list>, outside the input folder.
 #
 # A list that doesn't verify counts as empty, so every donation box closes
@@ -208,13 +208,15 @@ render_values() {
     /etc/ccs/addresses.txt >"$list"; then
     : >"$list" || return 1
   fi
-  sed -n 's/^general-fund //p' "$list" >"$in_dir/general-fund" || return 1
+  sed -n 's/^general-fund \([^ ]*\) .*/\1/p' "$list" >"$in_dir/general-fund" \
+    || return 1
+  sed 's/^general-fund //' "$list" >"$in_dir/qr" || return 1
   printf '%s\n' "$SITE" >"$in_dir/site" || return 1
   "$DEPLOY/checks.py" apply "$values" "$list" >"$in_dir/values" || return 1
 
   # the values' time changes with every push, so it stays out of the hash
-  sed '/^updated /d' "$in_dir/values" "$in_dir/general-fund" "$in_dir/site" \
-    | sha256sum | cut -c1-64
+  sed '/^updated /d' "$in_dir/values" "$in_dir/general-fund" "$in_dir/qr" \
+    "$in_dir/site" | sha256sum | cut -c1-64
 }
 
 # swap <target> <link>: points the link at the target with one rename, so a

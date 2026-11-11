@@ -35,8 +35,7 @@ result.
 ```
 
 1. `values.py` reads ccs-back's JSON about once a minute, and writes the values: each
-   proposal's amount raised, contribution count and donation address. It also reads
-   each address's QR code back with zbar, and adds the hash of the code. The push sends
+   proposal's amount raised, contribution count and donation address. The push sends
    them to the web server over SSH.
 2. Each push starts `fetch.sh`. It calls GitLab only when the push's `gitlab` line
    changes, or once an hour.
@@ -52,31 +51,41 @@ runs on neither machine.
 
 ### The values
 
-`values.py` writes one line for each proposal, then the QR lines, then two closing
-lines:
+`values.py` writes one line for each proposal, then two closing lines:
 
 ```
 proposal example-funding raised=10 contributions=3 address=888tNk…
 proposal Core%20website%20translation raised=0 contributions=0 address=-
-qr 888tNk… sha256=9ff6808f…
 gitlab sha256=1c0e…
 updated 1762600000
 ```
 
 - `proposal`: one proposal, named as in its page's URL. It holds the amount raised, the
   number of contributions and the donation address, or `-` for none.
-- `qr`: an address, and the hash of its QR code once zbar read the code back. The web
-  server shows a QR code only when its own drawing has this hash.
 - `gitlab`: a hash of ccs-back's proposals commit and of its Ideas stage, which lists
   the open merge requests.
 - `updated`: when `values.py` wrote the file, in Unix time. The web server refuses a file
   that is not newer than the last, or that is over 5 minutes ahead.
 
+### The address list
+
+The address signer signs one line for each address, with its QR code:
+
+```
+888tNk… /i5PG/wVDUa…
+general-fund 888tNk… /i5PG/wVDUa…
+```
+
+The code is the QR code's modules, one bit each, dark as 1, row by row, in base64.
+`address-list.py` makes each code with qrencode and reads it back with zbar before the
+signer signs. The servers draw the PNG from these bits, so neither runs a QR encoder or
+decoder.
+
 ### Files
 
 Each folder in `deploy/` names the machine that runs it. `web/` runs on the web server
 and `backend/` on the backend. `render/` and the scripts at the top run on both, except
-`release.sh`, which the signers run.
+`release.sh` and `address-list.py`, which the signers run.
 
 ---
 

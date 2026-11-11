@@ -1,7 +1,8 @@
 """Reading the render's input folder.
 
 The folder holds proposals/, mr/open.json, mr/open.tsv, mr/merged.tsv, values,
-with its QR lines, general-fund, and site, the address the site is served at.
+general-fund, qr, the signed list's QR code for each address, and site, the
+address the site is served at.
 This module only parses them; the rules live in proposals.py and content.py.
 """
 
@@ -30,7 +31,7 @@ class Inputs:
     merge_requests: list[dict]  # What the render reads of each open merge request
     general_fund: str  # The General Fund's address, or ""
     site_url: str
-    qr_hashes: dict[str, str]  # Address, to the hash the backend read back for its code
+    qr_codes: dict[str, str]  # Address, to its QR code from the signed list
 
 
 def read(folder: Path) -> Inputs:
@@ -45,7 +46,7 @@ def read(folder: Path) -> Inputs:
         merge_requests=read_merge_requests(folder / "mr"),
         general_fund=read_general_fund(folder / "general-fund"),
         site_url=read_text(folder / "site").strip(),
-        qr_hashes=read_qr_hashes(folder / "values"),
+        qr_codes=read_qr_codes(folder / "qr"),
     )
 
 
@@ -91,14 +92,10 @@ def read_wallets(path: Path) -> dict[str, Wallet]:
     return wallets
 
 
-def read_qr_hashes(path: Path) -> dict[str, str]:
-    """Read the values file's QR lines, each `qr <address> sha256=<hash>`."""
-    hashes = {}
-    for line in read_text(path).splitlines():
-        parts = line.split(" ")
-        if len(parts) == 3 and parts[0] == "qr" and is_address(parts[1]):
-            hashes[parts[1]] = parts[2].removeprefix("sha256=")
-    return hashes
+def read_qr_codes(path: Path) -> dict[str, str]:
+    """Read the QR codes, a line `<address> <code>` each."""
+    pairs = (line.split(" ") for line in read_text(path).splitlines())
+    return {p[0]: p[1] for p in pairs if len(p) == 2 and is_address(p[0])}
 
 
 def read_pairs(path: Path) -> Iterator[tuple[str, str]]:

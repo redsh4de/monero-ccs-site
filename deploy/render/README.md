@@ -16,8 +16,9 @@ The cache folder is optional, and speeds up later renders. The input folder hold
 | `mr/open.json`   | The open merge requests                                     | GitLab API               |
 | `mr/open.tsv`    | The files that open merge requests add                      | GitLab API               |
 | `mr/merged.tsv`  | The merge request that added each file                      | ccs-proposals history    |
-| `values`         | Amounts raised, contributions, addresses and QR code hashes | Backend                  |
+| `values`         | Amounts raised, contributions and addresses                 | Backend                  |
 | `general-fund`   | The General Fund address                                    | Address list             |
+| `qr`             | The QR code of each address                                 | Address list             |
 | `site`           | The address the site is served at, for the feed's links     | `SITE` in the config     |
 
 The render needs Python 3 and the Debian 13 packages in `deploy/Containerfile.render`.

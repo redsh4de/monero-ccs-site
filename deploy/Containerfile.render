@@ -2,5 +2,5 @@
 FROM docker.io/library/debian:trixie-20261020@sha256:4c25275446ca371766b8b093c696782eabce06263fccacb8d5d813b3dc44b308
 RUN apt-get update \
   && apt-get install -y --no-install-recommends python3-yaml python3-markdown-it \
-    python3-mdit-py-plugins python3-jinja2 qrencode \
+    python3-mdit-py-plugins python3-jinja2 \
   && rm -rf /var/lib/apt/lists/*
