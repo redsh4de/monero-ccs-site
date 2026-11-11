@@ -89,4 +89,80 @@ import { stages } from "@/lib/stages";
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
   }
+
+@keyframes cog-rotate {
+  from {
+    transform: rotate(0turn);
+  }
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@keyframes navcard-completed-icon {
+  3% {
+    transform: scale(1);
+  }
+  6% {
+  transform: scale(1.25);
+  }
+  7% {
+  transform: scale(1.25);
+  }
+  9% {
+    transform: scale(0);
+  }
+  20% {
+    transform: translateY(-170%) scaleX(0.85) scaleY(1.25);
+  }
+  23% {
+    transform: translateY(0) scale(1);
+  }
+  25% {
+    transform: translateY(0) scaleX(1.35) scaleY(0.75);
+  }
+  26% {
+    transform: translateY(0) scale(1);
+  }
+  29% {
+    transform: translateY(-65%) scaleX(0.95) scaleY(1.05);
+  }
+  31% {
+    transform: translateY(0) scale(1);
+  }
+  33% {
+    transform: translateY(0) scaleX(1.2) scaleY(0.8);
+  }
+  34% {
+    transform: translateY(0) scale(1);
+  }
+  84% {
+    transform: rotate(0deg);
+  }
+  85% {
+    transform: translateY(-10%) translateX(-16%) rotate(15deg);
+  }
+  87% {
+    transform: translateX(-20%);
+  }
+  89% {
+    transform: translateX(-20%);
+  }
+  91% {
+    transform: translateY(-10%) rotate(-15deg);
+  }
+  93% {
+    transform: translateX(20%);
+  }
+  95% {
+    transform: translateX(20%);
+  }
+  97% {
+    transform: translateY(-10%);
+  }
+  99% {
+    transform: translateX(0);
+  }
+
+}
 </style>
