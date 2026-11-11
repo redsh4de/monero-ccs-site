@@ -1,52 +1,44 @@
-"""A donation QR code is drawn only as the backend read it back."""
+"""A donation QR code is drawn only from a signed code that read back."""
 
-import sys
-from dataclasses import replace
+import runpy
+import struct
+import zlib
 from pathlib import Path
 
 import pytest
 
-import inputs
 import qr
-import render
 
-ADDRESS = "8" + "A" * 94
+ADDRESS = Path("example-data/general-fund").read_text().strip()
 OTHER = "4" + "B" * 94
+TOOL = runpy.run_path("deploy/address-list.py")
 
 
-def plant_qrencode(tmp_path, monkeypatch):
-    """Put a qrencode first on PATH that draws another address's code."""
+def drawn(png: bytes) -> list[list[bool]]:
+    """Return the pixels of a PNG from qr.png, light as True."""
+    side = struct.unpack(">I", png[16:20])[0]
+    length = struct.unpack(">I", png[33:37])[0]
+    raw = zlib.decompress(png[41 : 41 + length])
+    width = -(-side // 8) + 1
+    rows = [raw[i * width + 1 : (i + 1) * width] for i in range(side)]
+    return [
+        [bool(byte >> (7 - b) & 1) for byte in row for b in range(8)][:side]
+        for row in rows
+    ]
+
+
+def test_the_served_png_reads_back_as_the_signed_address():
+    png = qr.png(qr.modules(TOOL["code"](ADDRESS)))
+    assert TOOL["read_back"](drawn(png)) == [f"monero:{ADDRESS}"]
+
+
+def test_planted_qrencode_fails_the_signers_read_back(tmp_path, monkeypatch):
     planted = tmp_path / "bin" / "qrencode"
     planted.parent.mkdir()
-    planted.write_text(f'#!/bin/sh\nexec /usr/bin/qrencode -t ASCII "monero:{OTHER}"\n')
+    planted.write_text(
+        f'#!/bin/sh\nexec /usr/bin/qrencode -t ASCII -m 0 "monero:{OTHER}"\n'
+    )
     planted.chmod(0o755)
     monkeypatch.setenv("PATH", f"{planted.parent}:/usr/bin:/bin")
-
-
-def test_planted_qrencode_fails_the_backends_read_back(tmp_path, monkeypatch):
-    plant_qrencode(tmp_path, monkeypatch)
     with pytest.raises(ValueError, match="doesn't read back"):
-        qr.read_back(ADDRESS)
-
-
-def test_planted_qrencode_on_the_web_server_draws_nothing(tmp_path, monkeypatch):
-    pushed = qr.read_back(ADDRESS)
-    plant_qrencode(tmp_path, monkeypatch)
-    with pytest.raises(ValueError, match="isn't the one the backend read"):
-        qr.write(ADDRESS, tmp_path / "qr.png", pushed)
-    assert not (tmp_path / "qr.png").exists()
-
-
-def test_drawing_needs_no_decoder(tmp_path, monkeypatch):
-    pushed = qr.read_back(ADDRESS)
-    # as on the web server, which has no zbar
-    monkeypatch.setitem(sys.modules, "zbar", None)
-    qr.write(ADDRESS, tmp_path / "qr.png", pushed)
-    assert (tmp_path / "qr.png").read_bytes().startswith(b"\x89PNG")
-
-
-def test_box_whose_code_wasnt_read_back_stays_closed():
-    given = inputs.read(Path("example-data"))
-    assert render.build_site(given).addresses_shown
-    unread = replace(given, qr_hashes={})
-    assert render.build_site(unread).addresses_shown == set()
+        TOOL["code"](ADDRESS)

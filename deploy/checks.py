@@ -52,7 +52,9 @@ from pathlib import Path
 
 # the render's own address rule, from the same release, run from the file the
 # signers read: an import would take a safety/ folder or a cached .pyc first
-SAFETY = runpy.run_path(str(Path(__file__).resolve().parent / "render/safety.py"))
+RENDER = Path(__file__).resolve().parent / "render"
+SAFETY = runpy.run_path(str(RENDER / "safety.py"))
+qr_modules = runpy.run_path(str(RENDER / "qr.py"))["modules"]
 ADDRESS_RUN = SAFETY["ADDRESS_RUN"]
 has_address = SAFETY["has_address"]
 grouped_addresses = SAFETY["grouped_addresses"]
@@ -63,10 +65,9 @@ VALUE = re.compile(
     rf"proposal [A-Za-z0-9._~%-]{{1,750}} raised=[0-9]{{1,12}}(\.[0-9]{{1,12}})?"
     rf" contributions=[0-9]{{1,9}} address=({ADDRESS}|-)"
 )
-QR = re.compile(rf"qr {ADDRESS} sha256=[0-9a-f]{{64}}")
 GITLAB = re.compile(r"gitlab sha256=[0-9a-f]{64}")
 UPDATED = re.compile(r"updated ([0-9]{10})")
-LISTED = re.compile(rf"{ADDRESS}|general-fund {ADDRESS}")
+LISTED = re.compile(rf"(general-fund )?{ADDRESS} [A-Za-z0-9+/=]+")
 # a line of sha256sum's output
 SUM_LINE = re.compile(r"([0-9a-f]{64})  ([A-Za-z0-9._-]{1,200})")
 COMMIT = re.compile(r"[0-9a-f]{40}")
@@ -83,7 +84,8 @@ BUILD_SUFFIXES = {".html", ".css"} | BINARY_SUFFIXES
 # the authority after // in a URL, absolute or protocol-relative
 URL_AUTHORITY = re.compile(r"//([^/\s\"'<>()\\?#]+)")
 TAG = re.compile(r"<[^>]*>")
-VALUES_CAP = LIST_CAP = 1_000_000
+VALUES_CAP = 1_000_000
+LIST_CAP = 4_000_000
 SUMS_CAP = 10_000
 STATUS_CAP = 50_000_000
 TAR_CAP = 200_000_000
@@ -163,7 +165,7 @@ def check_values(data: bytes, last: int, now: int) -> str:
         raise Reject("values: the updated line is missing or in the future")
     if int(updated[1]) <= last:
         raise Reject(None)
-    patterns = (VALUE, QR, GITLAB, UPDATED)
+    patterns = (VALUE, GITLAB, UPDATED)
     matched = all(any(p.fullmatch(row) for p in patterns) for row in rows)
     gitlab = sum(row.startswith("gitlab ") for row in rows)
     times = sum(row.startswith("updated ") for row in rows)
@@ -183,26 +185,23 @@ def check_addresses(keyring: str, path: str) -> str:
     funds = sum(row.startswith("general-fund ") for row in rows)
     if not all(LISTED.fullmatch(row) for row in rows) or funds != 1:
         raise Reject("address list: malformed")
+    if not all(qr_modules(row.rpartition(" ")[2]) for row in rows):
+        raise Reject("address list: a QR code is malformed")
     return data.decode("ascii")
 
 
-def apply_list(values: str, listed: set[str]) -> str:
-    """Return the values with only the addresses that are lines of the list.
+def apply_list(values: str, addresses: set[str]) -> str:
+    """Return the values with only the list's addresses for proposals.
 
-    A proposal's address that isn't listed becomes -, and the QR line of an
-    address the list lacks is dropped; the list names the General Fund on a
-    general-fund line. Fields split on single spaces only, so a tab can't hide
-    an address.
+    A proposal's address that isn't listed becomes -. Fields split on single
+    spaces only, so a tab can't hide an address.
     """
     rows = []
     for row in values.split("\n"):
         fields = row.split(" ")
         address = fields[-1].removeprefix("address=")
-        if fields[0] == "proposal" and address not in listed:
+        if fields[0] == "proposal" and address not in addresses:
             fields[-1] = "address=-"
-        if len(fields) == 3 and fields[0] == "qr":
-            if not {fields[1], f"general-fund {fields[1]}"} & listed:
-                continue
         rows.append(" ".join(fields))
     return "\n".join(rows)
 
@@ -378,7 +377,7 @@ def check_site(site: str, list_path: str) -> None:
     - without its tags, for its text as it shows.
     """
     rows = lines(read_capped(list_path, LIST_CAP, "address list"), "address list")
-    listed = {row.split(" ")[-1] for row in rows}
+    listed = {row.removeprefix("general-fund ").split(" ")[0] for row in rows}
     for path in sorted(Path(site).rglob("*")):
         if not path.is_file() or path.suffix in BINARY_SUFFIXES:
             continue
@@ -459,9 +458,11 @@ def main(argv: list[str]) -> int:
                 print(check_addresses(keyring, path), end="")
             case ["apply", values, path]:
                 text = read_capped(values, VALUES_CAP, "values").decode("ascii")
-                data = read_capped(path, LIST_CAP, "address list")
-                listed = lines(data, "address list")
-                print(apply_list(text, set(listed)), end="")
+                rows = lines(
+                    read_capped(path, LIST_CAP, "address list"), "address list"
+                )
+                listed = {row.split(" ")[0] for row in rows} - {"general-fund"}
+                print(apply_list(text, listed), end="")
             case ["status", path]:
                 print(check_status(read_capped(path, STATUS_CAP, "status")))
             case ["snapshot", path]:

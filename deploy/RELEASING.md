@@ -173,13 +173,19 @@ a repository of their own, keep that layout, and change only `get_attestations` 
 A Core Team member, the address signer, makes the list once for each wallet.
 
 1. Make a view-only wallet from the published CCS address and view key.
-2. Write its first N subaddresses of account 0 to `addresses.txt`, one on each line.
+2. Write its first N subaddresses of account 0 to `subaddresses.txt`, one on each line.
    Pick N well above the count ccs-back has given out.
-3. Add the line `general-fund <address>`, with the General Fund address from
-   getmonero.org.
-4. Sign the list: `gpg --detach-sign --armor addresses.txt`.
-5. Give `addresses.txt` and `addresses.txt.asc` to the operators of both machines.
-6. Publish the sha256 of `addresses.txt` in a Monero meta issue.
+3. Install the QR tools: `apt install qrencode python3-zbar`.
+4. Make the list from a release's `deploy/` folder, with the General Fund address from
+   getmonero.org. It reads each QR code back before it writes the code:
+
+   ```sh
+   deploy/address-list.py subaddresses.txt <General Fund address> >addresses.txt
+   ```
+
+5. Sign the list: `gpg --detach-sign --armor addresses.txt`.
+6. Give `addresses.txt` and `addresses.txt.asc` to the operators of both machines.
+7. Publish the sha256 of `addresses.txt` in a Monero meta issue.
 
 Anyone with the view key can make the same subaddresses and compare. When ccs-back gives
 out an address beyond the list, the `addresses` alert fires: make a longer list the same

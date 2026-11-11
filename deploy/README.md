@@ -159,9 +159,8 @@ To go back, use the opposite order: the backend first. The previous release stay
 disk, so going back one release needs no download. Run the same command with its name.
 
 **Upgrade the render's Debian packages on both machines together.** Otherwise the
-monitor finds pages that differ, and a `qrencode` that draws other codes closes the
-donation boxes. These are `python3-yaml`, `python3-markdown-it`,
-`python3-mdit-py-plugins`, `python3-jinja2` and `qrencode`.
+monitor finds pages that differ. These are `python3-yaml`, `python3-markdown-it`,
+`python3-mdit-py-plugins` and `python3-jinja2`.
 
 ---
 
