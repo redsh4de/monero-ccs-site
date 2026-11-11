@@ -11,7 +11,7 @@ minutes.
 
 | Alert          | Fires when                                                       | Usual causes                                                                                                                                                |
 | -------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `stale-values` | No new values for 10 minutes. Each fetch checks, at least hourly | "In the future": clock skew. A traceback: a render bug, so go back one release. A refused key: see [Keys and certificates](README.md#keys-and-certificates) |
+| `stale-values` | No new values for 10 minutes. Each fetch checks, at least hourly | "In the future": clock skew. A traceback: a render bug, so go back one release. A refused key: see [Keys and certificates](README.md#keys-and-certificates). "Moves off its address" or "shows the address of": the backend changed a proposal's address, so check the backend for a compromise |
 | `fetch`        | Fetches from GitLab fail for 50 minutes                          | GitLab down or stalling. An error about objects or a lock: [repair the web server](README.md#repair-the-web-server)                                         |
 
 ## Monitor alerts

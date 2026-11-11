@@ -31,28 +31,22 @@ readonly IN_DIR="$CCS_DIR/in"
 readonly STATE_DIR="$CCS_DIR/state"
 readonly WORK_DIR="$CCS_DIR/work"
 
-# check_new_values: writes state/values.new: the pushed values when they are
-# newer than those applied last and checks.py accepts them, or else the last
-# applied values.
+# check_new_values: writes state/values.new: the pushed values and their pins
+# when checks.py accepts them, or else the values applied last.
 check_new_values() {
-  local updated=""
-
   touch -- "$STATE_DIR/values"
-  updated=$(sed -n 's/^updated //p' "$STATE_DIR/values")
-  if ! "$DEPLOY/checks.py" values "$IN_DIR/values" "${updated:-0}" \
-    >"$STATE_DIR/values.new"; then
+  if ! "$DEPLOY/checks.py" values "$IN_DIR/values" "$STATE_DIR/values" \
+    "$WORK_DIR/addresses" >"$STATE_DIR/values.new"; then
     cp -- "$STATE_DIR/values" "$STATE_DIR/values.new"
   fi
 }
 
-# link_inputs <repo> <mr>: builds the render's input folder in WORK_DIR from
+# link_inputs <repo> <mr>: fills the render's input folder in WORK_DIR with
 # links to the fetched content, which belongs to the ccs-fetch user.
 link_inputs() {
   local repo="$1"
   local mr="$2"
 
-  rm -rf -- "$WORK_DIR"
-  mkdir -p -- "$WORK_DIR/in/mr"
   ln -s -- "$repo/proposals" "$WORK_DIR/in/proposals"
   ln -s -- "$mr/open.json" "$mr/open.tsv" "$repo/mr/merged.tsv" \
     "$WORK_DIR/in/mr/"
@@ -100,8 +94,11 @@ main() {
   local rendered=""
 
   mkdir -p -- "$STATE_DIR" "$CCS_DIR/site" "$CCS_DIR/cache"
+  rm -rf -- "$WORK_DIR"
+  mkdir -p -- "$WORK_DIR/in/mr"
 
-  # 1. The values, when a newer file arrived.
+  # 1. The values, when a newer file arrived that keeps every pin.
+  verify_list "$WORK_DIR/addresses"
   check_new_values
 
   # 2. The render's input: the fetched content, and the values with every

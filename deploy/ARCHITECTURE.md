@@ -67,6 +67,22 @@ updated 1762600000
 - `updated`: when `values.py` wrote the file, in Unix time. The web server refuses a file
   that is not newer than the last, or that is over 5 minutes ahead.
 
+### Pins
+
+The web server pins each donation address to the first proposal that shows it:
+
+- No other proposal can show a pinned address.
+- A pinned proposal cannot change to a different address from the list.
+
+`checks.py values` refuses a push that breaks a pin. The site then keeps its last good
+values.
+
+A pin counts only while the signed list holds its address. A list for a new wallet does
+not hold the old addresses, so their pins stop counting.
+
+The pins are lines at the end of `/var/lib/ccs/state/values`, such as
+`pin example-funding 888tNk…`.
+
 ### The address list
 
 The address signer signs one line for each address, with its QR code:

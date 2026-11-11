@@ -2,9 +2,9 @@
 """Decide whether the deploy's untrusted inputs are accepted.
 
 Usage:
-  checks.py values <pushed> <last-updated>
-      print the pushed values, checked; <last-updated> is the "updated" time
-      of the values applied last, or 0
+  checks.py values <pushed> <applied> <verified-list>
+      print the pushed values, checked, then their pins; <applied> holds the
+      values applied last and their pins. A push that breaks a pin is refused
   checks.py addresses <keyring> <list>
       print the address list, once a key in <keyring> signed it in <list>.asc
   checks.py apply <values> <verified-list>
@@ -61,12 +61,14 @@ grouped_addresses = SAFETY["grouped_addresses"]
 visible = SAFETY["visible"]
 
 ADDRESS = SAFETY["ADDRESS"].pattern
+NAME = r"[A-Za-z0-9._~%-]{1,750}"
 VALUE = re.compile(
-    rf"proposal [A-Za-z0-9._~%-]{{1,750}} raised=[0-9]{{1,12}}(\.[0-9]{{1,12}})?"
+    rf"proposal {NAME} raised=[0-9]{{1,12}}(\.[0-9]{{1,12}})?"
     rf" contributions=[0-9]{{1,9}} address=({ADDRESS}|-)"
 )
 GITLAB = re.compile(r"gitlab sha256=[0-9a-f]{64}")
 UPDATED = re.compile(r"updated ([0-9]{10})")
+PIN = re.compile(rf"pin {NAME} {ADDRESS}")
 LISTED = re.compile(rf"(general-fund )?{ADDRESS} [A-Za-z0-9+/=]+")
 # a line of sha256sum's output
 SUM_LINE = re.compile(r"([0-9a-f]{64})  ([A-Za-z0-9._-]{1,200})")
@@ -190,15 +192,55 @@ def check_addresses(keyring: str, path: str) -> str:
     return data.decode("ascii")
 
 
+def read_listed(path: str) -> set[str]:
+    """Return the verified list's addresses for proposals."""
+    rows = lines(read_capped(path, LIST_CAP, "address list"), "address list")
+    return {row.split(" ")[0] for row in rows} - {"general-fund"}
+
+
+def read_applied(data: bytes) -> tuple[int, dict[str, str]]:
+    """Return the applied values' time, and each pinned address with its proposal."""
+    rows = lines(data, "applied values")
+    times = [int(m[1]) for m in map(UPDATED.fullmatch, rows) if m]
+    pins = [row.split(" ") for row in rows if row.startswith("pin ")]
+    if not all(PIN.fullmatch(" ".join(pin)) for pin in pins):
+        raise Reject("applied values: a pin is malformed")
+    return (times or [0])[-1], {address: name for _, name, address in pins}
+
+
+def keep_pins(values: str, addresses: set[str], pins: dict[str, str]) -> dict[str, str]:
+    """Return the pins, with one added for each listed address the values show.
+
+    Refuse values that show a pinned address for another proposal, or a
+    different listed address for a pinned proposal. A pin counts only while
+    the list holds its address, but it stays in the file.
+    """
+    kept = dict(pins)
+    held = {name: address for address, name in pins.items() if address in addresses}
+    for row in values.split("\n"):
+        fields = row.split(" ")
+        address = fields[-1].removeprefix("address=")
+        if fields[0] != "proposal" or address not in addresses:
+            continue
+        name = fields[1]
+        if kept.setdefault(address, name) != name:
+            raise Reject(f"values: {name} shows the address of {kept[address]}")
+        if held.setdefault(name, address) != address:
+            raise Reject(f"values: {name} moves off its address")
+    return kept
+
+
 def apply_list(values: str, addresses: set[str]) -> str:
     """Return the values with only the list's addresses for proposals.
 
-    A proposal's address that isn't listed becomes -. Fields split on single
-    spaces only, so a tab can't hide an address.
+    A proposal's address that isn't listed becomes -, and the pins stay out.
+    Fields split on single spaces only, so a tab can't hide an address.
     """
     rows = []
     for row in values.split("\n"):
         fields = row.split(" ")
+        if fields[0] == "pin":
+            continue
         address = fields[-1].removeprefix("address=")
         if fields[0] == "proposal" and address not in addresses:
             fields[-1] = "address=-"
@@ -447,22 +489,23 @@ def main(argv: list[str]) -> int:
     """Run one command and return its exit status."""
     try:
         match argv:
-            case ["values", path, last]:
+            case ["values", path, applied, list_path]:
                 if not os.path.exists(path):
                     raise Reject(None)
+                data = read_capped(applied, VALUES_CAP, "applied values")
+                last, pins = read_applied(data)
                 data = read_capped(path, VALUES_CAP, "values")
-                print(check_values(data, int(last), int(time.time())), end="")
+                text = check_values(data, last, int(time.time()))
+                kept = keep_pins(text, read_listed(list_path), pins)
+                text += "".join(sorted(f"pin {n} {a}\n" for a, n in kept.items()))
+                print(text, end="")
             case ["addresses", keyring, path]:
                 if not os.path.exists(path):
                     raise Reject(None)
                 print(check_addresses(keyring, path), end="")
             case ["apply", values, path]:
                 text = read_capped(values, VALUES_CAP, "values").decode("ascii")
-                rows = lines(
-                    read_capped(path, LIST_CAP, "address list"), "address list"
-                )
-                listed = {row.split(" ")[0] for row in rows} - {"general-fund"}
-                print(apply_list(text, listed), end="")
+                print(apply_list(text, read_listed(path)), end="")
             case ["status", path]:
                 print(check_status(read_capped(path, STATUS_CAP, "status")))
             case ["snapshot", path]:
