@@ -10,7 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from signing import Keys
+from signing import Keys, write_list
+from web import A, WebServer
 
 RELEASE_SIGNERS = ("signer-a", "signer-b")
 
@@ -65,3 +66,28 @@ def release_folder(keys, tmp_path):
         return folder
 
     return make
+
+
+@pytest.fixture
+def web(tmp_path, etc_ccs) -> WebServer:
+    return WebServer(tmp_path)
+
+
+@pytest.fixture
+def sign_list(etc_ccs, keys):
+    """Return sign(*addresses), which installs a signed list of those addresses."""
+
+    def sign(*addresses: str) -> None:
+        write_list(etc_ccs / "addresses.txt", addresses, keys)
+
+    return sign
+
+
+@pytest.fixture
+def rendered(web, sign_list) -> WebServer:
+    """Return a web server that has rendered release 1, listing A, once."""
+    web.install(1)
+    sign_list(A)
+    web.push()
+    web.update()
+    return web
