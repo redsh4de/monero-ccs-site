@@ -64,6 +64,29 @@ import { stages } from "@/lib/stages";
     background: var(--stage-color);
     border-radius: var(--radius-full);
     color: white;
+    clip-path: circle();
+  }
+
+  .stage-idea {
+    --icon-animation: lightbulb-flicker 2.5s linear infinite;
+  }
+
+  .stage-funding-required {
+    --icon-animation: coins-toss 2s ease-in-out infinite;
+  }
+
+  .stage-work-in-progress {
+    --icon-animation: cog-rotate 2s linear infinite;
+  }
+
+  .stage-completed {
+    --icon-animation: package-drop 5s linear infinite;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .step:is(:hover, :focus-within) .step-icon :global(.icon) {
+      animation: var(--icon-animation);
+    }
   }
 
   h3 {
@@ -87,6 +110,155 @@ import { stages } from "@/lib/stages";
   @media (width >= 1200px) {
     ol {
       grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  @keyframes lightbulb-flicker {
+    0%,
+    40%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    8% {
+      opacity: 0.3;
+    }
+
+    16% {
+      opacity: 1;
+    }
+
+    24% {
+      opacity: 0.5;
+    }
+
+    32% {
+      opacity: 1;
+    }
+
+    48% {
+      transform: scale(1.2);
+    }
+
+    56% {
+      transform: scale(1);
+    }
+  }
+
+  @keyframes coins-toss {
+    0%,
+    60%,
+    100% {
+      transform: translateY(0);
+    }
+
+    20% {
+      transform: translateY(-25%);
+    }
+
+    40% {
+      transform: translateY(0) scaleY(0.9);
+    }
+
+    50% {
+      transform: translateY(-8%);
+    }
+  }
+
+  @keyframes cog-rotate {
+    from {
+      transform: rotate(0turn);
+    }
+
+    to {
+      transform: rotate(1turn);
+    }
+  }
+
+  @keyframes package-drop {
+    3% {
+      transform: scale(1);
+    }
+
+    6% {
+      transform: scale(1.25);
+    }
+
+    7% {
+      transform: scale(1.25);
+    }
+
+    9% {
+      transform: scale(0);
+    }
+
+    20% {
+      transform: translateY(-170%) scaleX(0.85) scaleY(1.25);
+    }
+
+    23% {
+      transform: translateY(0) scale(1);
+    }
+
+    25% {
+      transform: translateY(0) scaleX(1.35) scaleY(0.75);
+    }
+
+    26% {
+      transform: translateY(0) scale(1);
+    }
+
+    29% {
+      transform: translateY(-65%) scaleX(0.95) scaleY(1.05);
+    }
+
+    31% {
+      transform: translateY(0) scale(1);
+    }
+
+    33% {
+      transform: translateY(0) scaleX(1.2) scaleY(0.8);
+    }
+
+    34% {
+      transform: translateY(0) scale(1);
+    }
+
+    84% {
+      transform: rotate(0deg);
+    }
+
+    85% {
+      transform: translateY(-10%) translateX(-16%) rotate(15deg);
+    }
+
+    87% {
+      transform: translateX(-20%);
+    }
+
+    89% {
+      transform: translateX(-20%);
+    }
+
+    91% {
+      transform: translateY(-10%) rotate(-15deg);
+    }
+
+    93% {
+      transform: translateX(20%);
+    }
+
+    95% {
+      transform: translateX(20%);
+    }
+
+    97% {
+      transform: translateY(-10%);
+    }
+
+    99% {
+      transform: translateX(0);
     }
   }
 </style>
