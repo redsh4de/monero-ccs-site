@@ -1,4 +1,3 @@
-/* each MaskIcon's image, one rule per icon name */
 .icon-calendar {
   --icon-src: url("../assets/icons/mask/calendar.avif");
 }

@@ -6,6 +6,7 @@ import checks
 
 LISTED = "8" + "A" * 94
 UNLISTED = "4" + "B" * 94
+CHECKSUMMED = "44AFFq5kSiGBoZ4NMDwYtN18obc8AemS33DBLWs3H7otXft3XjrpDtQGv7SqSsaBYBb98uNbr2VBBEt7f2wfn3RVGQBEP3A"
 HIDDEN = {
     "as text": f"<p>{UNLISTED}</p>",
     "in a link": f'<a href="https://example.com/{UNLISTED}">x</a>',
@@ -15,6 +16,7 @@ HIDDEN = {
     ),
     "split by a tag": f"<p>{UNLISTED[:47]}<b>{UNLISTED[47:]}</b></p>",
     "right after a listed one": f"<p>{LISTED}<b>{UNLISTED}</b></p>",
+    "in groups": "<p>" + " ".join(CHECKSUMMED[i : i + 4] for i in range(0, 95, 4)),
 }
 
 

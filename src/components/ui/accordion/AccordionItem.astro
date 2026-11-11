@@ -49,7 +49,6 @@ const Title = (headingLevel ? `h${headingLevel}` : "span") as HTMLTag;
   .header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     padding: var(--space-xl) 0;
     cursor: pointer;
     list-style: none;
@@ -100,7 +99,6 @@ const Title = (headingLevel ? `h${headingLevel}` : "span") as HTMLTag;
     }
   }
 
-  /* Card variant */
   .item[data-variant="card"] {
     border: none;
     margin-bottom: var(--space-sm);
@@ -116,14 +114,9 @@ const Title = (headingLevel ? `h${headingLevel}` : "span") as HTMLTag;
       padding: var(--space-lg) 0;
     }
 
-    &:has(.header:focus-visible) {
-      border-radius: var(--radius-lg);
-    }
-
     > .content {
       padding: 0 0 var(--space-lg) 0;
 
-      /* code on the card sits on the page colour */
       & :global(pre) {
         background: var(--bg-color);
       }

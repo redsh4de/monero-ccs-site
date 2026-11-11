@@ -5,12 +5,6 @@
   --monero-orange: #e2611f;
   --orange-text: light-dark(#b84c18, #ef7a3a);
 
-  /* Status Colors */
-  --status-idea-color: light-dark(#e8c24f, #b89336);
-  --status-funding-color: light-dark(#f28080, #b85c5c);
-  --status-wip-color: light-dark(#3a72aa, #4679a4);
-  --status-completed-color: light-dark(#70af71, #548c6a);
-
   /* Text Colors */
   --heading-color: light-dark(#191b23, #f0f0f0);
   --text-primary: light-dark(#2e3038, #c6c6d0);
@@ -35,11 +29,11 @@
   --border-color: light-dark(#e4e1e9, #36343b);
 
   /* Border Radius */
-  --radius-sm: 0.25rem; /* 4px - tooltips, small elements */
-  --radius-md: 0.5rem; /* 8px - cards, buttons (primary) */
-  --radius-lg: 0.75rem; /* 12px - large cards, dropdowns, modals */
-  --radius-xl: 1rem; /* 16px - hero elements */
-  --radius-full: 999px; /* pills, circular */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-full: 999px;
 
   /* Shadows */
   --shadow-xs: 0 1px 2px rgb(0 0 0 / 5%);
@@ -56,15 +50,15 @@
   --z-modal-content: 1001;
 
   /* Spacing */
-  --space-2xs: 0.35rem; /* 4px - tight gaps, icon spacing */
-  --space-xs: 0.5rem; /* 8px - compact elements, small gaps */
-  --space-sm: 0.75rem; /* 12px - list items, form inputs */
-  --space-md: 1rem; /* 16px - (primary) standard spacing, card gaps */
-  --space-lg: 1.25rem; /* 20px - card padding, medium gaps */
-  --space-xl: 1.5rem; /* 24px - section gaps, large padding */
-  --space-2xl: 2rem; /* 32px - section margins, page spacing */
-  --space-3xl: 2.5rem; /* 40px - large section gaps */
-  --space-4xl: 3rem; /* 48px - hero sections, major divisions */
+  --space-2xs: 0.35rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.25rem;
+  --space-xl: 1.5rem;
+  --space-2xl: 2rem;
+  --space-3xl: 2.5rem;
+  --space-4xl: 3rem;
 
   /* Layout Spacing */
   --page-top-margin: var(--space-2xl);
@@ -72,10 +66,10 @@
   --mobile-padding-inline: var(--space-md);
 
   /* Typography - Font Sizes */
-  --font-size-base: 1rem; /* body-base */
-  --font-size-xs: 0.75rem; /* extra small text */
-  --font-size-sm: 0.875rem; /* small text */
-  --font-size-lg: 1.125rem; /* body-lg */
+  --font-size-base: 1rem;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-lg: 1.125rem;
   --font-size-xl: clamp(1.25rem, 2vw, 1.5rem);
   --font-size-2xl: clamp(1.5rem, 3vw, 1.875rem);
   --font-size-3xl: clamp(1.875rem, 4vw, 2.25rem);
@@ -98,10 +92,6 @@
   /* Maximum Content Width */
   --content-max-width: 1600px;
 }
-
-/* ========================================
-   Global HTML Element Styles (do not define classes here!)
-   ======================================== */
 
 a {
   color: var(--monero-orange);
@@ -135,14 +125,12 @@ p {
 table {
   width: 100%;
   border-collapse: collapse;
-  border-spacing: 0;
 }
 
 th,
 td {
   padding: var(--space-sm) var(--space-md);
   text-align: start;
-  vertical-align: middle;
 }
 
 th {
@@ -160,23 +148,34 @@ tbody tr {
   }
 }
 
-/* each stage's colour, for any element with that stage's class */
 .stage-idea {
-  --stage-color: var(--status-idea-color);
+  --stage-color: light-dark(#e8c24f, #b89336);
 }
 
 .stage-funding-required {
-  --stage-color: var(--status-funding-color);
+  --stage-color: light-dark(#f28080, #b85c5c);
 }
 
 .stage-work-in-progress {
-  --stage-color: var(--status-wip-color);
+  --stage-color: light-dark(#3a72aa, #4679a4);
 }
 
 .stage-completed {
-  --stage-color: var(--status-completed-color);
+  --stage-color: light-dark(#70af71, #548c6a);
 }
 
 .stage-unlisted {
   --stage-color: var(--border-color);
+}
+
+a[rel~="external"]::after {
+  content: "";
+  display: inline-block;
+  inline-size: 0.9rem;
+  block-size: 0.9rem;
+  margin-inline-start: 0.25em;
+  vertical-align: -0.1rem;
+  mask: url("../assets/icons/mask/external-link.avif") no-repeat center /
+    contain;
+  background-color: currentcolor;
 }

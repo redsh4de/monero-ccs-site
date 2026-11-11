@@ -10,7 +10,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
-from safety import is_address
+from safety import is_address, redact
 
 
 @dataclass(frozen=True)
@@ -27,18 +27,13 @@ class Inputs:
     proposals: dict[str, str]  # File name without .md, to the file's text
     wallets: dict[str, Wallet]  # Proposal id, to its values
     merged: dict[str, str]  # File name, to the merge request that added it
-    added: dict[str, list[str]]  # Open merge request number, to the files it adds
-    merge_requests: list[dict]  # GitLab's list of open merge requests
+    merge_requests: list[dict]  # What the render reads of each open merge request
     general_fund: str  # The General Fund's address, or ""
     site_url: str
     qr_hashes: dict[str, str]  # Address, to the hash the backend read back for its code
 
 
 def read(folder: Path) -> Inputs:
-    added: dict[str, list[str]] = {}
-    for number, name in read_pairs(folder / "mr" / "open.tsv"):
-        added.setdefault(number, []).append(name)
-
     return Inputs(
         proposals={
             path.stem: read_text(path) for path in proposal_files(folder / "proposals")
@@ -47,8 +42,7 @@ def read(folder: Path) -> Inputs:
         merged={
             name: number for number, name in read_pairs(folder / "mr" / "merged.tsv")
         },
-        added=added,
-        merge_requests=read_merge_requests(folder / "mr" / "open.json"),
+        merge_requests=read_merge_requests(folder / "mr"),
         general_fund=read_general_fund(folder / "general-fund"),
         site_url=read_text(folder / "site").strip(),
         qr_hashes=read_qr_hashes(folder / "values"),
@@ -115,19 +109,42 @@ def read_pairs(path: Path) -> Iterator[tuple[str, str]]:
             yield number, name
 
 
-def read_merge_requests(path: Path) -> list[dict]:
-    """Read GitLab's list of open merge requests.
+def read_merge_requests(folder: Path) -> list[dict]:
+    """Return what the render reads of each open merge request, in GitLab's order.
 
-    Anything else, such as an error object, counts as an empty list.
+    Anyone can open one, so any address in its text is removed. Anything but a list
+    in open.json, such as an error object, counts as none.
     """
-    entries = json.loads(read_text(path))
+    added: dict[str, list[str]] = {}
+    for number, name in read_pairs(folder / "open.tsv"):
+        added.setdefault(number, []).append(name)
+    entries = json.loads(read_text(folder / "open.json"))
     if not isinstance(entries, list):
         return []
-    return [entry for entry in entries if isinstance(entry, dict)]
+    mrs = []
+    for mr in entries:
+        if not isinstance(mr, dict):
+            continue
+        author = mr.get("author")
+        username = author.get("username") if isinstance(author, dict) else ""
+        mrs.append(
+            {
+                "iid": mr.get("iid"),
+                "title": redact(str(mr.get("title") or ""), ignore_spaces=True),
+                "author": redact(str(username or ""), ignore_spaces=True),
+                "web_url": str(mr.get("web_url") or ""),
+                "created_at": str(mr.get("created_at") or ""),
+                "adds": [
+                    redact(name, ignore_spaces=True)
+                    for name in added.get(str(mr.get("iid")), [])
+                ],
+                "upvotes": mr.get("upvotes", 0),
+                "downvotes": mr.get("downvotes", 0),
+            }
+        )
+    return mrs
 
 
 def read_general_fund(path: Path) -> str:
-    if not path.is_file():
-        return ""
     address = read_text(path).strip()
     return address if is_address(address) else ""

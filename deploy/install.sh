@@ -25,8 +25,7 @@ set -o pipefail
 # the config, the alert URL and the push key are made root-only by name
 umask 022
 
-SCRIPT_DIR=$(dirname -- "$0")
-DEPLOY=$(cd -- "$SCRIPT_DIR" && pwd -P)
+DEPLOY=$(cd -- "$(dirname -- "$0")" && pwd -P)
 readonly DEPLOY
 # shellcheck source=lib.sh
 . "$DEPLOY/lib.sh"
@@ -60,21 +59,17 @@ matches() {
 }
 
 # load_config: makes /etc/ccs/config from the example on the first install,
-# keeps it root-only, and reads it. It comes first, since it can name
-# another release host.
+# and an empty /etc/ccs/alert_url, keeps both root-only, and reads the config.
+# It comes first, since it can name another release host.
 load_config() {
-  install -d /etc/ccs /etc/sysusers.d /etc/tmpfiles.d
+  install -d /etc/ccs
   if [ ! -e "$CONFIG" ]; then
     install -m 0600 "$DEPLOY/config.example" "$CONFIG"
   fi
-  chmod 600 "$CONFIG"
+  touch /etc/ccs/alert_url
+  chmod 600 "$CONFIG" /etc/ccs/alert_url
   # shellcheck source=/dev/null
   . "$CONFIG"
-  # the alert URL, root-only
-  if [ ! -e /etc/ccs/alert_url ]; then
-    install -m 0600 /dev/null /etc/ccs/alert_url
-  fi
-  chmod 600 /etc/ccs/alert_url
 }
 
 # check_keys_only: stops while sshd's global settings let a password alone log
@@ -216,8 +211,6 @@ download_release() {
   # shellcheck disable=SC2064 # the folder's name is fixed now
   trap "rm -rf -- '$download'" EXIT
   get_release "$tag" "$download" || stop "can't download $tag"
-  # it must be the release named: one served under another name is never
-  # unpacked
   "$DEPLOY/checks.py" release "$download" /etc/ccs/release-signers.gpg \
     "$version" "$download/tree" || stop "$tag doesn't verify"
   sync -f "$download/tree"
@@ -225,8 +218,7 @@ download_release() {
 }
 
 # install_files <release-dir> <role>: installs the role's units, sandboxes,
-# users, folders and nginx site from that release, named by role so one
-# machine can hold both.
+# users, folders and nginx site from that release.
 install_files() {
   local release="$1"
   local role="$2"
@@ -238,9 +230,9 @@ install_files() {
     install -D -m 0644 "$release/deploy/sandbox.conf" \
       "$UNITS/${service##*/}.d/sandbox.conf"
   done
-  install -m 0644 "$from/tmpfiles.conf" "/etc/tmpfiles.d/ccs-$role.conf"
   if [ "$role" = web ]; then
-    install -m 0644 "$from/sysusers.conf" /etc/sysusers.d/ccs-web.conf
+    install -D -m 0644 "$from/tmpfiles.conf" /etc/tmpfiles.d/ccs-web.conf
+    install -D -m 0644 "$from/sysusers.conf" /etc/sysusers.d/ccs-web.conf
     install -m 0644 "$from/nginx.conf" /etc/nginx/sites-enabled/ccs.conf
     rm -f /etc/nginx/sites-enabled/default
     install -D -m 0644 "$from/nginx-sandbox.conf" \
@@ -258,9 +250,7 @@ start_backend() {
   chmod 600 /etc/ccs/push_key
   if [ ! -s /etc/ccs/known_hosts ]; then
     ssh-keyscan -q -t ed25519 "$WEB_HOST" >/etc/ccs/known_hosts
-  fi
-  if [ ! -s /etc/ccs/known_hosts ]; then
-    stop "can't read $WEB_HOST's host key"
+    [ -s /etc/ccs/known_hosts ] || stop "can't read $WEB_HOST's host key"
   fi
 
   # the empty PathChanged= clears the unit's own path, so only this one is
@@ -282,7 +272,6 @@ start_backend() {
 # /var, /srv and /opt are empty but for ccs-back's storage folder and the
 # values. The wallet's files stay out of its sight, whatever their mode.
 write_monitor_view() {
-  install -d "$UNITS/ccs-monitor.service.d"
   printf '%s\n' "[Service]" \
     "TemporaryFileSystem=/var:ro /srv:ro /opt:ro" \
     "BindReadOnlyPaths=$CCS_BACK /var/lib/ccs-backend" \
@@ -299,8 +288,7 @@ write_push_key() {
   local push_key="$2"
   local command=""
 
-  # sshd's shell expands these on each push; the \" are quotes inside the
-  # command="..." option
+  # the \" are quotes inside the command="..." option
   command='f=$(mktemp /var/lib/ccs/in/values.XXXXXX)'
   command="$command"' && head -c 1000001 > \"$f\"'
   command="$command"' && chmod 644 \"$f\"'
@@ -420,8 +408,6 @@ main() {
   if [ "$role" = backend ]; then
     set_backend_config "${3:-}" "${4:-}"
   else
-    # the push key is written on the first install, or when it is given
-    # again
     if [ -n "${3:-}${4:-}" ] || [ ! -e "$AUTHORIZED_KEYS" ]; then
       new_key=yes
       check_push_key_args "${3:-}" "${4:-}"
@@ -450,11 +436,11 @@ main() {
   # 3. Scripts, render, design and units switch together.
   swap "$new_release" "$LIB/current"
   install_files "$new_release" "$role"
-  systemd-sysusers
-  systemd-tmpfiles --create "/etc/tmpfiles.d/ccs-$role.conf"
   if [ "$role" = backend ]; then
     start_backend
   else
+    systemd-sysusers
+    systemd-tmpfiles --create /etc/tmpfiles.d/ccs-web.conf
     if [ "$new_key" = yes ]; then
       write_push_key "${3:-}" "${4:-}"
     fi

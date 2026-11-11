@@ -22,41 +22,12 @@ from pathlib import Path
 # python3 -I leaves this folder off the import path, so the render's own
 # modules are found from here
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from inputs import read_merge_requests, read_pairs  # noqa: E402
+from inputs import read_merge_requests  # noqa: E402
 
 
 def canonical(value: object) -> str:
     """Return JSON that is the same for equal values."""
     return json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
-
-
-def field_text(value: object) -> str:
-    """Return a field as the render reads it: missing or empty is ""."""
-    return str(value or "")
-
-
-def snapshot(input_dir: Path) -> list[dict]:
-    """Return what the render reads of each open merge request, in GitLab's order."""
-    added: dict[str, list[str]] = {}
-    for number, name in read_pairs(input_dir / "mr" / "open.tsv"):
-        added.setdefault(number, []).append(name)
-    entries = []
-    for mr in read_merge_requests(input_dir / "mr" / "open.json"):
-        author = mr.get("author")
-        username = author.get("username") if isinstance(author, dict) else ""
-        entries.append(
-            {
-                "iid": mr.get("iid"),
-                "title": field_text(mr.get("title")),
-                "author": field_text(username),
-                "web_url": field_text(mr.get("web_url")),
-                "created_at": field_text(mr.get("created_at")),
-                "adds": added.get(str(mr.get("iid")), []),
-                "upvotes": mr.get("upvotes", 0),
-                "downvotes": mr.get("downvotes", 0),
-            }
-        )
-    return entries
 
 
 def restore(status: Path, input_dir: Path) -> None:
@@ -87,13 +58,13 @@ def main(argv: list[str]) -> int:
             status = {
                 "release": int(version),
                 "commit": commit,
-                "merge_requests": snapshot(Path(input_dir)),
+                "merge_requests": read_merge_requests(Path(input_dir) / "mr"),
             }
             print(canonical(status))
         case ["mrs", input_dir]:
             # votes change faster than the web server fetches them, so the
             # monitor compares the rest with GitLab's list
-            mrs = snapshot(Path(input_dir))
+            mrs = read_merge_requests(Path(input_dir) / "mr")
             for mr in mrs:
                 del mr["upvotes"], mr["downvotes"]
             print(canonical(mrs))

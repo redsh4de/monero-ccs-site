@@ -11,7 +11,7 @@ from hypothesis import strategies as st
 
 import bodies
 
-ADDRESS = "8" + "A" * 94
+ADDRESS = "888tNkZrPN6JsEgekjMnABU4TBzc2Dt29EPAvkRxbANsAnjyPbb3iQ1YBRk1UXcdRsiKc9dhwMVgN5S9cQUiyoogDavup3H"
 
 # fmt: off
 # what markdown-it renders, and the raw tags a proposal may use
@@ -44,6 +44,8 @@ KNOWN_ATTACKS = {
     "address split by a zero-width space": (
         f"{ADDRESS[:47]}\N{ZERO WIDTH SPACE}{ADDRESS[47:]}"
     ),
+    "address in groups": " ".join(ADDRESS[i : i + 4] for i in range(0, 95, 4)),
+    "address split across paragraphs": f"{ADDRESS[:47]}\n\n{ADDRESS[47:]}",
 }
 # fmt: off
 # Markdown and raw HTML to mix the attacks with
@@ -59,13 +61,12 @@ proposals = st.lists(
 
 
 class Page(HTMLParser):
-    """What a browser makes of some HTML: its tags, attributes, link schemes, text."""
+    """What a browser makes of some HTML: its tags, attributes, links, text."""
 
     def __init__(self, html):
         super().__init__()
         self.tags = set()
         self.attributes = set()
-        self.schemes = set()
         self.links = []
         self.text = ""
         self.feed(html)
@@ -76,7 +77,6 @@ class Page(HTMLParser):
         for name, value in attrs:
             self.attributes.add(name)
             if name == "href":
-                self.schemes.add(urllib.parse.urlsplit(value).scheme)
                 self.links.append(value)
 
     def handle_data(self, data):
@@ -87,17 +87,19 @@ def shows_address(text):
     """Whether a visitor could copy an address out of the text.
 
     Copying drops format characters, such as a zero-width space, and combining
-    marks, so they can't split an address.
+    marks, so they can't split an address, and a wallet may drop spaces.
     """
     visible = "".join(c for c in text if unicodedata.category(c) not in ("Cf", "Mn"))
-    return re.search(r"[1-9A-HJ-NP-Za-km-z]{90,}", visible) is not None
+    return bool(re.search(r"[1-9A-HJ-NP-Za-km-z]{90,}", visible)) or ADDRESS in "".join(
+        visible.split()
+    )
 
 
 def assert_safe(markdown):
     page = Page(bodies.render(markdown))
     assert page.tags <= ALLOWED_TAGS
     assert page.attributes <= ALLOWED_ATTRIBUTES
-    assert page.schemes <= SAFE_SCHEMES
+    assert {urllib.parse.urlsplit(link).scheme for link in page.links} <= SAFE_SCHEMES
     assert not shows_address(page.text)
     assert not any(shows_address(link) for link in page.links)
 

@@ -20,11 +20,13 @@ from mdit_py_plugins.footnote import footnote_plugin
 
 from safety import REMOVED, has_address
 
-ALLOWED_TAG = re.compile(r"</?(details|summary|sup)>")
-ESCAPED_TAG = re.compile(r"&lt;(/?(details|summary|sup))&gt;")
+TAGS = "details|summary|sup"
+ALLOWED_TAG = re.compile(rf"</?({TAGS})>")
+ESCAPED_TAG = re.compile(rf"&lt;(/?({TAGS}))&gt;")
 ALLOWED_SCHEMES = ("http", "https", "mailto")
 SCHEME = re.compile(r"([a-z][a-z0-9+.-]*):", re.I)
 COMMENT = re.compile(r"<!--.*?-->", re.S)
+ANY_TAG = re.compile(r"<[^>]*>")
 
 
 def safe_target(url: str) -> bool:
@@ -101,4 +103,8 @@ def narrow(tokens: list[Token]) -> None:
 def render(markdown: str) -> str:
     tokens = MARKDOWN.parse(markdown)
     narrow(tokens)
-    return MARKDOWN.renderer.render(tokens, MARKDOWN.options, {})
+    page = MARKDOWN.renderer.render(tokens, MARKDOWN.options, {})
+    # each block is checked alone, so this finds an address split across blocks
+    if has_address(html.unescape(ANY_TAG.sub(" ", page))):
+        return f"<p>{REMOVED}</p>\n"
+    return page

@@ -20,10 +20,6 @@ const meta = [
 ];
 ---
 
-{
-  /* popover is always set, and the drawer class only when donations are open;
-   the styles below undo the browser's popover hiding for the plain card */
-}
 <StageCard
   as="aside"
   id="summary"
@@ -65,7 +61,6 @@ const meta = [
      the browser's [popover] defaults */
   .summary {
     position: static;
-    inset: auto;
     display: flex;
     flex-direction: column;
     gap: var(--space-md);
@@ -83,7 +78,6 @@ const meta = [
     display: flex;
     flex-direction: column;
     gap: var(--space-md);
-    min-block-size: 0;
   }
 
   h2 {

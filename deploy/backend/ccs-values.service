@@ -1,12 +1,13 @@
 [Unit]
 Description=Write the CCS values from ccs-back's JSON
+After=ccs-push.service
 OnSuccess=ccs-push.service
 
 [Service]
 Type=oneshot
 DynamicUser=yes
-ExecStart=/usr/local/lib/ccs/current/deploy/backend/values.py
-StandardOutput=truncate:/var/lib/ccs-backend/values
+StateDirectory=ccs-backend
+ExecStart=/usr/local/lib/ccs/current/deploy/backend/values.py /var/lib/ccs-backend/values
 PrivateNetwork=yes
 IPAddressDeny=any
 RestrictAddressFamilies=AF_UNIX

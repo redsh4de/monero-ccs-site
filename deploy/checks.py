@@ -55,30 +55,29 @@ from pathlib import Path
 SAFETY = runpy.run_path(str(Path(__file__).resolve().parent / "render/safety.py"))
 ADDRESS_RUN = SAFETY["ADDRESS_RUN"]
 has_address = SAFETY["has_address"]
+grouped_addresses = SAFETY["grouped_addresses"]
 visible = SAFETY["visible"]
 
-ADDRESS = r"[48][1-9A-HJ-NP-Za-km-z]{94}"
+ADDRESS = SAFETY["ADDRESS"].pattern
 VALUE = re.compile(
     rf"proposal [A-Za-z0-9._~%-]{{1,750}} raised=[0-9]{{1,12}}(\.[0-9]{{1,12}})?"
     rf" contributions=[0-9]{{1,9}} address=({ADDRESS}|-)"
 )
-# the hash of an address's QR code, once the backend read the code back
 QR = re.compile(rf"qr {ADDRESS} sha256=[0-9a-f]{{64}}")
 GITLAB = re.compile(r"gitlab sha256=[0-9a-f]{64}")
 UPDATED = re.compile(r"updated ([0-9]{10})")
 LISTED = re.compile(rf"{ADDRESS}|general-fund {ADDRESS}")
-# a line of sha256sum's output: the hash, two spaces, the file name
+# a line of sha256sum's output
 SUM_LINE = re.compile(r"([0-9a-f]{64})  ([A-Za-z0-9._-]{1,200})")
 COMMIT = re.compile(r"[0-9a-f]{40}")
 GITLAB_URL = re.compile(r"https://[!-~]{1,500}")
 GITLAB_TIME = re.compile(
     r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,9})?(Z|[+-][0-9]{2}:[0-9]{2})"
 )
-SNAPSHOT_FIELDS = {"iid", "title", "author", "web_url", "created_at", "adds"}
 VOTES = ("upvotes", "downvotes")
+SNAPSHOT_FIELDS = {"iid", "title", "author", "web_url", "created_at", "adds", *VOTES}
 MAX_MERGE_REQUESTS = 1_000  # mrs.py reads at most ten pages of 100
 MAX_TEXT = 1_000  # GitLab allows 255 characters for a title or a username
-# what the built site holds: pages and templates, one stylesheet, fonts, images
 BINARY_SUFFIXES = {".woff2", ".avif", ".webp", ".png"}
 BUILD_SUFFIXES = {".html", ".css"} | BINARY_SUFFIXES
 # the authority after // in a URL, absolute or protocol-relative
@@ -99,7 +98,7 @@ class Reject(Exception):
 
 
 def read_capped(path: str, cap: int, what: str) -> bytes:
-    """Return a file's bytes, refusing one over the cap; `what` names it in messages."""
+    """Return a file's bytes, refusing one over the cap."""
     with open(path, "rb") as file:
         data = file.read(cap + 1)
     if len(data) > cap:
@@ -108,10 +107,7 @@ def read_capped(path: str, cap: int, what: str) -> bytes:
 
 
 def lines(data: bytes, what: str) -> list[str]:
-    """Return the lines of strict ASCII text, split on newlines only.
-
-    `what` names the input in the refusal message.
-    """
+    """Return the lines of strict ASCII text, split on newlines only."""
     try:
         text = data.decode("ascii")
     except UnicodeDecodeError:
@@ -159,9 +155,7 @@ def signers(keyring: str, signature: str, signed: bytes) -> set[str] | None:
 def check_values(data: bytes, last: int, now: int) -> str:
     """Return the pushed values with every repeated proposal dropped.
 
-    The file must end with an updated time newer than the last one applied and at
-    most five minutes ahead, hold only whole-line matches, at most one gitlab line and
-    exactly one updated line. A file no newer than the last is refused silently.
+    A file no newer than the last one applied is refused silently.
     """
     rows = lines(data, "values")
     updated = UPDATED.fullmatch(rows[-1]) if rows else None
@@ -213,7 +207,7 @@ def apply_list(values: str, listed: set[str]) -> str:
     return "\n".join(rows)
 
 
-def check_status(data: bytes) -> list[str]:
+def check_status(data: bytes) -> str:
     """Return status.json's release and commit, each checked."""
     try:
         status = json.loads(data.decode("utf-8"))
@@ -229,11 +223,10 @@ def check_status(data: bytes) -> list[str]:
         or not COMMIT.fullmatch(commit)
     ):
         raise Reject("status: a field is missing or malformed")
-    return [str(release), commit]
+    return f"{release} {commit}"
 
 
 def blank_or_matches(pattern: re.Pattern[str], value: object) -> bool:
-    """Return whether the value is "", or a string the whole pattern matches."""
     return isinstance(value, str) and (value == "" or bool(pattern.fullmatch(value)))
 
 
@@ -252,7 +245,7 @@ def check_snapshot(data: bytes) -> None:
     if not isinstance(snapshot, list) or len(snapshot) > MAX_MERGE_REQUESTS:
         raise Reject("snapshot: not a list of at most 1,000 merge requests")
     for mr in snapshot:
-        if not isinstance(mr, dict) or set(mr) != SNAPSHOT_FIELDS | set(VOTES):
+        if not isinstance(mr, dict) or set(mr) != SNAPSHOT_FIELDS:
             raise Reject("snapshot: a merge request has other fields")
         if type(mr["iid"]) is not int or not 1 <= mr["iid"] <= 999_999_999:
             raise Reject("snapshot: a merge request number is malformed")
@@ -305,7 +298,6 @@ def expiring(keyrings: list[str]) -> None:
 
 
 def release_name(version: int) -> str:
-    """Return the file name of release `version`'s archive."""
     return f"ccs-site-v{version}.tar"
 
 
@@ -324,7 +316,6 @@ def read_hosts(path: str) -> set[str]:
 
 
 def sha256(path: Path) -> str:
-    """Return the sha256 of a file's bytes."""
     with open(path, "rb") as file:
         return hashlib.file_digest(file, "sha256").hexdigest()
 
@@ -332,18 +323,10 @@ def sha256(path: Path) -> str:
 def check_build(dist: str, hosts_path: str, tag_files: str) -> None:
     """Refuse a built site that holds anything a release may not.
 
-    The build is refused when it holds:
-    - a file of a type the site never serves;
-    - a font or image that isn't byte for byte a file of the tag. The build
-      copies these unchanged, so a dependency can't swap one for a picture of
-      another address;
-    - a link to a host that isn't on the list;
-    - address-like text. Donation addresses come only from the signed list,
-      at render time.
-
-    Pages are read as a browser shows them. Links are read with entities
-    decoded, and addresses from the visible text without tags, so neither can
-    hide behind an escape or a tag.
+    The build copies fonts and images unchanged, so a dependency can't swap one
+    for a picture of another address. Links are read with entities decoded, and
+    addresses from the visible text without tags, so neither can hide behind an
+    escape or a tag.
     """
     allowed = read_hosts(hosts_path)
     paths = Path(tag_files).rglob("*")
@@ -354,25 +337,25 @@ def check_build(dist: str, hosts_path: str, tag_files: str) -> None:
             continue
         if path.is_symlink() or path.suffix not in BUILD_SUFFIXES:
             raise Reject(f"build: {name} isn't a file type the site serves")
-        if path.suffix not in (".html", ".css"):
+        if path.suffix in BINARY_SUFFIXES:
             if sha256(path) not in tag:
                 raise Reject(f"build: {name} isn't byte for byte a file of the tag")
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
-        visible = text
+        shown = text
         if path.suffix == ".html":
             text = html.unescape(text)
-            visible = TAG.sub("", text)
+            shown = TAG.sub("", text)
         for authority in URL_AUTHORITY.findall(text):
             host = url_host(authority)
             if host not in allowed:
                 raise Reject(f"build: {name} names {host}, not a listed host")
-        if has_address(visible, ignore_spaces=True):
+        if has_address(shown, ignore_spaces=True):
             raise Reject(f"build: {name} holds address-like text")
 
 
 def unlisted_run(text: str, listed: set[str]) -> str | None:
-    """Return an address-like run in the text that isn't a listed address, if any.
+    """Return an unlisted address-like run, or valid address in groups, if any.
 
     Each listed address is cut out of a run first, so text next to one, such as
     a button's label once tags are dropped, isn't taken for an address.
@@ -383,7 +366,7 @@ def unlisted_run(text: str, listed: set[str]) -> str | None:
             rest = rest.replace(address, " ")
         if ADDRESS_RUN.search(rest):
             return run
-    return None
+    return min(grouped_addresses(visible(text)) - listed, default=None)
 
 
 def check_site(site: str, list_path: str) -> None:
@@ -480,8 +463,7 @@ def main(argv: list[str]) -> int:
                 listed = lines(data, "address list")
                 print(apply_list(text, set(listed)), end="")
             case ["status", path]:
-                fields = check_status(read_capped(path, STATUS_CAP, "status"))
-                print(" ".join(fields))
+                print(check_status(read_capped(path, STATUS_CAP, "status")))
             case ["snapshot", path]:
                 check_snapshot(read_capped(path, STATUS_CAP, "snapshot"))
             case ["build", dist, hosts, tag_files]:
@@ -496,7 +478,7 @@ def main(argv: list[str]) -> int:
                 print(__doc__, file=sys.stderr, end="")
                 return 2
     except Reject as refused:
-        if refused.args and refused.args[0]:
+        if refused.args[0]:
             print(refused.args[0], file=sys.stderr)
         return 1
     return 0

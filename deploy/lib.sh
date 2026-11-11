@@ -55,7 +55,6 @@ alert() {
   local due=0
 
   if [ -s "$state" ]; then
-    # the rest of the line is the old text, which the new one replaces
     read -r since sent _ <"$state" || return 1
   fi
 
@@ -159,7 +158,6 @@ mark_posted() {
     rm -f -- "$state" || return 1
     return 0
   fi
-  # the second field is the old time sent, which NOW replaces
   read -r since _ text <"$state" || return 1
   printf '%s %s %s\n' "$since" "$NOW" "$text" >"$state" || return 1
 }
@@ -246,20 +244,17 @@ keep() {
 
 # export_tree <git-dir> <commit> <dir>: writes the commit's files to
 # <dir>/proposals, and the merge request behind each file to
-# <dir>/mr/merged.tsv. Its body is a subshell, so that pipefail fails the
-# export when git does, whatever the caller's settings.
-# shellcheck disable=SC3040 # Debian 13's dash has pipefail
-export_tree() (
-  set -o pipefail
+# <dir>/mr/merged.tsv.
+export_tree() {
   local git_dir="$1"
   local commit="$2"
   local dir="$3"
 
-  mkdir -p -- "$dir/proposals" "$dir/mr" || exit 1
+  mkdir -p -- "$dir/proposals" "$dir/mr" || return 1
   git -C "$git_dir" archive "$commit" \
-    | tar -x -C "$dir/proposals" --no-same-owner || exit 1
-  list_merges "$git_dir" "$commit" >"$dir/mr/merged.tsv" || exit 1
-)
+    | tar -x -C "$dir/proposals" --no-same-owner || return 1
+  list_merges "$git_dir" "$commit" >"$dir/mr/merged.tsv" || return 1
+}
 
 # list_merges <git-dir> <commit>: prints "<merge request>\t<file>" for each
 # file that a merge on the commit's first-parent history added, oldest first,

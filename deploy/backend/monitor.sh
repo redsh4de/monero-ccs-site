@@ -17,9 +17,8 @@ set -eu
 # shellcheck disable=SC3040 # Debian 13's dash has pipefail
 set -o pipefail
 
-SCRIPT_DIR=$(dirname -- "$0")
 # the physical path, so a run that overlaps an install stays in one release
-DEPLOY=$(cd -- "$SCRIPT_DIR/.." && pwd -P)
+DEPLOY=$(cd -- "$(dirname -- "$0")/.." && pwd -P)
 readonly DEPLOY
 # shellcheck source=lib.sh
 . "$DEPLOY/lib.sh"
@@ -99,7 +98,7 @@ new_circuit() {
 }
 
 # fetch_url <url> <file> <circuit> [<curl option>...]: downloads one file
-# from the live site, through Tor on that circuit when the unit sets
+# from the live site, on that Tor circuit; curl takes the proxy from
 # ALL_PROXY.
 fetch_url() {
   local url="$1"
@@ -107,11 +106,8 @@ fetch_url() {
   local circuit="$3"
   shift 3
 
-  if [ -n "${ALL_PROXY:-}" ]; then
-    set -- "$@" --proxy "$ALL_PROXY" --proxy-user "$circuit:x"
-  fi
-  curl -fsS -L --max-time 60 --max-filesize 200000000 "$@" \
-    -o "$file" "$url"
+  curl -fsS -L --max-time 60 --max-filesize 200000000 \
+    --proxy-user "$circuit:x" "$@" -o "$file" "$url"
 }
 
 # fetch_page <url> <file> <circuit>: downloads one page as Tor Browser asks
@@ -206,8 +202,8 @@ is_recently_verified() {
 }
 
 # verify_merge_requests <release> <snapshot> <snapshot sum>: compares the
-# site's merge requests with GitLab's, and prints what a failure means.
-# Fails when they differ, or when GitLab doesn't answer.
+# site's merge requests with GitLab's. Fails when they differ, or when GitLab
+# doesn't answer, and prints why in that case.
 verify_merge_requests() {
   local release="$1"
   local snapshot="$2"
@@ -215,7 +211,6 @@ verify_merge_requests() {
   local gitlab=""
 
   if is_recently_verified "$snapshot_sum"; then
-    printf '%s\n' "the site's merge requests differ from GitLab's"
     return 0
   fi
   mkdir -p -- "$RUN_DIR/gitlab/mr" || return 1
@@ -225,7 +220,6 @@ verify_merge_requests() {
       "so the site's merge requests are unverified"
     return 1
   fi
-  printf '%s\n' "the site's merge requests differ from GitLab's"
   gitlab=$(status_py "$release" mrs "$RUN_DIR/gitlab") || return 1
   if [ "$gitlab" != "$snapshot" ]; then
     return 1
@@ -238,7 +232,7 @@ verify_merge_requests() {
 # values fails the page compare, index.php/projects first.
 build_values() {
   if ! "$DEPLOY/checks.py" values "$BACKEND_VALUES" 0 >"$RUN_DIR/checked"; then
-    : >"$RUN_DIR/checked" || return 1
+    : >"$RUN_DIR/checked"
   fi
   render_values "$RUN_DIR/checked" "$RUN_DIR/in" "$RUN_DIR/addresses"
 }
@@ -304,7 +298,6 @@ list_always() {
     fi
     name="${qr##*/}"
     printf 'qr/%s\n' "$name"
-    # grep fails when no page shows the code, which is no failure
     (cd -- "$EXPECTED_DIR" && { grep -lF "${name%.png}" proposals/*.html || true; })
   done
 }
@@ -325,27 +318,12 @@ list_sample() {
   if [ "$offset" -ge "$total" ]; then
     offset=0
   fi
-  # ten lines from the offset on, carrying on from the top at the end
   LC_ALL=C awk -v start="$offset" -v count=10 '
     { line[NR - 1] = $0 }
     END { for (i = 0; i < count && i < NR; i++) print line[(start + i) % NR] }
   ' "$file_list"
   next=$(((offset + 10) % total))
   printf '%s\n' "$next" >"$STATE_DIR/sample-offset"
-}
-
-# page_in_alert <state file>: prints the path a page check's alert names.
-# compare_page writes its text as "<MESSAGE_PREFIX> page <path><PAGE_DIFFERS>".
-page_in_alert() {
-  local state="$1"
-  local text=""
-  local path=""
-
-  # the line is "<since> <sent> <text>"
-  read -r _ _ text <"$state" || return 1
-  path="${text#"$MESSAGE_PREFIX page "}"
-  path="${path%"$PAGE_DIFFERS"}"
-  printf '%s\n' "$path"
 }
 
 # list_failing <file-list> <always-list>: prints each failing page, so it is
@@ -355,17 +333,21 @@ list_failing() {
   local file_list="$1"
   local always_list="$2"
   local state=""
+  local text=""
   local path=""
 
   for state in "$ALERTS_DIR"/page-*; do
     if [ ! -e "$state" ]; then
       continue
     fi
-    path=$(page_in_alert "$state") || return 1
+    # compare_page writes "<MESSAGE_PREFIX> page <path><PAGE_DIFFERS>"
+    read -r _ _ text <"$state"
+    path="${text#"$MESSAGE_PREFIX page "}"
+    path="${path%"$PAGE_DIFFERS"}"
     if grep -qxF -- "$path" "$file_list" "$always_list"; then
       printf '%s\n' "$path"
     else
-      check "${state##*/}" 0 "page $path left the site" || return 1
+      check "${state##*/}" 0 "page $path left the site"
     fi
   done
 }
@@ -448,8 +430,8 @@ main() {
   keep "$STATE_DIR/releases/" "$release" "$release"
   failing=0
   is_recent_enough "$version" "$release" || failing=1
-  text="the site runs release $version, older than release $INSTALLED_VERSION"
-  require old-release "$failing" "$text here"
+  require old-release "$failing" \
+    "the site runs release $version, older than release $INSTALLED_VERSION here"
 
   # 4. The proposals commit is ccs-back's, and not an hour behind it.
   failing=0
@@ -471,6 +453,7 @@ main() {
   failing=0
   text=$(verify_merge_requests "$release" "$snapshot" "$snapshot_sum") \
     || failing=1
+  [ -n "$text" ] || text="the site's merge requests differ from GitLab's"
   alert merge-requests "$failing" 4500 86400 "$MESSAGE_PREFIX $text"
 
   # 6. The backend's latest values, built as the web server builds them.

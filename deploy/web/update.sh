@@ -17,9 +17,8 @@ set -eu
 # shellcheck disable=SC3040 # Debian 13's dash has pipefail
 set -o pipefail
 
-SCRIPT_DIR=$(dirname -- "$0")
 # the physical path, so a run that overlaps an install stays in one release
-DEPLOY=$(cd -- "$SCRIPT_DIR/.." && pwd -P)
+DEPLOY=$(cd -- "$(dirname -- "$0")/.." && pwd -P)
 readonly DEPLOY
 # shellcheck source=lib.sh
 . "$DEPLOY/lib.sh"
@@ -38,9 +37,7 @@ readonly WORK_DIR="$CCS_DIR/work"
 check_new_values() {
   local updated=""
 
-  if [ ! -e "$STATE_DIR/values" ]; then
-    : >"$STATE_DIR/values"
-  fi
+  touch -- "$STATE_DIR/values"
   updated=$(sed -n 's/^updated //p' "$STATE_DIR/values")
   if ! "$DEPLOY/checks.py" values "$IN_DIR/values" "${updated:-0}" \
     >"$STATE_DIR/values.new"; then
@@ -67,14 +64,14 @@ render_site() {
   local commit="$1"
 
   rsync -a --exclude=/templates/ "$RELEASE_DIR/dist/" "$WORK_DIR/out/"
-  timeout 300 python3 -I -B "$RELEASE_DIR/deploy/render/render.py" \
+  timeout 300 python3 -I -B "$DEPLOY/render/render.py" \
     "$WORK_DIR/in" "$RELEASE_DIR/dist/templates" "$WORK_DIR/out" \
     "$CCS_DIR/cache"
-  # whatever the render did, no page may show an address the list lacks
+  python3 -I -B "$DEPLOY/render/status.py" write \
+    "$WORK_DIR/in" "$VERSION" "$commit" >"$WORK_DIR/out/status.json"
+  # whatever the render did, no file may show an address the list lacks
   "$DEPLOY/checks.py" site "$WORK_DIR/out" "$WORK_DIR/addresses" \
     || stop "the render shows an address the signed list lacks, so the site stays"
-  python3 -I -B "$RELEASE_DIR/deploy/render/status.py" write \
-    "$WORK_DIR/in" "$VERSION" "$commit" >"$WORK_DIR/out/status.json"
 }
 
 # switch_site: copies WORK_DIR/out to a new folder and points nginx's link

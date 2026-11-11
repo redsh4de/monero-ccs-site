@@ -34,7 +34,6 @@ def modules(address: str) -> list[bytes]:
 
 
 def code_hash(rows: list[bytes]) -> str:
-    """Return the sha256 of a code's modules."""
     return hashlib.sha256(b"".join(rows)).hexdigest()
 
 
@@ -68,18 +67,17 @@ def write(address: str, path: Path, expected: str | None) -> None:
     if code_hash(rows) != expected:
         raise ValueError(f"the QR code for {address} isn't the one the backend read")
     pixels = [row for row in rows for _ in range(SCALE)]
-    path.write_bytes(png(len(pixels), pixels))
+    path.write_bytes(png(pixels))
 
 
-def png(side: int, rows: list[bytes]) -> bytes:
+def png(rows: list[bytes]) -> bytes:
     """Return a square of 1-bit grey rows as a PNG, unfiltered, in one IDAT."""
-    header = struct.pack(">IIBBBBB", side, side, 1, 0, 0, 0, 0)
+    header = struct.pack(">IIBBBBB", len(rows), len(rows), 1, 0, 0, 0, 0)
     data = zlib.compress(b"".join(b"\0" + row for row in rows), 9)
     chunks = [chunk(b"IHDR", header), chunk(b"IDAT", data), chunk(b"IEND", b"")]
     return b"\x89PNG\r\n\x1a\n" + b"".join(chunks)
 
 
 def chunk(kind: bytes, body: bytes) -> bytes:
-    """Return one PNG chunk: its length, kind, body and checksum."""
     crc = zlib.crc32(kind + body)
     return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", crc)

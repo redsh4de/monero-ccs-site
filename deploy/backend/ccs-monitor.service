@@ -14,10 +14,8 @@ Environment=ALL_PROXY=socks5h://localhost/run/tor/socks
 PrivateNetwork=yes
 IPAddressDeny=any
 RestrictAddressFamilies=AF_UNIX
-# its files are its own; no other user reads them
 UMask=0077
 ExecStart=/usr/local/lib/ccs/current/deploy/backend/monitor.sh
-# the alert URL, handed to this unit alone
 LoadCredential=alert_url:/etc/ccs/alert_url
 MemoryMax=1G
 TimeoutStartSec=1800
