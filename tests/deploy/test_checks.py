@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts import CHECKS, DEPLOY, REPO, replaced, run
+from scripts import CHECKS, DEPLOY, REPO, refuses, replaced, run
 from signing import CODE, GENERAL_FUND, Keys, write_list
 
 COMMIT = "0" * 40
@@ -27,12 +27,6 @@ GITLAB = "gitlab sha256=" + "b" * 64
 NOW = int(time.time())
 LAST = NOW - 1000
 PUSHED = NOW - 10
-
-
-def refuses(*cmd, reason):
-    """Run a command that must refuse, and check that it says why, not crash."""
-    stderr = run(*cmd, ok=False).stderr
-    assert reason in stderr, f"expected {reason!r} on stderr, got:\n{stderr}"
 
 
 def status(tmp_path, data):
@@ -220,8 +214,9 @@ def site(tmp_path):
 def build(dist, tag_files, refusal=None):
     command = [CHECKS, "build", dist, DEPLOY / "build-hosts", tag_files]
     if refusal:
-        return refuses(*command, reason=refusal)
-    return run(*command)
+        refuses(*command, reason=refusal)
+    else:
+        run(*command)
 
 
 def plant(dist, where, text):
