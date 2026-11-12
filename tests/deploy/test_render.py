@@ -4,8 +4,8 @@ import json
 import re
 import shutil
 
-from scripts import DEPLOY, replaced, run
-from web import DIST, EXAMPLE
+from scripts import DEPLOY, EXAMPLE, lib_sh, replaced, run
+from web import DIST
 
 TEMPLATES = DIST / "templates"
 
@@ -80,17 +80,9 @@ def test_the_restored_input_renders_the_same_ideas_and_proposal_pages(
     (restored / "proposals").symlink_to(rendered.ccs / "in/repo/proposals")
     shutil.copy(rendered.ccs / "in/repo/mr/merged.tsv", restored / "mr")
     verified = tmp_path / "addresses"
-    lib = f". {DEPLOY}/lib.sh; DEPLOY={DEPLOY}"
-    run("sh", "-c", f'{lib}; verify_list "$1"', "sh", verified)
-    run(
-        "sh",
-        "-c",
-        f'{lib}; render_values "$1" "$2" "$3" >/dev/null',
-        "sh",
-        rendered.ccs / "state/values",
-        restored,
-        verified,
-    )
+    lib_sh('verify_list "$1"', verified)
+    values = rendered.ccs / "state/values"
+    lib_sh('render_values "$1" "$2" "$3" >/dev/null', values, restored, verified)
     release = rendered.lib / "releases/1"
     out = shutil.copytree(release / "dist", tmp_path / "out")
     shutil.rmtree(out / "templates")

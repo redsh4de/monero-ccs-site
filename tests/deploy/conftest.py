@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest
 
+from fake_server import FakeServer
+from fetching import Fetcher
 from signing import Keys, write_list
 from web import A, WebServer
 
@@ -91,3 +93,15 @@ def rendered(web, sign_list) -> WebServer:
     web.push()
     web.update()
     return web
+
+
+@pytest.fixture
+def server(tmp_path):
+    server = FakeServer(tmp_path / "server")
+    yield server
+    server.stop()
+
+
+@pytest.fixture
+def fetcher(tmp_path, server) -> Fetcher:
+    return Fetcher(tmp_path, server)

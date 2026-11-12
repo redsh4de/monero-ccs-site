@@ -8,10 +8,9 @@ from collections.abc import Callable
 from pathlib import Path
 from subprocess import CompletedProcess
 
-from scripts import DEPLOY, REPO, replaced, run
+from scripts import DEPLOY, EXAMPLE, REPO, replaced, run
 
 DIST = REPO / "dist"
-EXAMPLE = REPO / "example-data"
 COMMIT = "0" * 39 + "7"
 A = next(
     line.rpartition("address=")[2]

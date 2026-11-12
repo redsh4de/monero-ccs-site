@@ -10,6 +10,7 @@ import pytest
 REPO = Path("/w")
 DEPLOY = REPO / "deploy"
 CHECKS = DEPLOY / "checks.py"
+EXAMPLE = REPO / "example-data"
 TAIL = 40
 
 
@@ -61,6 +62,29 @@ def fail(command: list[str], headline: str, stdout: str, stderr: str) -> None:
         f"--- stderr, last {TAIL} lines\n{tail(stderr)}",
         pytrace=False,
     )
+
+
+def refuses(*cmd: str | Path, reason: str, **options) -> None:
+    """Run a command that must refuse, and check that it says why, not crash.
+
+    options go to run(), such as env.
+    """
+    stderr = run(*cmd, ok=False, **options).stderr
+    assert reason in stderr, f"expected {reason!r} on stderr, got:\n{stderr}"
+
+
+def lib_sh(
+    snippet: str,
+    *args: str | Path,
+    ok: bool = True,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Run a shell snippet with lib.sh loaded, its arguments as $1, $2 and on.
+
+    The shell runs as every deploy script does: set -eu, and pipefail.
+    """
+    lib = f"set -eu; set -o pipefail; DEPLOY={DEPLOY}; . {DEPLOY}/lib.sh"
+    return run("sh", "-c", f"{lib}; {snippet}", "sh", *args, ok=ok, env=env)
 
 
 def tail(text: str) -> str:
