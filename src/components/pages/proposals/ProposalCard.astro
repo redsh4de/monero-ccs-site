@@ -14,22 +14,21 @@ const { variant = "full" } = Astro.props;
 const simple = variant === "simple";
 const Title = simple ? "h3" : "h2";
 
-const meta = [
-  { icon: "user", text: "[[ it.author ]]", when: "it.author", show: true },
-  { icon: "calendar", text: "[[ it.date ]]", when: "it.date", show: !simple },
-  {
-    icon: "users",
-    text: "[[ it.contributions ]] contribution[% if it.contributions != 1 %]s[% endif %]",
-    when: "it.listed",
-    show: true,
-  },
-  {
-    icon: "coins",
-    text: "[[ it.amount ]] XMR",
-    when: "it.amount",
-    show: !simple,
-  },
-];
+const author = { icon: "user", text: "[[ it.author ]]", when: "it.author" };
+const date = { icon: "calendar", text: "[[ it.date ]]", when: "it.date" };
+const contributions = {
+  icon: "users",
+  text: "[[ it.contributions ]] contribution[% if it.contributions != 1 %]s[% endif %]",
+  when: "it.listed",
+};
+const amount = {
+  icon: "coins",
+  text: "[[ it.amount ]] XMR",
+  when: "it.amount",
+};
+const meta = simple
+  ? [author, contributions]
+  : [author, date, contributions, amount];
 
 const votes = [
   { icon: "thumbs-up", label: "Upvotes", text: "[[ it.upvotes ]]" },
@@ -46,7 +45,7 @@ const votes = [
     [% if it.url %]<CardLink href="[[ it.url ]]">[[ it.title ]]</CardLink>[%
     else %][[ it.title ]][% endif %]
   </Title>
-  <ProposalMeta class="meta" items={meta.filter((item) => item.show)} />
+  <ProposalMeta class="meta" items={meta} />
   [% if it.listed %]<ProposalProgress class="progress" />[% endif %] [% if
   it.stage == "idea" %]<ProposalMeta class="votes" items={votes} />[% endif %]
 </StageCard>

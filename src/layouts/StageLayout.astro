@@ -1,9 +1,9 @@
 ---
 import StageNav from "@/components/pages/proposals/StageNav.astro";
-import type { ProposalStatus } from "@/lib/stages";
+import type { StageName } from "@/lib/stages";
 
 interface Props {
-  current: ProposalStatus | "home";
+  current: StageName | "home";
 }
 
 const { current } = Astro.props;

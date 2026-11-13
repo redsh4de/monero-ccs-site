@@ -1,13 +1,12 @@
 ---
 import Button from "@/components/ui/Button.astro";
-import Card from "@/components/ui/Card.astro";
 ---
 
 <div class="guide-link">
-  <Card padding="lg" class="row">
+  <div class="row">
     <h2 class="title">How to submit a proposal</h2>
     <Button href="/how-to-ccs/">Read the guide</Button>
-  </Card>
+  </div>
 </div>
 
 <style>
@@ -21,6 +20,9 @@ import Card from "@/components/ui/Card.astro";
     align-items: center;
     justify-content: space-between;
     gap: var(--space-sm) var(--space-xl);
+    padding: var(--space-lg);
+    border-radius: var(--radius-md);
+    background: var(--card-color);
   }
 
   .title {

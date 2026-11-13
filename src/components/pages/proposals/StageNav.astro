@@ -2,10 +2,10 @@
 import BackLink from "@/components/ui/BackLink.astro";
 import BottomBar from "@/components/ui/BottomBar.astro";
 import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
-import { type ProposalStatus, stages } from "@/lib/stages";
+import { type StageName, stages } from "@/lib/stages";
 
 interface Props {
-  current: ProposalStatus | "home";
+  current: StageName | "home";
   class?: string;
 }
 
@@ -30,8 +30,8 @@ const { current, class: className, ...rest } = Astro.props;
         stages.map((stage) => (
           <a
             href={`/${stage.slug}/`}
-            class={`stage stage-${stage.status}`}
-            aria-current={current === stage.status ? "page" : undefined}
+            class={`stage stage-${stage.name}`}
+            aria-current={current === stage.name ? "page" : undefined}
           >
             <span class="stage-icon">
               <MaskIcon name={stage.icon} />

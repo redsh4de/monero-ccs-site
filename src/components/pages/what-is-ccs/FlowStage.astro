@@ -11,7 +11,7 @@ const stage = stages.find((s) => s.slug === slug);
 if (!stage) throw new Error(`Unknown stage: ${slug}`);
 ---
 
-<div class={`flow-stage stage-${stage.status}`}>
+<div class={`flow-stage stage-${stage.name}`}>
   <span class="icon">
     <MaskIcon name={stage.icon} />
   </span>

@@ -8,10 +8,10 @@ import { Image } from "astro:assets";
 
 import newBranchSuccess from "@/assets/how-to/new-branch-success.webp";
 import CodeSample from "@/components/pages/how-to-ccs/CodeSample.astro";
+import CodeSamples from "@/components/pages/how-to-ccs/CodeSamples.astro";
 import Field from "@/components/pages/how-to-ccs/Field.astro";
 import AccordionItem from "@/components/ui/accordion/AccordionItem.astro";
 import Callout from "@/components/ui/Callout.astro";
-import Grid from "@/components/ui/layout/Grid.astro";
 import PageSection from "@/components/ui/layout/PageSection.astro";
 import ProseLink from "@/components/ui/ProseLink.astro";
 import SectionTabs from "@/components/ui/tabs/SectionTabs.astro";
@@ -70,7 +70,7 @@ On this new screen, fill in the File Name field with a descriptive title that in
 
 Before you begin writing your proposal, however, you must copy the following template and paste it onto the top of your file:
 
-<Grid columns={3} gap="sm">
+<CodeSamples>
 <CodeSample label="Template">
 
 ```
@@ -133,7 +133,7 @@ The proposal will be written here.
 ```
 
 </CodeSample>
-</Grid>
+</CodeSamples>
 
 Fill this template out as follows:
 
