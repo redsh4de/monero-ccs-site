@@ -181,14 +181,14 @@ class Monitored:
 
 def publish_merge_requests(server: FakeServer) -> None:
     """Give the fake GitLab the example's open merge requests."""
-    shutil.copy(EXAMPLE / "mr/open.json", server.state / "mrs.json")
-    changes: dict[str, list] = {}
-    for line in (EXAMPLE / "mr/open.tsv").read_text().splitlines():
-        iid, name = line.split("\t")
-        changes.setdefault(iid, []).append({"new_path": name, "new_file": True})
-    for iid, diffs in changes.items():
-        path = server.state / "changes" / f"{iid}.json"
+    merge_requests = json.loads((EXAMPLE / "mr/open.json").read_text())
+    for mr in merge_requests:
+        diffs = [{"new_path": name, "new_file": True} for name in mr.pop("adds")]
+        path = server.state / "changes" / f"{mr['iid']}.json"
         path.write_text(json.dumps({"changes": diffs}))
+        mr["author"] = {"username": mr["author"]}
+        mr["sha"] = str(mr["iid"]) * 40
+    (server.state / "mrs.json").write_text(json.dumps(merge_requests))
 
 
 def page(path: str) -> str:

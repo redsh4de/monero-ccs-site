@@ -29,8 +29,7 @@ def lay_out(ccs: Path) -> None:
     (tree / "mr").mkdir()
     shutil.copy(EXAMPLE / "mr/merged.tsv", tree / "mr")
     merge_requests.mkdir()
-    for name in ("open.json", "open.tsv"):
-        shutil.copy(EXAMPLE / "mr" / name, merge_requests)
+    shutil.copy(EXAMPLE / "mr/open.json", merge_requests)
     (ccs / "in").mkdir(exist_ok=True)
     (ccs / "in/repo").symlink_to(tree)
     (ccs / "in/mr").symlink_to(merge_requests)

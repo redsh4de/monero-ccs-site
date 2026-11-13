@@ -4,11 +4,11 @@ r"""Fetch GitLab's open merge requests and the files each one adds.
 Usage: mrs.py <project-api> <out-dir> <cache-dir>
 
   <project-api>  GitLab's API address for ccs-proposals, GITLAB_API in lib.sh
-  <out-dir>      where open.json and open.tsv go
+  <out-dir>      where open.json goes
   <cache-dir>    the files each merge request adds, kept between runs
 
-Writes <out-dir>/open.json, every page of GitLab's list joined, and
-<out-dir>/open.tsv, one "<number>\t<file>" line per file a merge request adds.
+Writes <out-dir>/open.json: what the render reads of each open merge request,
+in GitLab's order, with the files it adds as "adds".
 Each merge request's files are fetched once per head commit and kept in
 <cache-dir>. A merge request whose files can't be fetched adds none this time,
 so one merge request can't stop the rest. curl takes its proxy from ALL_PROXY.
@@ -75,18 +75,19 @@ def new_files(diffs: list) -> list[str]:
     ]
 
 
-def cached_files(api: str, iid: int, path: Path) -> list[str] | None:
+def cached_files(api: str, iid: int, path: Path) -> list[str]:
     """Return the files merge request `iid` adds, from the cache file or GitLab.
 
     The cache file is named by the merge request's head commit, so it is fetched
-    again only when the merge request changes. Returns None when GitLab can't
-    say, and caches nothing then.
+    again only when the merge request changes. When GitLab can't say, this
+    returns none and caches nothing.
     """
     if not path.exists():
         try:
             files = new_files(pages(f"{api}/merge_requests/{iid}/diffs?", DIFFS_CAP))
         except (subprocess.CalledProcessError, ValueError):
-            return None
+            print(f"merge requests: !{iid}'s files didn't load", file=sys.stderr)
+            return []
         write(path, "".join(f"{name}\n" for name in files))
     return path.read_text(encoding="utf-8").split("\n")[:-1]
 
@@ -104,27 +105,34 @@ def main(argv: list[str]) -> int:
         return 1
 
     cache.mkdir(parents=True, exist_ok=True)
-    used, lines = set(), []
+    used, merge_requests = set(), []
     for mr in entries:
         if not isinstance(mr, dict):
             continue
-        iid, sha = mr.get("iid"), mr.get("sha")
-        if not (isinstance(iid, int) and isinstance(sha, str) and SHA.fullmatch(sha)):
-            continue
-        path = cache / f"{iid}.{sha}"
-        used.add(path.name)
-        files = cached_files(api, iid, path)
-        if files is None:
-            print(f"merge requests: !{iid}'s files didn't load", file=sys.stderr)
-            continue
-        lines += [f"{iid}\t{name}\n" for name in files]
+        iid, sha, author = mr.get("iid"), mr.get("sha"), mr.get("author")
+        adds = []
+        if isinstance(iid, int) and isinstance(sha, str) and SHA.fullmatch(sha):
+            path = cache / f"{iid}.{sha}"
+            used.add(path.name)
+            adds = cached_files(api, iid, path)
+        merge_requests.append(
+            {
+                "iid": iid,
+                "title": mr.get("title"),
+                "author": author.get("username") if isinstance(author, dict) else "",
+                "web_url": mr.get("web_url"),
+                "created_at": mr.get("created_at"),
+                "adds": adds,
+                "upvotes": mr.get("upvotes", 0),
+                "downvotes": mr.get("downvotes", 0),
+            }
+        )
 
     for old in cache.iterdir():
         if old.name not in used:
             old.unlink()
 
-    write(out / "open.json", json.dumps(entries, ensure_ascii=False))
-    write(out / "open.tsv", "".join(lines))
+    write(out / "open.json", json.dumps(merge_requests, ensure_ascii=False))
     return 0
 
 

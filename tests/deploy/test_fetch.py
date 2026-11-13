@@ -28,6 +28,12 @@ def read(fetcher, path):
     return (fetcher.ccs / "in" / path).read_text()
 
 
+def adds(fetcher):
+    """Return the files that each open merge request adds, by its number."""
+    merge_requests = json.loads(read(fetcher, "mr/open.json"))
+    return {mr["iid"]: mr["adds"] for mr in merge_requests if mr["adds"]}
+
+
 def requests(fetcher):
     return len(fetcher.server.log("access.log"))
 
@@ -40,8 +46,19 @@ def test_a_first_fetch_links_the_head_tree_and_the_merge_requests(fetcher):
     proposals = list((fetcher.ccs / "in/repo/proposals").glob("*.md"))
     assert len(proposals) == len(list((EXAMPLE / "proposals").glob("*.md")))
     assert read(fetcher, "repo/mr/merged.tsv").startswith("1\t")
-    assert len(json.loads(read(fetcher, "mr/open.json"))) == 3
-    assert read(fetcher, "mr/open.tsv") == "3\tidea.md\n"
+    merge_requests = json.loads(read(fetcher, "mr/open.json"))
+    assert len(merge_requests) == 3
+    assert set(merge_requests[0]) == {
+        "iid",
+        "title",
+        "author",
+        "web_url",
+        "created_at",
+        "adds",
+        "upvotes",
+        "downvotes",
+    }
+    assert adds(fetcher) == {3: ["idea.md"]}
 
 
 def test_the_same_gitlab_line_within_the_hour_makes_no_call(fetched):
@@ -89,7 +106,7 @@ def test_150_merge_requests_arrive_in_api_order_over_two_pages(many):
 
 
 def test_paths_with_a_tab_or_newline_are_left_out(many):
-    assert read(many, "mr/open.tsv") == "150\tok.md\n3\tidea.md\n"
+    assert adds(many) == {150: ["ok.md"], 3: ["idea.md"]}
 
 
 def test_a_merge_requests_101_files_arrive_over_two_pages(many):
@@ -97,8 +114,7 @@ def test_a_merge_requests_101_files_arrive_over_two_pages(many):
     many.mrs(151)
     many.values(6)
     many.fetch()
-    rows = read(many, "mr/open.tsv").splitlines()
-    assert sum(row.startswith("151\t") for row in rows) == 101
+    assert len(adds(many)[151]) == 101
     assert many.server.calls("merge_requests/151/diffs") == 2
 
 
@@ -123,12 +139,12 @@ def test_one_failing_merge_request_is_left_out_and_retried(fetched):
     (fetched.server.state / "changes/2.fail").touch()
     fetched.values(11)
     fetched.fetch()
-    assert read(fetched, "mr/open.tsv") == "3\tidea.md\n"
+    assert adds(fetched) == {3: ["idea.md"]}
     assert not list((fetched.ccs / "fetch/changes").glob("2.*"))
     (fetched.server.state / "changes/2.fail").unlink()
     fetched.values(12)
     fetched.fetch()
-    assert read(fetched, "mr/open.tsv") == "3\tidea.md\n2\ttwo.md\n"
+    assert adds(fetched) == {3: ["idea.md"], 2: ["two.md"]}
 
 
 def test_a_failing_api_fails_the_fetch_and_keeps_the_links(fetched):

@@ -5,7 +5,6 @@ Usage:
   status.py mrs <input-dir>                       print the merge request snapshot,
                                                   without the vote counts
   status.py restore <status.json> <input-dir>     write <input-dir>/mr/open.json
-                                                  and open.tsv
 
 <input-dir> is the render's input folder, which render/README.md describes.
 
@@ -33,22 +32,8 @@ def canonical(value: object) -> str:
 def restore(status: Path, input_dir: Path) -> None:
     """Write the merge request input that a snapshot was taken from."""
     entries = json.loads(status.read_text(encoding="utf-8"))["merge_requests"]
-    mrs = [
-        {
-            "iid": mr["iid"],
-            "title": mr["title"],
-            "author": {"username": mr["author"]},
-            "web_url": mr["web_url"],
-            "created_at": mr["created_at"],
-            "upvotes": mr["upvotes"],
-            "downvotes": mr["downvotes"],
-        }
-        for mr in entries
-    ]
-    lines = [f"{mr['iid']}\t{name}\n" for mr in entries for name in mr["adds"]]
     (input_dir / "mr").mkdir(parents=True, exist_ok=True)
-    (input_dir / "mr" / "open.json").write_text(canonical(mrs), encoding="utf-8")
-    (input_dir / "mr" / "open.tsv").write_text("".join(lines), encoding="utf-8")
+    (input_dir / "mr" / "open.json").write_text(canonical(entries), encoding="utf-8")
 
 
 def main(argv: list[str]) -> int:

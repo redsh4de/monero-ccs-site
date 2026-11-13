@@ -109,7 +109,7 @@ def read_addresses(path: Path) -> tuple[str, dict[str, str]]:
 
 
 def read_pairs(path: Path) -> Iterator[tuple[str, str]]:
-    """Yield the number and file name from each line of a merge request .tsv."""
+    """Yield the number and file name from each line of merged.tsv."""
     for line in read_text(path).splitlines():
         number, _, name = line.partition("\t")
         if number.isdigit() and name:
@@ -120,11 +120,8 @@ def read_merge_requests(folder: Path) -> list[dict]:
     """Return what the render reads of each open merge request, in GitLab's order.
 
     Anyone can open one, so any address in its text is removed. Anything but a list
-    in open.json, such as an error object, counts as none.
+    in open.json counts as none.
     """
-    added: dict[str, list[str]] = {}
-    for number, name in read_pairs(folder / "open.tsv"):
-        added.setdefault(number, []).append(name)
     entries = json.loads(read_text(folder / "open.json"))
     if not isinstance(entries, list):
         return []
@@ -132,18 +129,17 @@ def read_merge_requests(folder: Path) -> list[dict]:
     for mr in entries:
         if not isinstance(mr, dict):
             continue
-        author = mr.get("author")
-        username = author.get("username") if isinstance(author, dict) else ""
+        adds = mr.get("adds")
         mrs.append(
             {
                 "iid": mr.get("iid"),
                 "title": redact(str(mr.get("title") or ""), ignore_spaces=True),
-                "author": redact(str(username or ""), ignore_spaces=True),
+                "author": redact(str(mr.get("author") or ""), ignore_spaces=True),
                 "web_url": str(mr.get("web_url") or ""),
                 "created_at": str(mr.get("created_at") or ""),
                 "adds": [
-                    redact(name, ignore_spaces=True)
-                    for name in added.get(str(mr.get("iid")), [])
+                    redact(str(name), ignore_spaces=True)
+                    for name in (adds if isinstance(adds, list) else [])
                 ],
                 "upvotes": mr.get("upvotes", 0),
                 "downvotes": mr.get("downvotes", 0),
