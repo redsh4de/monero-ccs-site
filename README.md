@@ -12,16 +12,25 @@ the site with the sample data in `example-data/`. Every pnpm command runs the
 dependencies' code as you, so read "Maintainer setup" in
 [deploy/RELEASING.md](deploy/RELEASING.md#maintainer-setup) first.
 
-| Command        | Action                                                                   |
-| :------------- | :----------------------------------------------------------------------- |
-| `pnpm install` | Install dependencies                                                     |
-| `pnpm dev`     | Start a local live-reload server, with the data pages unfilled           |
-| `pnpm build`   | Build the static pages and templates                                     |
-| `pnpm render`  | Render `example-data/` into `dist/`, in the render container             |
-| `pnpm test`    | Lint the deploy's Python and shell, then run `tests/`, in a container    |
-| `pnpm preview` | Build, render, and serve `dist/` as plain files on http://localhost:4321 |
-| `pnpm check`   | Type check, lint, and check the formatting                               |
-| `pnpm format`  | Format with Prettier                                                     |
+| Command            | Action                                                                      |
+| :----------------- | :-------------------------------------------------------------------------- |
+| `pnpm install`     | Install dependencies                                                        |
+| `pnpm dev`         | Start a local live-reload server, with the data pages unfilled              |
+| `pnpm build`       | Build the static pages and templates                                        |
+| `pnpm render`      | Render `example-data/` into `dist/`, in the render container                |
+| `pnpm preview`     | Build, render, and serve `dist/` as plain files on http://localhost:4321    |
+| `pnpm check`       | Type check, lint, and check the formatting                                  |
+| `pnpm test`        | Lint the deploy's Python and shell, then run `tests/`, in a container       |
+| `pnpm test:deploy` | Build, then run the deploy scripts' tests in `tests/deploy/`, in containers |
+| `pnpm format`      | Format with Prettier                                                        |
 
+`pnpm render` fills the pages that `pnpm build` made, so build first. CI and the release
+build use Node 26.8.1.
+
+The pages in `src/pages/templates/` are Jinja templates. Astro builds them with their
+`[[ ]]` and `[% %]` marks left in, and `deploy/render/` fills them with the proposal data.
+`dev/` holds the scripts behind `pnpm render` and `pnpm preview`.
+
+[tests/deploy/README.md](tests/deploy/README.md) explains the deploy tests.
 [deploy/README.md](deploy/README.md) explains how to run the live site, and
 [deploy/ARCHITECTURE.md](deploy/ARCHITECTURE.md) how it works.
