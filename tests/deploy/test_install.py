@@ -2,13 +2,15 @@
 
 import filecmp
 import os
+import shutil
 from pathlib import Path
 from subprocess import CompletedProcess
 
 import pytest
 
-from installing import CCS_BACK, LIB, PUSH_KEY, Machine, push_key, values
-from scripts import DEPLOY, run
+from installing import CCS_BACK, LIB, MERGE, PUSH_KEY, Machine, push_key, values
+from scripts import DEPLOY, replaced, run, stand_in
+from signing import publish
 from web import lay_out
 
 USAGE = "usage: install.sh"
@@ -383,3 +385,178 @@ def test_a_malformed_push_key_or_address_is_refused(
     key = key.format(key=push_key())
     installed_web.refuses("web", "site-v1", address, key, reason=reason)
     assert AUTHORIZED_KEYS.read_text() == installed_web.saved("web", AUTHORIZED_KEYS)
+
+
+def test_an_upgrade_is_announced_on_the_alert_channel(installed_web, server):
+    shutil.copy(server.credentials / "alert_url", "/etc/ccs/alert_url")
+    result = installed_web.install("web", "site-v2")
+    assert server.alerts() == ["ccs install: site-v2, web role"]
+    assert "The alert channel has the install." in result.stdout.splitlines()
+
+
+@pytest.fixture
+def mktemp_log(tmp_path) -> Path:
+    """Write a mktemp in tmp_path that logs its arguments, and return the log."""
+    log = tmp_path / "mktemp.log"
+    script = f'#!/bin/sh\necho "$*" >>{log}\nexec /usr/bin/mktemp "$@"\n'
+    stand_in(tmp_path, "mktemp", script)
+    return log
+
+
+def test_the_download_goes_beside_releases_and_leaves_nothing_behind(
+    installed_web, mktemp_log
+):
+    path = f"{mktemp_log.parent}:{installed_web.env['PATH']}"
+    installed_web.install("web", "site-v2", PATH=path)
+    assert f"-d -p {LIB}" in mktemp_log.read_text().splitlines()
+    assert list(LIB.glob("tmp.*")) == []
+
+
+def test_the_installed_copy_upgrades_from_the_release_host_in_the_config(upgraded):
+    assert upgraded.installed() == str(LIB / "releases/2")
+    assert upgraded.served() == 2
+    assert sorted(os.listdir(LIB / "releases")) == ["1", "2"]
+    assert AUTHORIZED_KEYS.read_text() == upgraded.saved("web", AUTHORIZED_KEYS)
+
+
+def test_the_backend_upgrade_keeps_the_push_key(upgraded):
+    upgraded.install("backend", "site-v2")
+    assert push_key() == upgraded.saved("upgraded", Path(f"{PUSH_KEY}.pub")).strip()
+
+
+def test_installing_the_installed_release_again_changes_nothing(upgraded):
+    upgraded.install("web", "site-v2")
+    assert upgraded.installed() == str(LIB / "releases/2")
+    assert sorted(os.listdir(LIB / "releases")) == ["1", "2"]
+
+
+def unrenderable(tree: Path) -> None:
+    """Make the proposal template fail to render, and mark three deploy files."""
+    template = tree / "dist/templates/proposal.html"
+    template.write_text(replaced(template.read_text(), "it.title", "it.nope"))
+    for name in ("web/ccs-fetch.service", "sandbox.conf", "web/nginx.conf"):
+        with open(tree / "deploy" / name, "a") as file:
+            file.write("# a release that fails to render\n")
+
+
+def test_a_release_that_fails_to_render_is_refused_and_the_old_one_comes_back(
+    upgraded,
+):
+    upgraded.publish(3, edit=unrenderable)
+    site = os.readlink("/var/lib/ccs/current")
+    reason = "site-v3 failed to render, or nginx refused its site"
+    upgraded.refuses("web", "site-v3", reason=reason)
+    assert upgraded.installed() == str(LIB / "releases/2")
+    assert not (LIB / "releases/3").exists()
+    assert os.readlink("/var/lib/ccs/current") == site
+    deploy = LIB / "releases/2/deploy"
+    installed = {
+        UNITS / "ccs-fetch.service": deploy / "web/ccs-fetch.service",
+        UNITS / "ccs-fetch.service.d/sandbox.conf": deploy / "sandbox.conf",
+        Path("/etc/nginx/sites-enabled/ccs.conf"): deploy / "web/nginx.conf",
+    }
+    assert differing(installed) == []
+
+
+def test_a_failed_render_is_refused_even_when_its_first_start_joins_a_run_already_going(
+    upgraded,
+):
+    MERGE.touch()
+    upgraded.publish(4, edit=unrenderable)
+    upgraded.refuses("web", "site-v4", reason="site-v4 failed to render")
+    assert upgraded.installed() == str(LIB / "releases/2")
+
+
+def publish_one_signature(machine: Machine) -> None:
+    publish(machine.host, 5, machine.keys, signers=["signer-a"])
+
+
+def publish_cut_off(machine: Machine) -> None:
+    tar = machine.publish(6)
+    tar.write_bytes(tar.read_bytes()[:1000])
+
+
+def publish_release_2_as_7(machine: Machine) -> None:
+    release_2, release_7 = (machine.host / f"download/site-v{n}" for n in (2, 7))
+    shutil.copytree(release_2, release_7)
+    (release_7 / "ccs-site-v2.tar").rename(release_7 / "ccs-site-v7.tar")
+
+
+@pytest.mark.parametrize(
+    "version, make, reason",
+    [
+        pytest.param(
+            5,
+            publish_one_signature,
+            "needs good signatures from two release signers",
+            id="one signature",
+        ),
+        pytest.param(
+            6,
+            publish_cut_off,
+            "the archive doesn't match its hash",
+            id="a cut-off archive",
+        ),
+        pytest.param(
+            7,
+            publish_release_2_as_7,
+            "this isn't release 7",
+            id="release 2 named site-v7",
+        ),
+    ],
+)
+def test_a_release_that_does_not_verify_is_refused(upgraded, version, make, reason):
+    make(upgraded)
+    upgraded.refuses("web", f"site-v{version}", reason=f"release: {reason}")
+    assert upgraded.installed() == str(LIB / "releases/2")
+    assert sorted(os.listdir(LIB / "releases")) == ["1", "2"]
+
+
+def test_an_older_release_is_refused(upgraded):
+    shutil.rmtree(LIB / "releases/1")
+    reason = "site-v1 is older than the installed release"
+    upgraded.refuses("web", "site-v1", reason=reason)
+    assert upgraded.installed() == str(LIB / "releases/2")
+
+
+def test_a_damaged_release_is_fetched_again_and_a_killed_download_cleared(upgraded):
+    (LIB / "tmp.killed").mkdir()
+    shutil.rmtree(LIB / "releases/2")
+    upgraded.install("web", "site-v2", first=True)
+    assert os.access(LIB / "releases/2/deploy/web/update.sh", os.X_OK)
+    assert not (LIB / "tmp.killed").exists()
+
+
+@pytest.fixture
+def certificate(upgraded) -> Path:
+    """Make a certificate in /etc/ssl/ccs; return its key, readable by root only."""
+    folder = Path("/etc/ssl/ccs")
+    folder.mkdir()
+    key = folder / "privkey.pem"
+    subject = ["-subj", "/CN=ccs.getmonero.org", "-days", "1", "-nodes"]
+    files = ["-keyout", key, "-out", folder / "fullchain.pem"]
+    run("openssl", "req", "-x509", "-newkey", "ed25519", *subject, *files)
+    return key
+
+
+def test_a_tls_key_that_others_can_read_is_refused(upgraded, certificate):
+    certificate.chmod(0o644)
+    reason = f"make {certificate} readable by root only"
+    upgraded.refuses("web", "site-v2", reason=reason)
+
+
+def test_with_a_certificate_the_release_passes_nginxs_check(upgraded, certificate):
+    upgraded.install("web", "site-v2")
+
+
+def unloadable_nginx_site(tree: Path) -> None:
+    with open(tree / "deploy/web/nginx.conf", "a") as site:
+        site.write("not_a_directive;\n")
+
+
+def test_a_release_whose_nginx_site_does_not_load_is_refused(upgraded, certificate):
+    upgraded.publish(8, edit=unloadable_nginx_site)
+    upgraded.refuses("web", "site-v8", reason='unknown directive "not_a_directive"')
+    assert upgraded.installed() == str(LIB / "releases/2")
+    nginx_site = Path("/etc/nginx/sites-enabled/ccs.conf")
+    assert differing({nginx_site: LIB / "releases/2/deploy/web/nginx.conf"}) == []
