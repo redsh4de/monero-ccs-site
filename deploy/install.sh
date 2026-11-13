@@ -297,8 +297,7 @@ write_push_key() {
 }
 
 # start_web <old-release> <new-release> <tag>: starts the units, and keeps
-# the new release only once it renders; on a failure the old release, its
-# units and its site come back.
+# the new release only once it renders.
 start_web() {
   local old_release="$1"
   local new_release="$2"
@@ -309,17 +308,7 @@ start_web() {
   systemctl daemon-reload
   systemctl enable --now ccs-fetch.path ccs-fetch.timer
   if ! trial_render; then
-    if [ -n "$old_release" ] && [ "$old_release" != "$new_release" ]; then
-      swap "$old_release" "$LIB/current"
-      install_files "$old_release" web
-      systemctl daemon-reload
-      rm -rf -- "$new_release"
-      # nginx can refuse a release after its render went live; update.sh
-      # keeps the site before it
-      if [ -d "$site" ]; then
-        swap "$site" /var/lib/ccs/current
-      fi
-    fi
+    restore_release "$old_release" "$new_release" "$site"
     stop "$tag failed to render, or nginx refused its site;" \
       "the site and the release stay as they were"
   fi
@@ -330,6 +319,28 @@ start_web() {
   else
     echo "Put the certificate in /etc/ssl/ccs/ (fullchain.pem," \
       "privkey.pem), then run this command again."
+  fi
+}
+
+# restore_release <old-release> <new-release> <site>: brings back the old
+# release, its units and the site that was live, and deletes the new release.
+# A first install has no old release, so it keeps the new one.
+restore_release() {
+  local old_release="$1"
+  local new_release="$2"
+  local site="$3"
+
+  if [ -z "$old_release" ] || [ "$old_release" = "$new_release" ]; then
+    return 0
+  fi
+  swap "$old_release" "$LIB/current"
+  install_files "$old_release" web
+  systemctl daemon-reload
+  rm -rf -- "$new_release"
+  # nginx can refuse a release after its render went live; update.sh keeps
+  # the site before it
+  if [ -d "$site" ]; then
+    swap "$site" /var/lib/ccs/current
   fi
 }
 
