@@ -93,7 +93,7 @@ def many(fetched):
     """Return a fetcher that has fetched 150 merge requests, over two pages."""
     fetched.mrs(150)
     files = [("tab\there.md", True), ("nl\nhere.md", True), ("ok.md", True)]
-    fetched.changes(150, files)
+    fetched.server.changes(150, files)
     fetched.values(5)
     fetched.fetch()
     return fetched
@@ -110,7 +110,7 @@ def test_paths_with_a_tab_or_newline_are_left_out(many):
 
 
 def test_a_merge_requests_101_files_arrive_over_two_pages(many):
-    many.changes(151, [(f"f{number:03}.md", True) for number in range(101)])
+    many.server.changes(151, [(f"f{number:03}.md", True) for number in range(101)])
     many.mrs(151)
     many.values(6)
     many.fetch()
@@ -133,7 +133,7 @@ def test_over_1000_open_merge_requests_fails(fetched):
 
 
 def test_one_failing_merge_request_is_left_out_and_retried(fetched):
-    fetched.changes(2, [("two.md", True)])
+    fetched.server.changes(2, [("two.md", True)])
     for cached in (fetched.ccs / "fetch/changes").glob("2.*"):
         cached.unlink()
     (fetched.server.state / "changes/2.fail").touch()

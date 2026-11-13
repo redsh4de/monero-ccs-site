@@ -16,7 +16,7 @@ from fetching import Fetcher
 from installing import CCS_BACK, LIB, PUSH_KEY, make_certificate, push_key
 from monitoring import publish_merge_requests
 from scripts import DEPLOY, TAIL, refuses, run
-from signing import RELEASE_SIGNERS, publish, write_list
+from signing import place_keyrings, publish, write_list
 from web import A, B, C
 
 BOOTED = Path("/proc/1/comm").read_text() == "systemd\n"
@@ -115,8 +115,7 @@ def machine(tmp_path_factory, keys, gitlab) -> None:
     publish(gitlab.state, 1, keys)
     etc = Path("/etc/ccs")
     etc.mkdir()
-    keys.keyring(etc / "release-signers.gpg", *RELEASE_SIGNERS)
-    keys.keyring(etc / "address-signers.gpg", "addresser")
+    place_keyrings(etc, keys)
     write_list(etc / "addresses.txt", [A, B, C], keys)
     config = (DEPLOY / "config.example").read_text()
     config += f"RELEASES={gitlab.url}\nGITLAB_API={gitlab.api}\n"

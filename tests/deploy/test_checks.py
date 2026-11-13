@@ -14,12 +14,20 @@ import subprocess
 import tarfile
 import threading
 import time
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
 
 from scripts import CHECKS, DEPLOY, REPO, refuses, replaced, run
-from signing import CODE, GENERAL_FUND, Keys, write_list
+from signing import (
+    CODE,
+    GENERAL_FUND,
+    RELEASE_SIGNERS,
+    Keys,
+    sign_release,
+    write_list,
+)
 
 COMMIT = "0" * 40
 A1 = "8" + "A" * 94
@@ -95,7 +103,34 @@ def test_a_cached_safety_pyc_never_runs(deploy, tmp_path):
 
 @pytest.fixture
 def release_keyring(keys, tmp_path):
-    return keys.keyring(tmp_path / "release-signers.gpg", "signer-a", "signer-b")
+    return keys.keyring(tmp_path / "release-signers.gpg", *RELEASE_SIGNERS)
+
+
+@pytest.fixture
+def release_folder(keys, tmp_path):
+    """Return make(name, signers, tar): a folder holding release 2, as published."""
+
+    def make(
+        name: str, signers: Sequence[str] = RELEASE_SIGNERS, tar: Path | None = None
+    ) -> Path:
+        folder = tmp_path / f"release-{name}"
+        folder.mkdir()
+        archive = folder / "ccs-site-v2.tar"
+        if tar:
+            shutil.copy(tar, archive)
+        else:
+            with tarfile.open(archive, "w") as release:
+                for member, data in [
+                    ("dist/index.html", b"<p>site</p>\n"),
+                    ("deploy/render/render.py", b'print("render")\n'),
+                ]:
+                    info = tarfile.TarInfo(member)
+                    info.size = len(data)
+                    release.addfile(info, io.BytesIO(data))
+        sign_release(archive, keys, signers)
+        return folder
+
+    return make
 
 
 def verify(folder, keyring, dest, refusal=None, cwd=None):
@@ -151,13 +186,6 @@ def test_unknown_signers_are_skipped(release_folder, release_keyring, tmp_path):
 def unsafe_tar(kind, tmp_path):
     """Return a release archive holding the site's index and one unsafe member."""
     path = tmp_path / f"{kind}.tar"
-    if kind == "sparse":
-        big = tmp_path / "big/dist/big"
-        big.parent.mkdir(parents=True)
-        with open(big, "wb") as file:
-            file.truncate(200_000_001)
-        run("tar", "--sparse", "-cf", path, "-C", tmp_path / "big", "dist")
-        return path
     member = tarfile.TarInfo(
         {"dotdot": "../x", "absolute": "/etc/x"}.get(kind, f"dist/{kind}")
     )
@@ -185,15 +213,27 @@ def unsafe_tar(kind, tmp_path):
         pytest.param("device", id="a device"),
         pytest.param("dotdot", id="a path that climbs out with .."),
         pytest.param("absolute", id="an absolute path"),
-        pytest.param("sparse", id="a sparse member over the size cap"),
     ],
 )
 def test_a_release_archive_holding_an_unsafe_member_is_refused(
     kind, release_folder, release_keyring, tmp_path
 ):
-    refusal = "too big" if kind == "sparse" else "a link, a device or an unsafe path"
+    refusal = "a link, a device or an unsafe path"
     folder = release_folder(kind, tar=unsafe_tar(kind, tmp_path))
     verify(folder, release_keyring, tmp_path / "out", refusal=refusal)
+
+
+def test_a_release_archive_over_the_size_cap_is_refused(
+    release_folder, release_keyring, tmp_path
+):
+    big = tmp_path / "big/dist/big"
+    big.parent.mkdir(parents=True)
+    with open(big, "wb") as file:
+        file.truncate(200_000_001)
+    sparse = tmp_path / "sparse.tar"
+    run("tar", "--sparse", "-cf", sparse, "-C", tmp_path / "big", "dist")
+    folder = release_folder("sparse", tar=sparse)
+    verify(folder, release_keyring, tmp_path / "out", refusal="too big")
 
 
 def test_a_signed_archive_that_is_not_a_tar_is_refused(
@@ -227,7 +267,7 @@ def test_a_malformed_sums_file_is_refused(
     folder = release_folder("sums")
     sums = folder / "SHA256SUMS"
     sums.write_text(rewrite(sums.read_text()))
-    keys.sign(sums, "signer-a", "signer-b")
+    keys.sign(sums, *RELEASE_SIGNERS)
     verify(folder, release_keyring, tmp_path / "out", refusal=refusal)
 
 
@@ -755,21 +795,14 @@ def test_an_unlisted_address_is_never_pinned(applied, verified_list, tmp_path):
     assert "pin " not in values(path, applied, verified_list).stdout
 
 
-@pytest.mark.parametrize(
-    "where",
-    [
-        pytest.param("applied", id="a malformed pin in the applied values"),
-        pytest.param("pushed", id="a pin line in the push"),
-    ],
-)
-def test_a_malformed_pin_or_a_pushed_pin_line_is_refused(
-    where, applied, verified_list, tmp_path
-):
-    if where == "applied":
-        path = values_file(tmp_path, *GOOD)
-        applied = pinned(tmp_path, "example-funding <b>")
-        refusal = "applied values: a pin is malformed"
-    else:
-        path = values_file(tmp_path, f"pin example-funding {A1}", f"updated {PUSHED}")
-        refusal = "values: a line doesn't match"
+def test_a_malformed_pin_in_the_applied_values_is_refused(verified_list, tmp_path):
+    path = values_file(tmp_path, *GOOD)
+    applied = pinned(tmp_path, "example-funding <b>")
+    refusal = "applied values: a pin is malformed"
+    refuses(CHECKS, "values", path, applied, verified_list, reason=refusal)
+
+
+def test_a_pin_line_in_the_push_is_refused(applied, verified_list, tmp_path):
+    path = values_file(tmp_path, f"pin example-funding {A1}", f"updated {PUSHED}")
+    refusal = "values: a line doesn't match"
     refuses(CHECKS, "values", path, applied, verified_list, reason=refusal)

@@ -65,6 +65,22 @@ def write_list(
     keys.sign(path, signer)
 
 
+def place_keyrings(etc: Path, keys: Keys) -> list[Path]:
+    """Write both keyrings into etc, as an operator places them; return them."""
+    return [
+        keys.keyring(etc / "release-signers.gpg", *RELEASE_SIGNERS),
+        keys.keyring(etc / "address-signers.gpg", "addresser"),
+    ]
+
+
+def sign_release(tar: Path, keys: Keys, signers: Sequence[str]) -> None:
+    """Write SHA256SUMS beside the tar, with each signer's signature of it."""
+    sums = tar.parent / "SHA256SUMS"
+    digest = hashlib.sha256(tar.read_bytes()).hexdigest()
+    sums.write_text(f"{digest}  {tar.name}\n")
+    keys.sign(sums, *signers)
+
+
 def publish(
     host: Path,
     version: int,
@@ -77,7 +93,5 @@ def publish(
     folder.mkdir(parents=True)
     tar = folder / f"ccs-site-v{version}.tar"
     run("tar", "-cf", tar, "--exclude=__pycache__", "-C", tree, "dist", "deploy")
-    digest = hashlib.sha256(tar.read_bytes()).hexdigest()
-    (folder / "SHA256SUMS").write_text(f"{digest}  {tar.name}\n")
-    keys.sign(folder / "SHA256SUMS", *signers)
+    sign_release(tar, keys, signers)
     return tar
