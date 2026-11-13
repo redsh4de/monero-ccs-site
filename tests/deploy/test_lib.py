@@ -171,6 +171,14 @@ def test_a_failed_post_is_logged(url, alerts):
     assert "alert not sent" in lib_sh(queued, env=env).stderr
 
 
+def test_alerts_go_through_the_proxy_all_proxy_names(alerts):
+    # an alert channel only the proxy reaches; the fake server logs any post
+    (alerts.server.credentials / "alert_url").write_text("http://alert.invalid/\n")
+    alerts.env["ALL_PROXY"] = alerts.server.url
+    alerts.run(1000, "a 1 0 9999 'A broke'")
+    assert alerts.server.alerts() == ["A broke (a)"]
+
+
 def test_a_due_alert_stays_unsent_while_alerts_are_paused(alerts):
     (alerts.server.credentials / "alert_url").write_text("")
     alerts.run(100, "p 1 0 9999 P")

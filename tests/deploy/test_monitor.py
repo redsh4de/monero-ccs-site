@@ -1,11 +1,14 @@
 """monitor.sh: the backend's checks of the live site."""
 
+import shutil
 import time
 
 import pytest
 
-from monitoring import ALWAYS, VALUES, Monitored, SiteServer, page
+from fetching import git
+from monitoring import ALWAYS, ETC, VALUES, Monitored, SiteServer, page
 from scripts import replaced
+from web import B, C
 
 
 @pytest.fixture(scope="module")
@@ -190,3 +193,110 @@ def test_malformed_merge_requests_in_status_json_are_refused_not_a_crash(
     monitored.edit_merge_requests(edit)
     assert reason in monitored.monitor().stderr
     assert monitored.failures() == ["snapshot"]
+
+
+def test_an_address_list_that_does_not_verify_alerts(monitored):
+    (ETC / "addresses.txt").write_text("an unsigned line\n")
+    monitored.failing_for("addresses", 700)
+    monitored.monitor()
+    assert monitored.server.alerts() == [
+        "ccs monitor: the address list doesn't verify, so no donation address"
+        " shows (addresses)"
+    ]
+
+
+def test_a_proposal_whose_address_is_not_listed_alerts_naming_it(monitored):
+    VALUES.write_text(replaced(VALUES.read_text(), f"address={B}\n", f"address={C}\n"))
+    monitored.failing_for("addresses", 700)
+    monitored.monitor()
+    assert monitored.server.alerts() == [
+        "ccs monitor: proposals take donations with no address on the list:"
+        " proposals/example-no-address.html (addresses)"
+    ]
+
+
+def test_a_render_that_shows_an_unlisted_address_alerts(monitored):
+    index = monitored.state / "expected/index.html"
+    index.write_text(replaced(index.read_text(), "</body>", f"<p>{C}</p></body>"))
+    monitored.failing_for("unlisted", 700)
+    monitored.monitor()
+    assert monitored.server.alerts() == [
+        "ccs monitor: the render shows an address the signed list lacks (unlisted)"
+    ]
+
+
+def test_a_signing_key_that_expires_soon_alerts_naming_it_and_its_day(monitored, keys):
+    keys.gpg("--quick-gen-key", "soon-expiring", "ed25519", "sign", "10d")
+    day = time.strftime("%Y-%m-%d", time.gmtime(time.time() + 10 * 86400))
+    keys.keyring(ETC / "address-signers.gpg", "addresser", "soon-expiring")
+    monitored.failing_for("key-expiry", 700)
+    monitored.monitor()
+    assert monitored.server.alerts() == [
+        f"ccs monitor: keys expire: soon-expiring: {day} (key-expiry)"
+    ]
+
+
+def test_a_site_that_does_not_answer_is_recorded_with_curls_reason(monitored):
+    assert "curl: (7)" in monitored.monitor(SITE="http://127.0.0.1:1").stderr
+    assert monitored.failures() == ["status"]
+
+
+def test_a_site_over_an_hour_behind_ccs_back_alerts(monitored):
+    trust = ("-c", "safe.directory=*")
+    git(monitored.checkout, *trust, "commit", "-q", "--allow-empty", "-m", "newer")
+    monitored.monitor()
+    assert monitored.server.alerts() == []
+    monitored.age("stall", 3700)
+    monitored.monitor()
+    assert monitored.server.alerts() == [
+        "ccs monitor: the site's content is over an hour behind ccs-back (stall)"
+    ]
+
+
+def install_newer(monitored, *changed: str) -> None:
+    """Install release 2: release 1 with a newline added to each file changed names."""
+    shutil.copytree(monitored.release(1), monitored.release(2))
+    for path in changed:
+        with open(next(monitored.release(2).glob(path)), "a") as file:
+            file.write("\n")
+
+
+def test_an_older_site_release_differing_only_in_backend_files_and_docs_is_checked(
+    monitored,
+):
+    install_newer(monitored, "deploy/backend/values.py", "deploy/README.md")
+    monitored.monitor(release=2)
+    assert monitored.failures() == []
+    assert set(ALWAYS) <= set(monitored.site_server.requested)
+
+
+@pytest.mark.parametrize(
+    "changed",
+    [
+        "deploy/web/update.sh",
+        "deploy/checks.py",
+        "deploy/render/content.py",
+        "dist/_astro/*.css",
+    ],
+)
+def test_an_older_site_release_with_other_site_files_alerts_and_compares_no_page(
+    monitored, changed
+):
+    install_newer(monitored, changed)
+    monitored.failing_for("old-release", 700)
+    monitored.monitor(release=2)
+    assert monitored.site_server.requested == ["status.json"]
+    assert monitored.server.alerts() == [
+        "ccs monitor: the site runs release 1, older than release 2 here (old-release)"
+    ]
+
+
+def test_a_crash_alerts_and_a_good_run_clears_it(monitored):
+    shutil.rmtree(monitored.state / "releases/1/dist/templates")
+    (monitored.state / "rendered").unlink()
+    monitored.failing_for("monitor", 700)
+    monitored.monitor(ok=False)
+    assert monitored.server.alerts() == ["ccs monitor: the monitor crashed (monitor)"]
+    shutil.rmtree(monitored.state / "releases/1")
+    monitored.monitor()
+    assert monitored.failures() == []
