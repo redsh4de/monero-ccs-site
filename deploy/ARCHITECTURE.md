@@ -103,6 +103,27 @@ Each folder in `deploy/` names the machine that runs it. `web/` runs on the web 
 and `backend/` on the backend. `render/` and the scripts at the top run on both, except
 `release.sh` and `address-list.py`, which the signers run.
 
+Both servers keep the installed releases in `/usr/local/lib/ccs/releases/`. The link
+`/usr/local/lib/ccs/current` names the one in use.
+
+The web server keeps its data in `/var/lib/ccs/`:
+
+| Path      | Holds                                                                         | Written by           |
+| :-------- | :---------------------------------------------------------------------------- | :------------------- |
+| `in/`     | The pushed `values`, and the links `repo` and `mr` to the fetched content     | The push, `fetch.sh` |
+| `fetch/`  | The proposals repository, its exported trees, and the merge request sets      | `fetch.sh`           |
+| `state/`  | The `values` applied last, with the pins, and the hash of the inputs rendered | `update.sh`          |
+| `work/`   | One run's input and output, made afresh each run                              | `update.sh`          |
+| `cache/`  | Rendered proposal bodies, kept between runs                                   | `update.sh`          |
+| `site/`   | The site that nginx serves, and the one before it                             | `update.sh`          |
+| `current` | A link to the site in `site/` that nginx serves                               | `update.sh`          |
+
+So `/var/lib/ccs/current` is the served site, and `/usr/local/lib/ccs/current` is the
+installed release.
+
+The backend keeps the values it pushes in `/var/lib/ccs-backend/values`. The monitor
+keeps its state in `/var/lib/ccs-monitor/`.
+
 ---
 
 ## The release, from tag to install

@@ -1,4 +1,4 @@
-"""The deploy documents: every path, link and alert they name, and their style."""
+"""The documents: every path, link and alert they name, and their style."""
 
 import re
 
@@ -6,8 +6,12 @@ import pytest
 
 from scripts import CHECKS, DEPLOY, REPO
 
-DOCS = sorted(DEPLOY.rglob("*.md"))
-IDS = [str(doc.relative_to(DEPLOY)) for doc in DOCS]
+DOCS = [
+    REPO / "README.md",
+    REPO / "tests/deploy/README.md",
+    *sorted(DEPLOY.rglob("*.md")),
+]
+IDS = [str(doc.relative_to(REPO)) for doc in DOCS]
 SCRIPTS = sorted(DEPLOY.glob("*/*.sh"))
 
 
@@ -37,7 +41,8 @@ def sentences(text):
 def test_every_path_a_doc_names_exists(doc):
     named = set(
         re.findall(
-            r"(?<![\w/])(?:deploy|src)/[A-Za-z0-9_./-]*[A-Za-z0-9_]", doc.read_text()
+            r"(?<![\w/])(?:deploy|src|tests|dev)/[A-Za-z0-9_./-]*[A-Za-z0-9_]",
+            doc.read_text(),
         )
     )
     assert sorted(path for path in named if not (REPO / path).exists()) == []
@@ -94,4 +99,6 @@ def test_no_doc_uses_a_contraction(doc):
     pattern = (
         r"\b(?:don|can|isn|aren|won|doesn|didn|it|that|there|you)'(?:t|s|re|ll|ve)\b"
     )
-    assert re.findall(pattern, doc.read_text()) == []
+    # a script's message, quoted as code, keeps its own wording
+    prose = re.sub(r"`[^`]*`", "", doc.read_text())
+    assert re.findall(pattern, prose) == []
