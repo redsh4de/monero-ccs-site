@@ -1,12 +1,13 @@
 """install.sh: both roles, the push, upgrades, and the releases it refuses."""
 
+import filecmp
 from pathlib import Path
 from subprocess import CompletedProcess
 
 import pytest
 
-from installing import CCS_BACK, LIB, Machine, push_key, values
-from scripts import DEPLOY
+from installing import CCS_BACK, LIB, PUSH_KEY, Machine, push_key, values
+from scripts import DEPLOY, run
 from web import lay_out
 
 USAGE = "usage: install.sh"
@@ -131,3 +132,93 @@ def test_ccs_backs_json_that_others_cannot_read_is_refused(fresh):
     unreadable.touch(mode=0o600)
     reason = f"make ccs-back's files readable by all users: {unreadable}"
     fresh.refuses(*BACKEND, reason=reason, first=True)
+
+
+UNITS = Path("/etc/systemd/system")
+
+
+def differing(installed: dict[Path, Path]) -> list[str]:
+    """Return each installed file whose bytes differ from its source's."""
+    return [
+        str(path)
+        for path, source in installed.items()
+        if not filecmp.cmp(path, source, shallow=False)
+    ]
+
+
+def test_the_backend_writes_both_settings_to_its_config_and_no_alert_url(
+    installed_backend,
+):
+    config = Path("/etc/ccs/config").read_text()
+    assert "WEB_HOST=127.0.0.1" in config.splitlines()
+    assert f"CCS_BACK={CCS_BACK}" in config.splitlines()
+    assert "ALERT_URL" not in config
+
+
+def test_the_alert_url_file_starts_empty_and_root_only_and_the_install_says_so(
+    installed_backend, backend_install
+):
+    alert_url = Path("/etc/ccs/alert_url")
+    assert (ownership(alert_url), alert_url.read_text()) == ("root 600", "")
+    said = "/etc/ccs/alert_url is empty, so no alert reaches anyone yet."
+    assert said in backend_install.stdout.splitlines()
+
+
+def test_a_release_installed_under_a_strict_umask_is_readable_by_the_services(
+    installed_backend,
+):
+    assert installed_backend.installed() == str(LIB / "releases/1")
+    expected = {
+        LIB / "releases": "root 755",
+        LIB / "releases/1": "root 755",
+        LIB / "releases/1/deploy/web/update.sh": "root 755",
+        Path("/etc/ccs/known_hosts"): "root 644",
+    }
+    assert {path: ownership(path) for path in expected} == expected
+
+
+def test_the_push_key_stays_root_only_and_no_push_user_is_made(installed_backend):
+    assert ownership(PUSH_KEY) == "root 600"
+    run("id", "ccs-push", ok=False)
+
+
+def test_the_keyrings_are_made_readable_by_the_services(installed_backend):
+    names = ("release-signers.gpg", "address-signers.gpg")
+    expected = {Path("/etc/ccs", name): "root 644" for name in names}
+    assert {path: ownership(path) for path in expected} == expected
+
+
+def test_the_web_servers_host_key_is_recorded_and_its_fingerprint_shown(
+    installed_backend, backend_install
+):
+    host_key = Path("/etc/ssh/ssh_host_ed25519_key.pub")
+    recorded = Path("/etc/ccs/known_hosts").read_text().split()
+    assert recorded[1:3] == host_key.read_text().split()[:2]
+    fingerprint = run("ssh-keygen", "-lf", host_key).stdout.split()[1]
+    assert fingerprint in backend_install.stdout
+
+
+def test_the_values_path_watches_ccs_backs_json(installed_backend):
+    expected = f"[Path]\nPathChanged=\nPathChanged={CCS_BACK}/proposals.json\n"
+    assert (UNITS / "ccs-values.path.d/path.conf").read_text() == expected
+
+
+def test_the_backend_units_are_installed_each_service_with_the_sandbox(
+    installed_backend,
+):
+    deploy = LIB / "releases/1/deploy"
+    units = ["ccs-values.service", "ccs-values.path", "ccs-push.service"]
+    units += ["ccs-monitor.service", "ccs-monitor.timer"]
+    installed = {UNITS / unit: deploy / "backend" / unit for unit in units}
+    for service in ("ccs-values", "ccs-push", "ccs-monitor"):
+        installed[UNITS / f"{service}.service.d/sandbox.conf"] = deploy / "sandbox.conf"
+    assert differing(installed) == []
+    assert not (UNITS / "ccs-.service.d").exists()
+
+
+def test_the_backend_prints_the_files_still_to_place_and_the_web_servers_command(
+    installed_backend, backend_install
+):
+    lines = backend_install.stdout.splitlines()
+    assert "Still to place by hand: /etc/ccs/addresses.txt" in lines
+    assert f"  install.sh web site-v1 <backend IP address> '{push_key()}'" in lines
