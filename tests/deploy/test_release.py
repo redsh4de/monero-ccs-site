@@ -150,7 +150,8 @@ def digests(archive: Path, folder: str) -> dict[str, str]:
 def repo(tmp_path_factory) -> Path:
     """Return a clone of the repo, tagged with the releases the tests build.
 
-    site-v1 holds the working tree's deploy/, which is the code under test.
+    site-v1 holds the working tree's deploy/, which is the code under test. A
+    file a tag edits is also in release.yml's paths, so a change to it runs this.
     """
     repo = tmp_path_factory.mktemp("repo")
     run("git", "clone", "-q", "--no-tags", "--no-hardlinks", REPO, repo)
