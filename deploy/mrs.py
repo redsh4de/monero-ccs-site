@@ -92,7 +92,6 @@ def cached_files(api: str, iid: int, path: Path) -> list[str] | None:
 
 
 def main(argv: list[str]) -> int:
-    """Write the open merge requests and their files, and return the exit status."""
     if len(argv) != 3:
         print(__doc__, file=sys.stderr, end="")
         return 2

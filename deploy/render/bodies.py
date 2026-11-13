@@ -6,7 +6,8 @@ links) plus footnotes. On the way, the token stream is narrowed:
 - table alignment becomes a class, since the CSP blocks inline styles;
 - images become links, since inline images from other hosts would leak every
   visitor's IP;
-- raw HTML is escaped, comments dropped, and only six tags turned back;
+- raw HTML is escaped, comments dropped, and only details, summary and sup
+  turned back;
 - any block whose text or links hold an address-like run is replaced, and any
   link title, which would show on hover, is dropped.
 """

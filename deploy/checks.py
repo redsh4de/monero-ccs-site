@@ -486,7 +486,6 @@ def install_release(folder: str, keyring: str, version: int, dest: str) -> None:
 
 
 def main(argv: list[str]) -> int:
-    """Run one command and return its exit status."""
     try:
         match argv:
             case ["values", path, applied, list_path]:

@@ -2,7 +2,7 @@
 
 Usage: render.py <input-dir> <templates-dir> <out-dir> [<cache-dir>]
 
-  <input-dir>      the render's input, as inputs.py describes it
+  <input-dir>      the render's input, as render/README.md describes it
   <templates-dir>  the Jinja templates, dist/templates in a release
   <out-dir>        where the pages go
   <cache-dir>      optional: rendered proposal bodies, kept between runs

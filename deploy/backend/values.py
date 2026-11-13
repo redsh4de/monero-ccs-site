@@ -100,7 +100,6 @@ def gitlab_line(commit: str, groups: list) -> str:
 
 
 def main(argv: list[str]) -> int:
-    """Write the values, and return the exit status."""
     if len(argv) != 1:
         print("usage: values.py <file>", file=sys.stderr)
         return 2

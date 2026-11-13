@@ -4,7 +4,7 @@ import re
 
 import pytest
 
-from scripts import DEPLOY, REPO
+from scripts import CHECKS, DEPLOY, REPO
 
 DOCS = sorted(DEPLOY.rglob("*.md"))
 IDS = [str(doc.relative_to(DEPLOY)) for doc in DOCS]
@@ -70,10 +70,9 @@ def test_the_docs_name_every_alert_the_scripts_raise_and_every_checks_py_command
     )
     assert alerts, "no alert names found in the scripts"
     docs = "\n".join(doc.read_text() for doc in DOCS)
-    commands = [
-        f"checks.py {name}"
-        for name in ("values", "addresses", "apply", "status", "release")
-    ]
+    names = re.findall(r'case \["([a-z]+)"', CHECKS.read_text())
+    assert names, "no commands found in checks.py"
+    commands = [f"checks.py {name}" for name in names]
     unnamed = [
         name for name in [*sorted(alerts), "page-", *commands] if f"`{name}" not in docs
     ]

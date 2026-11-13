@@ -12,6 +12,7 @@ on:
       - deploy/checks.py
       - deploy/render/safety.py
       - deploy/render/qr.py
+      - deploy/build-hosts
       - package.json
       - pnpm-lock.yaml
       - tests/deploy/test_release.py
@@ -19,9 +20,17 @@ on:
       - tests/deploy/scripts.py
       - tests/deploy/signing.py
       - tests/deploy/fake_server.py
+      - tests/deploy/web.py
+      - tests/deploy/fetching.py
       - tests/deploy/run.sh
       - tests/deploy/Containerfile
       - .github/workflows/release.yml
+      # the files the test's tags edit
+      - astro.config.mjs
+      - src/layouts/Layout.astro
+      - src/styles/global.css
+      - deploy/web/ccs-update.service
+      - deploy/README.md
 
 permissions:
   contents: read
