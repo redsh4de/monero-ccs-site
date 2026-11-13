@@ -24,14 +24,26 @@ from signing import publish
 from web import lay_out
 
 USAGE = "usage: install.sh"
+INSTALL = (DEPLOY / "install.sh").read_text()
+
+
+def test_a_push_holds_one_byte_more_than_the_values_cap():
+    checks = (DEPLOY / "checks.py").read_text()
+    cap = int(re.search(r"^VALUES_CAP = ([0-9_]+)$", checks, re.M)[1])
+    assert f"head -c {cap + 1} " in INSTALL
+
+
+def test_fetch_deletes_the_temporary_files_that_a_push_makes():
+    made = re.search(r"mktemp /var/lib/ccs/in/values\.(X+)\)", INSTALL)[1]
+    fetch = (DEPLOY / "web/fetch.sh").read_text()
+    assert f"-name 'values.{'?' * len(made)}' " in fetch
 
 
 def test_install_names_every_package_of_the_render_image():
     image = (REPO / "dev/Containerfile.render").read_text()
     packages = re.findall(r"python3-[a-z0-9-]+", image)
-    installed = (DEPLOY / "install.sh").read_text().split()
     assert packages
-    assert [name for name in packages if name not in installed] == []
+    assert [name for name in packages if name not in INSTALL.split()] == []
 
 
 BACKEND = ("backend", "site-v1", "127.0.0.1", CCS_BACK)

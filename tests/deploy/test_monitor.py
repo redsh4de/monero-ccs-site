@@ -8,7 +8,7 @@ import pytest
 from fetching import git
 from monitoring import ALWAYS, ETC, VALUES, Monitored, SiteServer, page
 from scripts import replaced
-from web import B, C
+from web import DIST, B, C
 
 
 @pytest.fixture(scope="module")
@@ -80,6 +80,12 @@ def test_the_fixed_always_checked_pages_alert_in_one_message(monitored):
     monitored.monitor()
     posts = [sorted(post.split("|")) for post in monitored.server.alerts()]
     assert posts == [sorted(differs(path) for path in ALWAYS)]
+
+
+def test_every_page_with_a_template_of_its_own_is_always_checked():
+    templates = {path.stem for path in (DIST / "templates").glob("*.html")}
+    pages = {f"{name}/index.html" for name in templates - {"home", "proposal"}}
+    assert pages and pages <= set(ALWAYS)
 
 
 def test_values_unlike_the_backends_show_in_the_projects_page(monitored):
