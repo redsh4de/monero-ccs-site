@@ -1,6 +1,7 @@
 """install.sh: both roles, the push, upgrades, and the releases it refuses."""
 
 import filecmp
+import os
 from pathlib import Path
 from subprocess import CompletedProcess
 
@@ -222,3 +223,163 @@ def test_the_backend_prints_the_files_still_to_place_and_the_web_servers_command
     lines = backend_install.stdout.splitlines()
     assert "Still to place by hand: /etc/ccs/addresses.txt" in lines
     assert f"  install.sh web site-v1 <backend IP address> '{push_key()}'" in lines
+
+
+AUTHORIZED_KEYS = Path("/home/ccs-fetch/.ssh/authorized_keys")
+PASSWORDS = (
+    "sshd may take passwords: turn PasswordAuthentication and"
+    " KbdInteractiveAuthentication off in /etc/ssh/sshd_config.d/, reload ssh,"
+    " then run this again"
+)
+
+
+def test_an_sshd_that_takes_passwords_stops_the_web_install(installed_backend):
+    args = ("web", "site-v1", "127.0.0.1", push_key())
+    installed_backend.refuses(*args, reason=PASSWORDS, first=True)
+
+
+def test_the_web_install_leaves_sshds_config_as_it_was(installed_web):
+    assert os.listdir(SSHD_CONFIG) == ["50-admin.conf"]
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        pytest.param(
+            "KbdInteractiveAuthentication yes\n"
+            "AuthenticationMethods publickey,keyboard-interactive\n",
+            id="a key and a second factor",
+        ),
+        pytest.param(
+            "AuthenticationMethods publickey password\n",
+            id="both password methods off",
+        ),
+    ],
+)
+def test_an_sshd_that_takes_only_keys_passes_the_web_install(installed_web, config):
+    (SSHD_CONFIG / "40-totp.conf").write_text(config)
+    installed_web.install("web", "site-v1")
+
+
+@pytest.mark.parametrize(
+    "config, reason",
+    [
+        pytest.param(
+            "PasswordAuthentication yes\nAuthenticationMethods publickey password\n",
+            PASSWORDS,
+            id="a method list without a key",
+        ),
+        pytest.param(
+            "KbdInteractiveAuthentication yes\n",
+            PASSWORDS,
+            id="keyboard-interactive, which takes passwords through PAM",
+        ),
+        pytest.param("NoSuchOption yes\n", "NoSuchOption", id="a config sshd refuses"),
+    ],
+)
+def test_an_sshd_that_may_take_passwords_stops_the_web_install(
+    installed_web, config, reason
+):
+    (SSHD_CONFIG / "40-totp.conf").write_text(config)
+    installed_web.refuses("web", "site-v1", reason=reason)
+
+
+def test_the_web_users_are_made_as_sysusers_conf_declares(installed_web):
+    shell = run("getent", "passwd", "ccs-fetch").stdout.strip().split(":")[6]
+    assert shell == "/bin/sh"
+    expiry = run("getent", "shadow", "ccs-update").stdout.split(":")[7]
+    assert expiry != "", "ccs-update's account has no expiry date, so it is not locked"
+
+
+def test_the_web_folders_are_made_and_a_changed_mode_is_put_back(installed_web):
+    ccs = Path("/var/lib/ccs")
+    expected = {
+        ccs: "ccs-update 755",
+        ccs / "in": "ccs-fetch 755",
+        ccs / "fetch": "ccs-fetch 755",
+        Path("/home/ccs-fetch"): "root 755",
+        Path("/home/ccs-fetch/.ssh"): "root 755",
+    }
+    assert {path: ownership(path) for path in expected} == expected
+    assert Path("/var/lib/systemd/linger/ccs-fetch").exists()
+    (ccs / "in").chmod(0o700)
+    run("systemd-tmpfiles", "--create", "/etc/tmpfiles.d/ccs-web.conf")
+    assert ownership(ccs / "in") == "ccs-fetch 755"
+
+
+def test_authorized_keys_is_roots_and_holds_only_the_backends_key(installed_web):
+    assert ownership(AUTHORIZED_KEYS) == "root 644"
+    lines = AUTHORIZED_KEYS.read_text().splitlines()
+    assert len(lines) == 1, lines
+    assert lines[0].endswith(f" {push_key()}")
+
+
+def test_the_web_units_and_nginx_site_are_installed_each_service_with_the_sandbox(
+    installed_web,
+):
+    deploy = LIB / "releases/1/deploy"
+    units = ["ccs-fetch.service", "ccs-fetch.path", "ccs-fetch.timer"]
+    units += ["ccs-update.service"]
+    installed = {UNITS / unit: deploy / "web" / unit for unit in units}
+    for service in ("ccs-fetch", "ccs-update"):
+        installed[UNITS / f"{service}.service.d/sandbox.conf"] = deploy / "sandbox.conf"
+    installed[Path("/etc/nginx/sites-enabled/ccs.conf")] = deploy / "web/nginx.conf"
+    nginx_sandbox = UNITS / "nginx.service.d/ccs-sandbox.conf"
+    installed[nginx_sandbox] = deploy / "web/nginx-sandbox.conf"
+    assert differing(installed) == []
+    assert os.listdir("/etc/nginx/sites-enabled") == ["ccs.conf"]
+
+
+def test_a_push_from_the_backend_replaces_the_values(installed_web):
+    PUSHED.unlink()
+    text = values()
+    installed_web.push(text)
+    assert PUSHED.read_text() == text
+    assert ownership(PUSHED) == "ccs-fetch 644"
+
+
+def test_the_push_key_runs_nothing_but_the_values_write(installed_web):
+    assert "root:" not in installed_web.push("", "cat", "/etc/passwd").stdout
+
+
+def test_the_push_key_works_only_from_the_backends_address(installed_web):
+    logged = installed_web.sshd_log.read_text()
+    installed_web.push("pushed\n", source="127.0.0.2", ok=False)
+    refusal = installed_web.sshd_log.read_text().removeprefix(logged)
+    assert "with correct key but not from a permitted host" in refusal
+    assert PUSHED.read_text() == installed_web.saved("web", PUSHED)
+
+
+@pytest.mark.parametrize(
+    "address, key, reason",
+    [
+        pytest.param(
+            "127.0.0.1",
+            'ssh-ed25519 AAAA" evil',
+            "the push key must be the one line",
+            id="a key with a quote",
+        ),
+        pytest.param(
+            "127.0.0.1",
+            "{key}\n{key}",
+            "the push key must be the one line",
+            id="a key with a second line",
+        ),
+        pytest.param("1.2.3.4 x", "{key}", USAGE, id="an address with a space"),
+        pytest.param(
+            "127.0.0.1\n10.0.0.1", "{key}", USAGE, id="an address with a second line"
+        ),
+        pytest.param(
+            "backend.example",
+            "{key}",
+            USAGE,
+            id="a host name, which sshd's from= never matches",
+        ),
+    ],
+)
+def test_a_malformed_push_key_or_address_is_refused(
+    installed_web, address, key, reason
+):
+    key = key.format(key=push_key())
+    installed_web.refuses("web", "site-v1", address, key, reason=reason)
+    assert AUTHORIZED_KEYS.read_text() == installed_web.saved("web", AUTHORIZED_KEYS)
