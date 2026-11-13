@@ -37,7 +37,8 @@ sh tests/deploy/run.sh 'tests/deploy/test_update.py::test_a_bad_values_line_keep
 - Put the test in the file for the script that it tests, such as `test_update.py` for
   `deploy/web/update.sh`.
 - Take the setup from the fixtures in `conftest.py`. For example, `rendered` gives a web
-  server that has rendered the site once. Do not copy setup into a test file.
+  server that has rendered the site once. A file can also have its own fixtures, such as
+  `monitored` in `test_monitor.py`. Do not copy setup into a test file.
 - Test one guarantee, and name the test after it.
 - Change example data or a template only through `replaced()`. When the data changes
   later, the test then fails with its own message, and does not blame the script.
@@ -51,7 +52,7 @@ podman run --rm --network=none -v "$PWD:/w:ro,z" \
   python3 -B -m pytest -c tests/deploy/pytest.ini tests/deploy/test_update.py
 ```
 
-The shared setup is in six files:
+The shared setup is in seven files:
 
 | File | Holds |
 |---|---|
@@ -60,6 +61,7 @@ The shared setup is in six files:
 | `web.py` | A web server's folders and actions, as `update.sh` sees them |
 | `fetching.py` | `fetch.sh`'s folders, and a proposals repository for it to fetch |
 | `fake_server.py` | A fake GitLab and alert channel, in the test's own process |
+| `monitoring.py` | A site for the monitor to check, built once for each test file and copied for each test |
 | `conftest.py` | The fixtures that the tests ask for |
 
 A test that needs a package the image lacks adds it to `Containerfile`.
