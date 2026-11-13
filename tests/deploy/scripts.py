@@ -87,6 +87,14 @@ def lib_sh(
     return run("sh", "-c", f"{lib}; {snippet}", "sh", *args, ok=ok, env=env)
 
 
+def stand_in(folder: Path, name: str, script: str) -> str:
+    """Write a stand-in for a command into folder; return a PATH that finds it first."""
+    folder.mkdir(exist_ok=True)
+    (folder / name).write_text(script)
+    (folder / name).chmod(0o755)
+    return f"{folder}:{os.environ['PATH']}"
+
+
 def tail(text: str) -> str:
     return "\n".join(text.splitlines()[-TAIL:])
 

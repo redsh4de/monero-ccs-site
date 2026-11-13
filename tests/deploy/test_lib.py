@@ -5,7 +5,7 @@ import os
 import pytest
 
 from fetching import merge, new_repository
-from scripts import lib_sh, run
+from scripts import lib_sh, run, stand_in
 
 
 @pytest.fixture
@@ -141,13 +141,8 @@ def test_alert_and_alerts_send_leave_the_callers_variables_alone(alerts):
 
 
 def test_the_alert_url_reaches_curl_on_stdin_never_in_its_arguments(alerts, tmp_path):
-    stand_ins = tmp_path / "bin"
-    stand_ins.mkdir()
-    (stand_ins / "curl").write_text(
-        f'#!/bin/sh\nprintf "%s\\n" "$@" >{tmp_path}/args\ncat >{tmp_path}/stdin\n'
-    )
-    (stand_ins / "curl").chmod(0o755)
-    env = {**alerts.env, "PATH": f"{stand_ins}:{os.environ['PATH']}"}
+    script = f'#!/bin/sh\nprintf "%s\\n" "$@" >{tmp_path}/args\ncat >{tmp_path}/stdin\n'
+    env = {**alerts.env, "PATH": stand_in(tmp_path / "bin", "curl", script)}
     queued = "NOW=1; alerts_begin; alert x 1 0 9999 @/etc/hostname; alerts_send"
     lib_sh(queued, env=env)
     arguments = (tmp_path / "args").read_text().splitlines()

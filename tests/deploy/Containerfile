@@ -3,4 +3,5 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends gpgv gpg gpg-agent rsync \
     python3-yaml python3-markdown-it python3-mdit-py-plugins python3-jinja2 \
     git curl nginx openssl systemd openssh-client python3-pytest \
+    openssh-server tor libnss-systemd ca-certificates \
   && rm -rf /var/lib/apt/lists/*

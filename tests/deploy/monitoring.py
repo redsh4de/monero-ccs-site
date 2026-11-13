@@ -11,8 +11,8 @@ from urllib.parse import unquote, urlsplit
 
 from fake_server import FakeServer
 from fetching import Fetcher
-from scripts import EXAMPLE, REPO, replaced, run
-from signing import RELEASE_SIGNERS, Keys, write_list
+from scripts import EXAMPLE, replaced, run
+from signing import RELEASE_SIGNERS, Keys, publish, write_list
 from web import A, B
 
 ETC = Path("/etc/ccs")
@@ -117,13 +117,7 @@ class Monitored:
 
     def publish_release(self, keys: Keys) -> None:
         """Publish release 1 of this repo, signed, and install it."""
-        folder = self.root / "releases/download/site-v1"
-        folder.mkdir(parents=True)
-        tar = folder / "ccs-site-v1.tar"
-        run("tar", "-cf", tar, "--exclude=__pycache__", "-C", REPO, "dist", "deploy")
-        digest = hashlib.sha256(tar.read_bytes()).hexdigest()
-        (folder / "SHA256SUMS").write_text(f"{digest}  {tar.name}\n")
-        keys.sign(folder / "SHA256SUMS", *RELEASE_SIGNERS)
+        tar = publish(self.root / "releases", 1, keys)
         shutil.unpack_archive(tar, self.release(1), filter="tar")
 
     def copy(self, root: Path, server: FakeServer) -> "Monitored":

@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from scripts import DEPLOY, EXAMPLE, run
+from scripts import DEPLOY, EXAMPLE, run, stand_in
 
 
 @pytest.fixture
@@ -149,15 +149,12 @@ def test_one_500_is_retried(fetched):
 
 
 def test_a_failed_git_rev_parse_fails_the_fetch(fetched, tmp_path):
-    stand_ins = tmp_path / "bin"
-    stand_ins.mkdir()
-    (stand_ins / "git").write_text(
+    script = (
         '#!/bin/sh\ncase "$*" in *rev-parse*) exit 1 ;; esac\nexec /usr/bin/git "$@"\n'
     )
-    (stand_ins / "git").chmod(0o755)
     links = fetched.links()
     fetched.values(30)
-    failed = fetched.fetch(ok=False, PATH=f"{stand_ins}:{os.environ['PATH']}")
+    failed = fetched.fetch(ok=False, PATH=stand_in(tmp_path / "bin", "git", script))
     assert "fetch: content failed" in failed.stderr
     assert fetched.links() == links
 
