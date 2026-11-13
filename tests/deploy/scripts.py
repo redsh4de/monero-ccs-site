@@ -64,13 +64,18 @@ def fail(command: list[str], headline: str, stdout: str, stderr: str) -> None:
     )
 
 
-def refuses(*cmd: str | Path, reason: str, **options) -> None:
+def refuses(
+    *cmd: str | Path, reason: str, **options
+) -> subprocess.CompletedProcess[str]:
     """Run a command that must refuse, and check that it says why, not crash.
 
-    options go to run(), such as env.
+    options go to run(), such as env. Return the run, as run() does.
     """
-    stderr = run(*cmd, ok=False, **options).stderr
-    assert reason in stderr, f"expected {reason!r} on stderr, got:\n{stderr}"
+    result = run(*cmd, ok=False, **options)
+    assert (
+        reason in result.stderr
+    ), f"expected {reason!r} on stderr, got:\n{result.stderr}"
+    return result
 
 
 def lib_sh(

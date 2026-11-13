@@ -2,7 +2,7 @@
 
 These tests run the scripts in `deploy/` as the servers run them, and check what each one
 guarantees. Each test file runs in a fresh Debian 13 container, with the repository
-read-only and no network.
+read-only and, except for `test_release.py`, no network.
 
 ## Run them
 
@@ -10,8 +10,8 @@ read-only and no network.
 pnpm test:deploy
 ```
 
-This builds the site with pnpm and Node, then runs every test file in podman. To run one
-file, or one test:
+This builds the site with pnpm and Node, then runs every test file but `test_release.py`
+in podman. To run one file, or one test:
 
 ```sh
 sh tests/deploy/run.sh tests/deploy/test_update.py
@@ -25,6 +25,17 @@ sh tests/deploy/run.sh 'tests/deploy/test_update.py::test_a_bad_values_line_keep
 in its own sandbox. When systemd does not boot, the file is skipped, and in CI it fails.
 The reason given says what to fix.
 
+`test_release.py` runs `release.sh`, which builds the site in podman. So the file runs in a
+privileged container that has the network and a podman of its own. Each run downloads
+pnpm, two build images and the site's packages, and takes about 5 minutes. Run it by name:
+
+```sh
+sh tests/deploy/run.sh tests/deploy/test_release.py
+```
+
+CI runs it each Monday, and on each pull request that changes `release.sh` or a file it
+uses. `.github/workflows/release.yml` lists these files.
+
 ## Read a failure
 
 1. The test's name states the guarantee that broke, such as
@@ -33,7 +44,8 @@ The reason given says what to fix.
    shows the command, the exit status and the last 40 lines of its output.
 3. A test can also fail on a later check, after its scripts ran as expected. Then each
    run shows under "Captured stdout": the command, its exit status and its output.
-   A failure about a systemd unit also shows the end of the unit's journal.
+   A failure about a systemd unit also shows the end of the unit's journal. A failure
+   about a `release.sh` run shows the end of what it said, without the review.
 4. Open the script that the command names. Its output usually names the check that
    refused, such as `values: a line doesn't match`.
 

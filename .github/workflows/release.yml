@@ -1,0 +1,37 @@
+name: release
+
+# release.sh builds the site about eight times here, which takes too long for
+# every pull request
+on:
+  schedule:
+    - cron: "0 5 * * 1"
+  pull_request:
+    paths:
+      - deploy/release.sh
+      - deploy/lib.sh
+      - deploy/checks.py
+      - deploy/render/safety.py
+      - deploy/render/qr.py
+      - package.json
+      - pnpm-lock.yaml
+      - tests/deploy/test_release.py
+      - tests/deploy/conftest.py
+      - tests/deploy/scripts.py
+      - tests/deploy/signing.py
+      - tests/deploy/fake_server.py
+      - tests/deploy/run.sh
+      - tests/deploy/Containerfile
+      - .github/workflows/release.yml
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: sh tests/deploy/run.sh tests/deploy/test_release.py

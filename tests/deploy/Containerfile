@@ -4,4 +4,5 @@ RUN apt-get update \
     python3-yaml python3-markdown-it python3-mdit-py-plugins python3-jinja2 \
     git curl nginx openssl systemd openssh-client python3-pytest \
     openssh-server tor libnss-systemd ca-certificates \
+    podman fuse-overlayfs nftables less \
   && rm -rf /var/lib/apt/lists/*
