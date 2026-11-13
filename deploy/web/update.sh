@@ -48,8 +48,7 @@ link_inputs() {
   local mr="$2"
 
   ln -s -- "$repo/proposals" "$WORK_DIR/in/proposals"
-  ln -s -- "$mr/open.json" "$mr/open.tsv" "$repo/mr/merged.tsv" \
-    "$WORK_DIR/in/mr/"
+  ln -s -- "$mr/open.json" "$repo/mr/merged.tsv" "$WORK_DIR/in/mr/"
 }
 
 # render_site <commit>: renders the site into WORK_DIR/out, with its

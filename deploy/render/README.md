@@ -13,8 +13,7 @@ The cache folder is optional, and speeds up later renders. The input folder hold
 | Path             | Contents                                                    | Source                   |
 | :--------------- | :---------------------------------------------------------- | :----------------------- |
 | `proposals/*.md` | The proposal files                                          | ccs-proposals repository |
-| `mr/open.json`   | The open merge requests                                     | GitLab API               |
-| `mr/open.tsv`    | The files that open merge requests add                      | GitLab API               |
+| `mr/open.json`   | The open merge requests, with the files that each one adds  | GitLab API               |
 | `mr/merged.tsv`  | The merge request that added each file                      | ccs-proposals history    |
 | `values`         | Amounts raised, contributions and addresses                 | Backend                  |
 | `addresses`      | The verified address list, with each address's QR code      | Address list             |

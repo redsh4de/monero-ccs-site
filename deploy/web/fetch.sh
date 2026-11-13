@@ -114,8 +114,7 @@ fetch_merge_requests() {
   rm -rf -- "$new" || return 1
   mkdir -- "$new" || return 1
   "$DEPLOY/mrs.py" "$GITLAB_API" "$new" "$FETCH_DIR/changes" || return 1
-  hash=$(cat -- "$new/open.json" "$new/open.tsv" | sha256sum | cut -c1-16) \
-    || return 1
+  hash=$(sha256sum <"$new/open.json" | cut -c1-16) || return 1
 
   set="$FETCH_DIR/mr-$hash"
   if [ ! -d "$set" ]; then
