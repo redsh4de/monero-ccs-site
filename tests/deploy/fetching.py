@@ -1,6 +1,5 @@
 """fetch.sh's folders, the proposals repository it fetches, and its actions."""
 
-import json
 import os
 import shutil
 import time
@@ -59,17 +58,12 @@ class Fetcher:
             "CREDENTIALS_DIRECTORY": str(server.credentials),
         }
         self.mrs(3)
-        self.changes(3, [("idea.md", True), ("old.md", False)])
+        server.changes(3, [("idea.md", True), ("old.md", False)])
 
     def mrs(self, count: int) -> None:
         """Open merge requests count down to 1, newest first."""
         mrs = [{"iid": iid, "sha": f"{iid:040d}"} for iid in range(count, 0, -1)]
-        (self.server.state / "mrs.json").write_text(json.dumps(mrs))
-
-    def changes(self, iid: int, files: list[tuple[str, bool]]) -> None:
-        diffs = [{"new_path": path, "new_file": new} for path, new in files]
-        path = self.server.state / "changes" / f"{iid}.json"
-        path.write_text(json.dumps({"changes": diffs}))
+        self.server.set_merge_requests(mrs)
 
     def values(self, gitlab: int) -> None:
         """Push values whose gitlab line is this number, written now."""

@@ -163,7 +163,7 @@ def test_gitlab_not_answering_leaves_the_merge_requests_unverified(monitored):
 
 
 def test_a_verified_set_is_asked_about_again_only_an_hour_on(monitored):
-    (monitored.server.state / "mrs.json").write_text("[]")
+    monitored.server.set_merge_requests([])
     monitored.monitor()
     assert monitored.server.calls("merge_requests") == 0
     monitored.forget_verification()

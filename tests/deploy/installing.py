@@ -10,7 +10,8 @@ from pathlib import Path
 from subprocess import CompletedProcess
 
 from scripts import DEPLOY, EXAMPLE, REPO, refuses, run, stand_in
-from signing import RELEASE_SIGNERS, Keys, publish
+from signing import Keys, place_keyrings, publish
+from web import as_pushed
 
 LIB = Path("/usr/local/lib/ccs")
 CCS_BACK = Path("/srv/ccs-back/storage/app")
@@ -33,8 +34,7 @@ exec runuser -u ccs-update -- /usr/local/lib/ccs/current/deploy/web/update.sh
 
 def values() -> str:
     """Return the example values as the backend pushes them, written now."""
-    text = (EXAMPLE / "values").read_text()
-    return text + f"gitlab sha256={'0' * 64}\nupdated {int(time.time())}\n"
+    return as_pushed((EXAMPLE / "values").read_text(), int(time.time()))
 
 
 def push_key() -> str:
@@ -71,8 +71,8 @@ class Machine:
         CCS_BACK.mkdir(parents=True)
         etc = Path("/etc/ccs")
         etc.mkdir()
-        keys.keyring(etc / "release-signers.gpg", *RELEASE_SIGNERS).chmod(0o600)
-        keys.keyring(etc / "address-signers.gpg", "addresser").chmod(0o600)
+        for keyring in place_keyrings(etc, keys):
+            keyring.chmod(0o600)
         self.publish(1)
 
     def publish(self, version: int, edit: Callable[[Path], None] | None = None) -> Path:

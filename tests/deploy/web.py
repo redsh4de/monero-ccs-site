@@ -21,6 +21,11 @@ B = "8" + "B" * 94
 C = "8" + "C" * 94
 
 
+def as_pushed(text: str, updated: int) -> str:
+    """Return the values with the lines that the backend's push ends them with."""
+    return text + f"gitlab sha256={'0' * 64}\nupdated {updated}\n"
+
+
 def lay_out(ccs: Path) -> None:
     """Lay out in ccs what fetch.sh leaves: the example proposals and merge requests."""
     tree = ccs / "fetch/trees" / COMMIT
@@ -64,7 +69,7 @@ class WebServer:
             "proposal example-funding raised=10 ",
             f"proposal example-funding raised={raised} ",
         )
-        text += f"gitlab sha256={'0' * 64}\nupdated {self.pushed}\n"
+        text = as_pushed(text, self.pushed)
         (self.ccs / "in/values").write_text(edit(text) if edit else text)
 
     def update(self, ok: bool = True, **env: str) -> CompletedProcess[str]:

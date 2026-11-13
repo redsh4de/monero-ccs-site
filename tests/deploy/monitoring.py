@@ -12,8 +12,8 @@ from urllib.parse import unquote, urlsplit
 from fake_server import FakeServer
 from fetching import Fetcher
 from scripts import EXAMPLE, replaced, run
-from signing import RELEASE_SIGNERS, Keys, publish, write_list
-from web import A, B
+from signing import Keys, place_keyrings, publish, write_list
+from web import A, B, as_pushed
 
 ETC = Path("/etc/ccs")
 VALUES = Path("/var/lib/ccs-backend/values")
@@ -80,8 +80,7 @@ class Monitored:
 
         shutil.rmtree(ETC, ignore_errors=True)
         ETC.mkdir()
-        keys.keyring(ETC / "release-signers.gpg", *RELEASE_SIGNERS)
-        keys.keyring(ETC / "address-signers.gpg", "addresser")
+        place_keyrings(ETC, keys)
         write_list(ETC / "addresses.txt", [A, B], keys)
         shutil.copytree(ETC, root / "etc")
         # as live, every proposal that takes donations has a listed address
@@ -90,7 +89,7 @@ class Monitored:
             "proposal example-no-address raised=0 contributions=0 address=-\n",
             f"proposal example-no-address raised=0 contributions=0 address={B}\n",
         )
-        values += f"gitlab sha256={'0' * 64}\nupdated {int(time.time())}\n"
+        values = as_pushed(values, int(time.time()))
         VALUES.parent.mkdir(parents=True, exist_ok=True)
         for path in (VALUES, root / "values", fetcher.ccs / "in/values"):
             path.write_text(values)
@@ -183,12 +182,10 @@ def publish_merge_requests(server: FakeServer) -> None:
     """Give the fake GitLab the example's open merge requests."""
     merge_requests = json.loads((EXAMPLE / "mr/open.json").read_text())
     for mr in merge_requests:
-        diffs = [{"new_path": name, "new_file": True} for name in mr.pop("adds")]
-        path = server.state / "changes" / f"{mr['iid']}.json"
-        path.write_text(json.dumps({"changes": diffs}))
+        server.changes(mr["iid"], [(name, True) for name in mr.pop("adds")])
         mr["author"] = {"username": mr["author"]}
         mr["sha"] = str(mr["iid"]) * 40
-    (server.state / "mrs.json").write_text(json.dumps(merge_requests))
+    server.set_merge_requests(merge_requests)
 
 
 def page(path: str) -> str:
