@@ -19,5 +19,5 @@ The cache folder is optional, and speeds up later renders. The input folder hold
 | `addresses`      | The verified address list, with each address's QR code      | Address list             |
 | `site`           | The address the site is served at, for the feed's links     | `SITE` in the config     |
 
-The render needs Python 3 and the Debian 13 packages in `deploy/Containerfile.render`.
+The render needs Python 3 and the Debian 13 packages in `dev/Containerfile.render`.
 `pnpm render` runs the render in that image, so a preview uses production's versions.

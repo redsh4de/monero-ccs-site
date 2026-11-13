@@ -1,7 +1,6 @@
-FROM docker.io/library/debian:trixie-20261020@sha256:4c25275446ca371766b8b093c696782eabce06263fccacb8d5d813b3dc44b308
+FROM localhost/ccs-render
 RUN apt-get update \
   && apt-get install -y --no-install-recommends gpgv gpg gpg-agent rsync \
-    python3-yaml python3-markdown-it python3-mdit-py-plugins python3-jinja2 \
     git curl nginx openssl systemd openssh-client python3-pytest \
     openssh-server tor libnss-systemd ca-certificates \
     podman fuse-overlayfs nftables less \
