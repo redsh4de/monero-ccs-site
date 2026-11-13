@@ -12,7 +12,7 @@ from fake_server import FakeServer
 from fetching import Fetcher
 from installing import CCS_BACK, LIB, PUSH_KEY, make_certificate, push_key
 from monitoring import publish_merge_requests
-from scripts import DEPLOY, TAIL, run
+from scripts import DEPLOY, TAIL, refuses, run
 from signing import RELEASE_SIGNERS, publish, write_list
 from web import A, B, C
 
@@ -64,6 +64,14 @@ def outcomes(since: int) -> dict[str, str]:
         started = int(properties["ExecMainStartTimestampMonotonic"])
         found[unit] = properties["Result"] if started > since else "no run since"
     return found
+
+
+def nginx_pid() -> str:
+    return systemctl("show", "-P", "MainPID", "nginx").strip()
+
+
+def text(path: str | Path) -> str:
+    return Path(path).read_text().strip() if os.path.exists(path) else "no such file"
 
 
 @pytest.fixture(scope="module")
@@ -173,3 +181,44 @@ def test_status_json_names_the_installed_release(pushed):
 
 def test_the_push_lands_as_in_values_and_nowhere_else(pushed):
     assert set(os.listdir("/var/lib/ccs/in")) == {"mr", "repo", "values"}
+
+
+def test_nginxs_pid_file_is_in_its_own_run_and_linked_for_log_rotation(installed):
+    files = ["/run/nginx.pid", "/run/nginx/nginx.pid"]
+    assert {path: text(path) for path in files} == dict.fromkeys(files, nginx_pid())
+
+
+@pytest.mark.parametrize(
+    "command, reason",
+    [
+        pytest.param(
+            ("ls", "/run/systemd/private"),
+            "No such file or directory",
+            id="systemd's socket",
+        ),
+        pytest.param(
+            ("touch", "/var/lib/ccs/x"),
+            "Read-only file system",
+            id="a write to the site",
+        ),
+    ],
+)
+def test_nginxs_sandbox_refuses(installed, command, reason):
+    refuses("nsenter", "-t", nginx_pid(), "-m", *command, reason=reason)
+
+
+@pytest.mark.parametrize("action", ["reload", "restart"])
+def test_nginx_still_serves_after_a(pushed, action):
+    systemctl(action, "nginx")
+    assert get("index.html")[0] == 200
+
+
+def test_log_rotations_signal_makes_nginx_start_a_new_log(installed):
+    log = Path("/var/log/nginx/access.log")
+    log.rename(log.with_name("access.log.1"))
+    run("/etc/init.d/nginx", "rotate", env={"_SYSTEMCTL_SKIP_REDIRECT": "1"})
+    deadline = time.monotonic() + 5
+    while text(log) in ("", "no such file") and time.monotonic() < deadline:
+        get("index.html")
+        time.sleep(0.2)
+    assert text(log) not in ("", "no such file"), "nginx wrote no new access.log"
