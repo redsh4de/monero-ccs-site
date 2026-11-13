@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from fake_server import FakeServer
-from scripts import CHECKS, REPO, refuses, replaced, run, tail
+from scripts import CHECKS, REPO, refuses, replaced, run, stand_in, tail
 from signing import RELEASE_SIGNERS, Keys, publish
 
 CAP_SYS_ADMIN = 21
@@ -457,3 +457,105 @@ def test_deploy_in_the_archive_is_the_tags_own_even_when_the_build_writes_to_it(
 
 def test_the_review_lists_a_package_the_tag_added(third):
     assert "  + planted-package@1.0.0" in third.review.splitlines()
+
+
+def test_a_build_that_differs_from_a_release_signers_is_not_signed(
+    tmp_path, repo, env, keys, homes, published
+):
+    root = tmp_path / "attested-by-mallory"
+    attest(root, "site-v2", "mallory", OTHER_BYTES, keys, "signer-a")
+    bob = {
+        **env,
+        "ATTESTATIONS_REF": tree(repo, root),
+        "GNUPGHOME": str(homes["signer-b"]),
+    }
+    worktree = checkout(repo, "site-v2", tmp_path)
+    refusal = "differs from mallory's"
+    release(worktree, "site-v2", "bob", env=bob, answer="y", refusal=refusal)
+    assert not (worktree / "release-site-v2/attestations").exists()
+
+
+def test_a_control_byte_in_a_text_file_stops_the_build(tmp_path, repo, env, published):
+    worktree = checkout(repo, "site-v4", tmp_path)
+    refusal = "a control byte in a text file"
+    release(worktree, "site-v4", "tester", env=env, answer="y", refusal=refusal)
+    assert not (worktree / "release-site-v4").exists()
+
+
+def test_an_output_folder_already_there_stops_it(tmp_path, repo, env):
+    worktree = checkout(repo, "site-v1", tmp_path)
+    (worktree / "release-site-v1").mkdir()
+    release(worktree, "site-v1", "tester", env=env, refusal="already exists")
+
+
+def test_a_tampered_release_before_stops_the_build(
+    tmp_path, repo, env, host, server, published
+):
+    release_1 = server.state / "download/site-v1"
+    shutil.copytree(host.state / "download/site-v1", release_1)
+    with open(release_1 / "ccs-site-v1.tar", "ab") as archive:
+        archive.write(b"X")
+    worktree = checkout(repo, "site-v2", tmp_path)
+    tampered = {**env, "RELEASES": server.url}
+    refusal = "site-v1 doesn't verify"
+    release(worktree, "site-v2", "tester", env=tampered, refusal=refusal)
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        pytest.param(("v1", "tester"), id="an untagged name"),
+        pytest.param(
+            ("site-v1", "../x"), id="a builder name that is not a folder name"
+        ),
+        pytest.param(("site-v1",), id="no builder name"),
+    ],
+)
+def test_release_sh_needs_a_tag_and_a_builder_name(tmp_path, repo, env, args):
+    worktree = checkout(repo, "site-v1", tmp_path)
+    release(worktree, *args, env=env, refusal="usage: release.sh")
+
+
+def test_a_tar_that_is_not_gnu_tar_stops_it(tmp_path, repo, env):
+    worktree = checkout(repo, "site-v1", tmp_path)
+    path = stand_in(tmp_path / "bin", "tar", '#!/bin/sh\necho "bsdtar 3.7.2"\n')
+    bsd = {**env, "PATH": path}
+    release(worktree, "site-v1", "tester", env=bsd, refusal="needs GNU tar")
+
+
+def test_a_release_sh_other_than_the_tags_stops_it(tmp_path, repo, env):
+    worktree = checkout(repo, "site-v1", tmp_path)
+    other = worktree / "deploy/other.sh"
+    other.write_text((worktree / "deploy/release.sh").read_text() + "# changed\n")
+    other.chmod(0o755)
+    refusal = "run the deploy/ of site-v1"
+    refuses(other, "site-v1", "tester", reason=refusal, cwd=worktree, env=env)
+
+
+@pytest.mark.parametrize(
+    "script",
+    [
+        pytest.param("lib.sh", id="lib.sh"),
+        pytest.param("render/safety.py", id="safety.py, which checks.py runs"),
+    ],
+)
+def test_a_script_other_than_the_tags_stops_it(tmp_path, repo, env, script):
+    worktree = checkout(repo, "site-v1", tmp_path)
+    changed = worktree / "deploy" / script
+    changed.write_text(changed.read_text() + "# changed\n")
+    refusal = "run the deploy/ of site-v1"
+    release(worktree, "site-v1", "tester", env=env, refusal=refusal)
+
+
+def test_a_pnpm_that_does_not_match_its_hash_stops_it(tmp_path, repo, env):
+    worktree = checkout(repo, "site-v1", tmp_path)
+    path = stand_in(tmp_path / "bin", "curl", '#!/bin/sh\necho planted >"$3"\n')
+    swapped = {**env, "PATH": path}
+    refusal = "pnpm doesn't match its hash"
+    release(worktree, "site-v1", "tester", env=swapped, refusal=refusal)
+
+
+def test_a_tag_asking_for_another_pnpm_stops_it(tmp_path, repo, env):
+    worktree = checkout(repo, "site-v5", tmp_path)
+    refusal = "the packageManager of site-v5"
+    release(worktree, "site-v5", "tester", env=env, refusal=refusal)

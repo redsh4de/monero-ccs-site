@@ -4,9 +4,11 @@ The fast suite in tests/ covers the logic behind several of them; these tests
 cover what only the command shows: its files, its refusals and its messages.
 """
 
+import importlib.util
 import io
 import json
 import os
+import py_compile
 import shutil
 import subprocess
 import tarfile
@@ -61,6 +63,34 @@ def test_status_refuses_a_malformed_file(tmp_path, data):
 
 def test_an_unknown_command_exits_2():
     assert run(CHECKS, "frobnicate", ok=False).returncode == 2
+
+
+@pytest.fixture
+def deploy(tmp_path) -> Path:
+    """Return a copy of deploy/, for a test to plant files beside its scripts."""
+    ignored = shutil.ignore_patterns("__pycache__")
+    return shutil.copytree(DEPLOY, tmp_path / "deploy", ignore=ignored)
+
+
+def test_a_safety_folder_beside_safety_py_never_runs(deploy, tmp_path):
+    (deploy / "render/safety").mkdir()
+    (deploy / "render/safety/__init__.py").write_text(
+        f'open("{tmp_path}/planted", "w")\n'
+    )
+    result = run(deploy / "checks.py", "frobnicate", ok=False)
+    assert not (tmp_path / "planted").exists()
+    assert result.returncode == 2
+
+
+def test_a_cached_safety_pyc_never_runs(deploy, tmp_path):
+    source = tmp_path / "planted.py"
+    source.write_text(f'open("{tmp_path}/planted", "w")\n')
+    cache = importlib.util.cache_from_source(deploy / "render/safety.py")
+    unchecked = py_compile.PycInvalidationMode.UNCHECKED_HASH
+    py_compile.compile(source, cfile=cache, invalidation_mode=unchecked)
+    result = run(deploy / "checks.py", "frobnicate", ok=False)
+    assert not (tmp_path / "planted").exists()
+    assert result.returncode == 2
 
 
 @pytest.fixture
