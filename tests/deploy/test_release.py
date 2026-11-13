@@ -12,8 +12,8 @@ from pathlib import Path
 import pytest
 
 from fake_server import FakeServer
-from scripts import REPO, refuses, replaced, run, tail
-from signing import RELEASE_SIGNERS
+from scripts import CHECKS, REPO, refuses, replaced, run, tail
+from signing import RELEASE_SIGNERS, Keys
 
 CAP_SYS_ADMIN = 21
 CAPABILITIES = re.search(
@@ -124,6 +124,14 @@ def tree(repo: Path, root: Path) -> str:
     }
     run("git", "add", "-A", cwd=root, env=git)
     return run("git", "write-tree", env=git).stdout.strip()
+
+
+def attest(root: Path, tag: str, builder: str, sums: str, keys: Keys, signer: str):
+    """Write builder's attestation of sums under root, as release.sh writes one."""
+    folder = root / "attestations" / tag / builder
+    folder.mkdir(parents=True)
+    (folder / "SHA256SUMS").write_text(sums)
+    keys.sign(folder / "SHA256SUMS", signer)
 
 
 @pytest.fixture(scope="module")
@@ -275,3 +283,41 @@ def test_an_outsider_can_attest_but_does_not_count(first):
     attestation = first.out / "attestations/site-v1/carol/SHA256SUMS"
     assert attestation.read_text() == first.sums
     assert "your key isn't in" in first.said, first.said
+
+
+@pytest.fixture(scope="module")
+def bob(tmp_path_factory, repo, env, homes, keys, first) -> Build:
+    """Build release 1 again as bob, after carol and alice attested it."""
+    root = tmp_path_factory.mktemp("attested-by-carol-and-alice")
+    shutil.copytree(first.out / "attestations", root / "attestations")
+    attest(root, "site-v1", "alice", first.sums, keys, "signer-a")
+    bob = {
+        **env,
+        "ATTESTATIONS_REF": tree(repo, root),
+        "GNUPGHOME": str(homes["signer-b"]),
+    }
+    folder = tmp_path_factory.mktemp("bob")
+    return build(repo, folder, "site-v1", "bob", bob, answer="y")
+
+
+def test_a_yes_writes_an_attestation_that_verifies(bob, keyring):
+    folder = bob.out / "attestations/site-v1/bob"
+    assert (folder / "SHA256SUMS").read_text() == bob.sums
+    run("gpgv", "--keyring", keyring, folder / "SHA256SUMS.asc", folder / "SHA256SUMS")
+
+
+def test_the_second_signer_sees_the_first_signers_attestation(bob):
+    assert "The same bytes as alice, a release signer." in bob.said, bob.said
+
+
+def test_a_builder_sees_an_outsiders_attestation_too(bob):
+    assert "The same bytes as carol." in bob.said, bob.said
+
+
+def test_two_release_signers_make_a_release_that_verifies(bob, keyring, tmp_path):
+    assert "Create the GitHub release site-v1" in bob.said, bob.said
+    run(CHECKS, "release", bob.out, keyring, "1", tmp_path / "files")
+
+
+def test_two_builds_of_a_tag_give_the_same_sha256sums(bob, first):
+    assert bob.sums == first.sums
