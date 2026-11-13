@@ -12,10 +12,8 @@ import pytest
 
 from fake_server import FakeServer
 from fetching import Fetcher
-from signing import Keys, write_list
+from signing import RELEASE_SIGNERS, Keys, write_list
 from web import A, WebServer
-
-RELEASE_SIGNERS = ("signer-a", "signer-b")
 
 
 def pytest_configure(config):

@@ -29,7 +29,8 @@ class FakeServer:
         self.credentials = state / "credentials"
         self.credentials.mkdir()
         (self.credentials / "alert_url").write_text(f"{self.url}/alert\n")
-        threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
+        serve = self.httpd.serve_forever
+        threading.Thread(target=serve, args=(0.05,), daemon=True).start()
 
     def calls(self, fragment: str) -> int:
         return sum(fragment in line for line in self.log("access.log"))
