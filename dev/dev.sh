@@ -12,7 +12,7 @@ trap 'exit 130' INT TERM
 
 podman build -q -t ccs-render -f dev/Containerfile.render dev >/dev/null
 podman run --rm -d --name ccs-dev -p 127.0.0.1:4321:4321 -v "$PWD:/w:ro,z" \
-  -w /w ccs-render python3 -B dev/preview.py >/dev/null
+  -w /w ccs-render python3 -B dev/serve.py >/dev/null
 echo "Serving dist/ on http://localhost:4321, Ctrl+C stops it"
 
 # a file watcher would miss a file that an editor saves by a rename, so this

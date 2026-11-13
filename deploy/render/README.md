@@ -20,4 +20,4 @@ The cache folder is optional, and speeds up later renders. The input folder hold
 | `site`           | The address the site is served at, for the feed's links     | `SITE` in the config     |
 
 The render needs Python 3 and the Debian 13 packages in `dev/Containerfile.render`.
-`pnpm render` runs the render in that image, so a preview uses production's versions.
+`pnpm render` runs the render in that image, so `pnpm dev` shows the site with production's versions.

@@ -18,7 +18,6 @@
     "render": "sh dev/render.sh",
     "test": "sh tests/run.sh",
     "test:deploy": "pnpm build >/dev/null && sh tests/deploy/run.sh",
-    "preview": "sh dev/preview.sh",
     "check": "astro check && eslint . && stylelint \"src/**/*.{css,astro}\" && prettier --check .",
     "format": "prettier --write ."
   },
