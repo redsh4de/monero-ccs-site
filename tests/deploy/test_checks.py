@@ -196,6 +196,16 @@ def test_a_release_archive_holding_an_unsafe_member_is_refused(
     verify(folder, release_keyring, tmp_path / "out", refusal=refusal)
 
 
+def test_a_signed_archive_that_is_not_a_tar_is_refused(
+    release_folder, release_keyring, tmp_path
+):
+    not_a_tar = tmp_path / "not-a.tar"
+    not_a_tar.write_bytes(b"not a tar\n" * 100)
+    folder = release_folder("not-a-tar", tar=not_a_tar)
+    refusal = "the archive doesn't list"
+    verify(folder, release_keyring, tmp_path / "out", refusal=refusal)
+
+
 @pytest.mark.parametrize(
     "rewrite, refusal",
     [

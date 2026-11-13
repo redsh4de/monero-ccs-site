@@ -93,6 +93,8 @@ STATUS_CAP = 50_000_000
 TAR_CAP = 200_000_000
 EXPIRY_NOTICE = 30 * 86_400
 NEVER = 2**62
+# the fields of a row that gpg --with-colons prints
+KIND, VALIDITY, EXPIRES, USER_ID, CAPABILITIES = 0, 1, 6, 9, 11
 # gpgv status lines that start or settle one signature's verdict
 VERDICTS = {"NEWSIG", "GOODSIG", "EXPSIG", "EXPKEYSIG", "REVKEYSIG", "BADSIG", "ERRSIG"}
 
@@ -320,18 +322,22 @@ def expiring(keyrings: list[str]) -> None:
     soon = []
     for block in re.split(r"\n(?=pub:)", run.stdout):
         rows = [line.split(":") for line in block.splitlines()]
-        if not rows or rows[0][0] != "pub" or rows[0][1] == "r":
+        if not rows or rows[0][KIND] != "pub" or rows[0][VALIDITY] == "r":
             continue
-        keys = [row for row in rows if row[0] in ("pub", "sub") and row[1] != "r"]
-        signing = [row for row in keys if "s" in row[11]]
+        keys = [
+            row for row in rows if row[KIND] in ("pub", "sub") and row[VALIDITY] != "r"
+        ]
+        signing = [row for row in keys if "s" in row[CAPABILITIES]]
         if not signing:
             continue
         # a signature stops verifying when its signing key or the primary key
         # expires; a rotation leaves expired subkeys behind, which sign no more
-        valid = [row for row in signing if row[1] != "e"]
-        until = min(int(row[6] or NEVER) for row in [rows[0], *(valid or signing)])
+        valid = [row for row in signing if row[VALIDITY] != "e"]
+        until = min(
+            int(row[EXPIRES] or NEVER) for row in [rows[0], *(valid or signing)]
+        )
         if until < time.time() + EXPIRY_NOTICE:
-            owner = next((row[9] for row in rows if row[0] == "uid"), "?")
+            owner = next((row[USER_ID] for row in rows if row[KIND] == "uid"), "?")
             day = time.strftime("%Y-%m-%d", time.gmtime(until))
             soon.append(f"{owner}: {day}")
     if soon:
@@ -470,19 +476,23 @@ def install_release(folder: str, keyring: str, version: int, dest: str) -> None:
         try:
             with tarfile.open(fileobj=tar_file, mode="r:") as tar:
                 members = tar.getmembers()
-                for member in members:
-                    parts = member.name.split("/")
-                    unsafe = member.name.startswith("/") or ".." in parts
-                    if unsafe or not (member.isreg() or member.isdir()):
-                        raise Reject(
-                            "release: the archive holds a link, a device or an unsafe path"
-                        )
-                if sum(m.size for m in members if m.isreg()) > TAR_CAP:
-                    raise Reject("release: the archive is too big")
+                refuse_unsafe_members(members)
                 os.makedirs(dest)
                 tar.extractall(dest, members=members, filter="data")
         except tarfile.TarError:
             raise Reject("release: the archive doesn't list") from None
+
+
+def refuse_unsafe_members(members: list[tarfile.TarInfo]) -> None:
+    for member in members:
+        parts = member.name.split("/")
+        unsafe = member.name.startswith("/") or ".." in parts
+        if unsafe or not (member.isreg() or member.isdir()):
+            raise Reject(
+                "release: the archive holds a link, a device or an unsafe path"
+            )
+    if sum(member.size for member in members if member.isreg()) > TAR_CAP:
+        raise Reject("release: the archive is too big")
 
 
 def main(argv: list[str]) -> int:
