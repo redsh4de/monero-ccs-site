@@ -2,13 +2,16 @@
 
 import json
 import os
+import re
 import shutil
+import subprocess
 import time
 from pathlib import Path
 
 import pytest
 
 from fake_server import FakeServer
+from fake_tor import serve_socks
 from fetching import Fetcher
 from installing import CCS_BACK, LIB, PUSH_KEY, make_certificate, push_key
 from monitoring import publish_merge_requests
@@ -32,6 +35,7 @@ PATHS_AND_TIMERS = """ccs-values.path ccs-monitor.timer ccs-fetch.path
 PIPELINE = """ccs-values.service ccs-push.service ccs-fetch.service
     ccs-update.service""".split()
 FUNDING = "proposals/example-funding.html"
+MONITOR = Path("/var/lib/private/ccs-monitor")
 
 
 def systemctl(*args: str) -> str:
@@ -41,6 +45,11 @@ def systemctl(*args: str) -> str:
 def journal(*units: str) -> str:
     names = [arg for unit in units for arg in ("-u", unit)]
     return run("journalctl", "--no-pager", "-q", "-n", str(TAIL), *names).stdout
+
+
+def start(unit: str) -> None:
+    if subprocess.run(["systemctl", "start", unit], timeout=300).returncode:
+        pytest.fail(f"{unit} failed:\n{journal(unit)}", pytrace=False)
 
 
 def get(path: str) -> tuple[int, str]:
@@ -222,3 +231,64 @@ def test_log_rotations_signal_makes_nginx_start_a_new_log(installed):
         get("index.html")
         time.sleep(0.2)
     assert text(log) not in ("", "no such file"), "nginx wrote no new access.log"
+
+
+@pytest.fixture(scope="module")
+def monitored(pushed) -> None:
+    """Run the monitor once, under its unit."""
+    # Tor cannot reach this machine, so a stand-in takes its socket; masked,
+    # Tor cannot take the socket back
+    systemctl("stop", "tor", "tor@default")
+    systemctl("mask", "tor@default")
+    Path("/run/tor").mkdir(exist_ok=True)
+    serve_socks(Path("/run/tor/socks"))
+    trusted = "/usr/local/share/ca-certificates/ccs-test.crt"
+    shutil.copy("/etc/ssl/ccs/fullchain.pem", trusted)
+    run("update-ca-certificates")
+    start("ccs-monitor.service")
+
+
+def test_a_monitor_run_under_its_unit_finds_nothing_wrong(monitored):
+    alerts = (MONITOR / "alerts").glob("[!.]*")
+    assert {path.name: path.read_text() for path in alerts} == {}
+
+
+def test_the_monitor_renders_the_site_inside_its_view(monitored):
+    assert A in text(MONITOR / "expected" / FUNDING)
+
+
+def test_the_monitors_view_shows_ccs_backs_json_and_hides_a_wallet_beside_it(
+    installed,
+):
+    wallet = Path("/srv/wallet.keys")
+    wallet.write_text("")
+    wallet.chmod(0o644)
+    units = Path("/run/systemd/system")
+    seen = Path("/run/ccs-view-test.out")
+    script = f"ls -A /srv && cat {CCS_BACK}/proposals.json"
+    (units / "ccs-view-test.service").write_text(
+        f"[Service]\nType=oneshot\nDynamicUser=yes\nStandardOutput=file:{seen}\n"
+        f"ExecStart=/bin/sh -c '{script}'\n"
+    )
+    (units / "ccs-view-test.service.d").mkdir()
+    view = "/etc/systemd/system/ccs-monitor.service.d/view.conf"
+    shutil.copy(view, units / "ccs-view-test.service.d")
+    systemctl("daemon-reload")
+    start("ccs-view-test.service")
+    assert seen.read_text() == "ccs-back\n" + (CCS_BACK / "proposals.json").read_text()
+
+
+def test_the_sandboxes_refused_nothing(monitored):
+    logged = run("journalctl", "--no-pager", "-q", "-u", "ccs-*", "-u", "nginx").stdout
+    error_log = Path("/var/log/nginx/error.log").read_text()
+    calls = "bad system call|SIGSYS|Permission denied|Operation not permitted|status=31"
+    files = "Permission denied|Operation not permitted|Read-only file system"
+    refused = {
+        "the units' journal": matching(calls, logged),
+        "nginx's error log": matching(files, error_log),
+    }
+    assert refused == dict.fromkeys(refused, [])
+
+
+def matching(pattern: str, log: str) -> list[str]:
+    return [line for line in log.splitlines() if re.search(pattern, line, re.I)]
