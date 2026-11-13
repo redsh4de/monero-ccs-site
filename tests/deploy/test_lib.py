@@ -196,7 +196,7 @@ def test_render_values_writes_only_the_renders_inputs(tmp_path):
     inputs.mkdir()
     verified.write_text("")
     lib_sh('render_values "$1" "$2" "$3" >/dev/null', values, inputs, verified)
-    assert sorted(os.listdir(inputs)) == ["general-fund", "qr", "site", "values"]
+    assert sorted(os.listdir(inputs)) == ["addresses", "site", "values"]
 
 
 def test_release_tag_reads_the_version():

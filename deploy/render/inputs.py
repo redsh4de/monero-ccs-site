@@ -32,6 +32,7 @@ class Inputs:
 
 
 def read(folder: Path) -> Inputs:
+    general_fund, qr_codes = read_addresses(folder / "addresses")
     return Inputs(
         proposals={
             path.stem: read_text(path) for path in proposal_files(folder / "proposals")
@@ -41,9 +42,9 @@ def read(folder: Path) -> Inputs:
             name: number for number, name in read_pairs(folder / "mr" / "merged.tsv")
         },
         merge_requests=read_merge_requests(folder / "mr"),
-        general_fund=read_general_fund(folder / "general-fund"),
+        general_fund=general_fund,
         site_url=read_text(folder / "site").strip(),
-        qr_codes=read_qr_codes(folder / "qr"),
+        qr_codes=qr_codes,
     )
 
 
@@ -89,10 +90,22 @@ def read_wallets(path: Path) -> dict[str, Wallet]:
     return wallets
 
 
-def read_qr_codes(path: Path) -> dict[str, str]:
-    """Read the QR codes, a line `<address> <code>` each."""
-    pairs = (line.split(" ") for line in read_text(path).splitlines())
-    return {p[0]: p[1] for p in pairs if len(p) == 2 and is_address(p[0])}
+def read_addresses(path: Path) -> tuple[str, dict[str, str]]:
+    """Return the General Fund's address, or "", and each address's QR code.
+
+    Each line is `<address> <code>`, and the General Fund's starts with
+    `general-fund `.
+    """
+    general_fund = ""
+    qr_codes = {}
+    for line in read_text(path).splitlines():
+        parts = line.removeprefix("general-fund ").split(" ")
+        if len(parts) != 2 or not is_address(parts[0]):
+            continue
+        qr_codes[parts[0]] = parts[1]
+        if line.startswith("general-fund "):
+            general_fund = parts[0]
+    return general_fund, qr_codes
 
 
 def read_pairs(path: Path) -> Iterator[tuple[str, str]]:
@@ -137,8 +150,3 @@ def read_merge_requests(folder: Path) -> list[dict]:
             }
         )
     return mrs
-
-
-def read_general_fund(path: Path) -> str:
-    address = read_text(path).strip()
-    return address if is_address(address) else ""

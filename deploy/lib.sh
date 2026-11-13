@@ -202,8 +202,8 @@ verify_list() {
 }
 
 # render_values <values> <input-dir> <list>: writes the render's values,
-# general-fund, qr and site into the render's input folder from the verified
-# <list>, with every address not on it as -, and prints a hash of all four.
+# addresses and site into the render's input folder from the verified <list>,
+# with every address not on it as -, and prints a hash of all three.
 # update.sh and the monitor both build the render's input this way, so they
 # agree.
 render_values() {
@@ -211,15 +211,13 @@ render_values() {
   local in_dir="$2"
   local list="$3"
 
-  sed -n 's/^general-fund \([^ ]*\) .*/\1/p' "$list" >"$in_dir/general-fund" \
-    || return 1
-  sed 's/^general-fund //' "$list" >"$in_dir/qr" || return 1
+  cp "$list" "$in_dir/addresses" || return 1
   printf '%s\n' "$SITE" >"$in_dir/site" || return 1
   "$DEPLOY/checks.py" apply "$values" "$list" >"$in_dir/values" || return 1
 
   # the values' time changes with every push, so it stays out of the hash
-  sed '/^updated /d' "$in_dir/values" "$in_dir/general-fund" "$in_dir/qr" \
-    "$in_dir/site" | sha256sum | cut -c1-64
+  sed '/^updated /d' "$in_dir/values" "$in_dir/addresses" "$in_dir/site" \
+    | sha256sum | cut -c1-64
 }
 
 # swap <target> <link>: points the link at the target with one rename, so a
