@@ -153,8 +153,11 @@ def test_the_alert_url_reaches_curl_on_stdin_never_in_its_arguments(alerts, tmp_
 
 @pytest.mark.parametrize(
     "url",
-    ["http://127.0.0.1:9/x", "", None],
-    ids=["a URL that refuses", "an empty URL", "no credentials at all"],
+    [
+        pytest.param("http://127.0.0.1:9/x", id="a URL that refuses"),
+        pytest.param("", id="an empty URL"),
+        pytest.param(None, id="no credentials at all"),
+    ],
 )
 def test_a_failed_post_is_logged(url, alerts):
     env = dict(alerts.env)

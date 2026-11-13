@@ -91,18 +91,11 @@ def test_the_site_config_loads_with_no_warnings(nginx):
 @pytest.mark.parametrize(
     "path, code",
     [
-        ("/", 200),
-        ("/ideas/", 200),
-        ("/proposals/with%20space.html", 200),
-        ("/missing.html", 404),
-        ("_astro/*.css", 200),
-    ],
-    ids=[
-        "the home page",
-        "a folder",
-        "a name with a space",
-        "a missing page",
-        "a stylesheet",
+        pytest.param("/", 200, id="the home page"),
+        pytest.param("/ideas/", 200, id="a folder"),
+        pytest.param("/proposals/with%20space.html", 200, id="a name with a space"),
+        pytest.param("/missing.html", 404, id="a missing page"),
+        pytest.param("_astro/*.css", 200, id="a stylesheet"),
     ],
 )
 def test_every_response_has_one_of_each_security_header(nginx, path, code):
@@ -117,22 +110,21 @@ def test_every_response_has_one_of_each_security_header(nginx, path, code):
 @pytest.mark.parametrize(
     "path, kind",
     [
-        ("/feed.xml", "application/rss+xml; charset=utf-8"),
-        ("/index.php/projects", "application/json; charset=utf-8"),
-        ("/status.json", "application/json; charset=utf-8"),
-        ("_astro/*.avif", "image/avif"),
-        ("_astro/*.woff2", "font/woff2"),
-        ("_astro/*.css", "text/css; charset=utf-8"),
-        ("/file.unknown", "application/octet-stream"),
-    ],
-    ids=[
-        "the feed",
-        "the projects API",
-        "status.json",
-        "AVIF",
-        "WOFF2",
-        "CSS",
-        "an unknown extension",
+        pytest.param("/feed.xml", "application/rss+xml; charset=utf-8", id="the feed"),
+        pytest.param(
+            "/index.php/projects",
+            "application/json; charset=utf-8",
+            id="the projects API",
+        ),
+        pytest.param(
+            "/status.json", "application/json; charset=utf-8", id="status.json"
+        ),
+        pytest.param("_astro/*.avif", "image/avif", id="AVIF"),
+        pytest.param("_astro/*.woff2", "font/woff2", id="WOFF2"),
+        pytest.param("_astro/*.css", "text/css; charset=utf-8", id="CSS"),
+        pytest.param(
+            "/file.unknown", "application/octet-stream", id="an unknown extension"
+        ),
     ],
 )
 def test_each_file_has_its_type(nginx, path, kind):
@@ -147,7 +139,11 @@ def test_a_folder_without_its_slash_redirects(nginx):
 
 
 @pytest.mark.parametrize(
-    "path", ["/leak.html", "/inner.html"], ids=["out of the tree", "inside it"]
+    "path",
+    [
+        pytest.param("/leak.html", id="out of the tree"),
+        pytest.param("/inner.html", id="inside it"),
+    ],
 )
 def test_a_symlink_is_refused(nginx, path):
     assert status(path) == 403

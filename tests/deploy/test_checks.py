@@ -43,24 +43,16 @@ def test_status_prints_the_release_and_commit_on_one_line(tmp_path):
 @pytest.mark.parametrize(
     "data",
     [
-        {"release": True, "commit": COMMIT},
-        {"release": "7", "commit": COMMIT},
-        {"release": 0, "commit": COMMIT},
-        {"release": 1_000_000, "commit": COMMIT},
-        {"release": 7, "commit": "abc"},
-        {"release": 7},
-        "nope",
-        [1, 2],
-    ],
-    ids=[
-        "release true",
-        "release as a string",
-        "release 0",
-        "release over 999999",
-        "a short commit",
-        "a missing field",
-        "not JSON",
-        "a list, not an object",
+        pytest.param({"release": True, "commit": COMMIT}, id="release true"),
+        pytest.param({"release": "7", "commit": COMMIT}, id="release as a string"),
+        pytest.param({"release": 0, "commit": COMMIT}, id="release 0"),
+        pytest.param(
+            {"release": 1_000_000, "commit": COMMIT}, id="release over 999999"
+        ),
+        pytest.param({"release": 7, "commit": "abc"}, id="a short commit"),
+        pytest.param({"release": 7}, id="a missing field"),
+        pytest.param("nope", id="not JSON"),
+        pytest.param([1, 2], id="a list, not an object"),
     ],
 )
 def test_status_refuses_a_malformed_file(tmp_path, data):
@@ -157,14 +149,13 @@ def unsafe_tar(kind, tmp_path):
 
 @pytest.mark.parametrize(
     "kind",
-    ["symlink", "hardlink", "device", "dotdot", "absolute", "sparse"],
-    ids=[
-        "a symlink",
-        "a hard link",
-        "a device",
-        "a path that climbs out with ..",
-        "an absolute path",
-        "a sparse member over the size cap",
+    [
+        pytest.param("symlink", id="a symlink"),
+        pytest.param("hardlink", id="a hard link"),
+        pytest.param("device", id="a device"),
+        pytest.param("dotdot", id="a path that climbs out with .."),
+        pytest.param("absolute", id="an absolute path"),
+        pytest.param("sparse", id="a sparse member over the size cap"),
     ],
 )
 def test_a_release_archive_holding_an_unsafe_member_is_refused(
@@ -178,13 +169,17 @@ def test_a_release_archive_holding_an_unsafe_member_is_refused(
 @pytest.mark.parametrize(
     "rewrite, refusal",
     [
-        (lambda sums: "sha256 " + sums[:64] + "\n", "isn't sha256sum's output"),
-        (
+        pytest.param(
+            lambda sums: "sha256 " + sums[:64] + "\n",
+            "isn't sha256sum's output",
+            id="not sha256sum's output",
+        ),
+        pytest.param(
             lambda sums: sums.replace("ccs-site-v2.tar", "ccs-site-v02.tar"),
             "this isn't release 2",
+            id="the archive named for release 02, not 2",
         ),
     ],
-    ids=["not sha256sum's output", "the archive named for release 02, not 2"],
 )
 def test_a_malformed_sums_file_is_refused(
     rewrite, refusal, keys, release_folder, release_keyring, tmp_path
@@ -237,8 +232,12 @@ def test_the_real_build_passes(tag_files):
 
 @pytest.mark.parametrize(
     "where, text",
-    [("_astro/x.js", "alert(1)\n"), ("x.svg", '<svg xmlns="x"/>\n')],
-    ids=["a script", "an SVG, which can carry script"],
+    [
+        pytest.param("_astro/x.js", "alert(1)\n", id="a script"),
+        pytest.param(
+            "x.svg", '<svg xmlns="x"/>\n', id="an SVG, which can carry script"
+        ),
+    ],
 )
 def test_a_build_holding_a_forbidden_file_is_refused(where, text, site, tag_files):
     plant(site, where, text)
@@ -248,12 +247,21 @@ def test_a_build_holding_a_forbidden_file_is_refused(where, text, site, tag_file
 @pytest.mark.parametrize(
     "where, text",
     [
-        ("page", '<a href="https://evil.example/donate">donate</a>'),
-        ("page", '<a href="//evil.example/">x</a>'),
-        ("page", '<a href="https:&#x2F;&#x2F;evil.example/">x</a>'),
-        ("css", ".x{background:url(https://evil.example/a.png)}"),
+        pytest.param(
+            "page", '<a href="https://evil.example/donate">donate</a>', id="plain"
+        ),
+        pytest.param("page", '<a href="//evil.example/">x</a>', id="protocol-relative"),
+        pytest.param(
+            "page",
+            '<a href="https:&#x2F;&#x2F;evil.example/">x</a>',
+            id="behind HTML entities",
+        ),
+        pytest.param(
+            "css",
+            ".x{background:url(https://evil.example/a.png)}",
+            id="in the stylesheet",
+        ),
     ],
-    ids=["plain", "protocol-relative", "behind HTML entities", "in the stylesheet"],
 )
 def test_a_build_linking_to_an_unlisted_host_is_refused(where, text, site, tag_files):
     plant(site, where, text)
@@ -268,11 +276,14 @@ def test_a_listed_host_passes_whatever_its_case_user_or_port(site, tag_files):
 @pytest.mark.parametrize(
     "where, text",
     [
-        ("page", f"<p>{A1}</p>"),
-        ("page", f"<p>{A1[:48]}<span>{A1[48:]}</span></p>"),
-        ("css", f'.x::after{{content:"{A1}"}}'),
+        pytest.param("page", f"<p>{A1}</p>", id="in a page"),
+        pytest.param(
+            "page", f"<p>{A1[:48]}<span>{A1[48:]}</span></p>", id="split by a tag"
+        ),
+        pytest.param(
+            "css", f'.x::after{{content:"{A1}"}}', id="in the stylesheet's text"
+        ),
     ],
-    ids=["in a page", "split by a tag", "in the stylesheet's text"],
 )
 def test_a_build_showing_an_address_is_refused(where, text, site, tag_files):
     plant(site, where, text)
@@ -359,22 +370,36 @@ NOT_SQUARE = "A" * 136  # 100 bytes, which no QR code's square of modules fills
 @pytest.mark.parametrize(
     "lines, signer, refusal",
     [
-        ([f"{A1} {CODE}", FUND], "signer-a", "a signature is bad or missing"),
-        ([f"{A1} {CODE}", FUND, FUND], "addresser", "address list: malformed"),
-        (
+        pytest.param(
+            [f"{A1} {CODE}", FUND],
+            "signer-a",
+            "a signature is bad or missing",
+            id="signed by a release signer",
+        ),
+        pytest.param(
+            [f"{A1} {CODE}", FUND, FUND],
+            "addresser",
+            "address list: malformed",
+            id="two general-fund lines",
+        ),
+        pytest.param(
             [f"{A1} {CODE}", f"not-an-address {CODE}", FUND],
             "addresser",
             "address list: malformed",
+            id="a malformed address line",
         ),
-        ([A1, FUND], "addresser", "address list: malformed"),
-        ([f"{A1} {NOT_SQUARE}", FUND], "addresser", "a QR code is malformed"),
-    ],
-    ids=[
-        "signed by a release signer",
-        "two general-fund lines",
-        "a malformed address line",
-        "a line without its QR code",
-        "a QR code that isn't square",
+        pytest.param(
+            [A1, FUND],
+            "addresser",
+            "address list: malformed",
+            id="a line without its QR code",
+        ),
+        pytest.param(
+            [f"{A1} {NOT_SQUARE}", FUND],
+            "addresser",
+            "a QR code is malformed",
+            id="a QR code that isn't square",
+        ),
     ],
 )
 def test_a_malformed_or_wrongly_signed_list_is_refused(
@@ -647,26 +672,24 @@ def test_kept_pins_carry_over(verified_list, tmp_path):
 @pytest.mark.parametrize(
     "lines, pins, message",
     [
-        (
+        pytest.param(
             [proposal("example-no-address", A1)],
             [f"example-funding {A1}"],
             "values: example-no-address shows the address of example-funding",
+            id="an address given to another proposal",
         ),
-        (
+        pytest.param(
             [proposal("example-funding", A2)],
             [f"example-funding {A1}"],
             "values: example-funding moves off its address",
+            id="a proposal moved to another listed address",
         ),
-        (
+        pytest.param(
             [proposal("a", A1), proposal("b", A1)],
             [],
             "values: b shows the address of a",
+            id="two proposals with one address",
         ),
-    ],
-    ids=[
-        "an address given to another proposal",
-        "a proposal moved to another listed address",
-        "two proposals with one address",
     ],
 )
 def test_a_push_breaking_a_pin_is_refused_naming_the_proposals(
@@ -694,8 +717,10 @@ def test_an_unlisted_address_is_never_pinned(applied, verified_list, tmp_path):
 
 @pytest.mark.parametrize(
     "where",
-    ["applied", "pushed"],
-    ids=["a malformed pin in the applied values", "a pin line in the push"],
+    [
+        pytest.param("applied", id="a malformed pin in the applied values"),
+        pytest.param("pushed", id="a pin line in the push"),
+    ],
 )
 def test_a_malformed_pin_or_a_pushed_pin_line_is_refused(
     where, applied, verified_list, tmp_path

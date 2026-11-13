@@ -121,25 +121,37 @@ def test_a_run_that_cannot_read_ccs_back_fails_and_keeps_the_last_file(
 @pytest.mark.parametrize(
     "slug, expected",
     [
-        (
+        pytest.param(
             "Core website translation to serbian",
             f"raised=10 contributions=3 address={A1}",
+            id="a slug with spaces",
         ),
-        ("fcmp++-development", "raised=0.00001 contributions=1 address=-"),
-        ("text-amount", "raised=10.5 contributions=0 address=-"),
-        ("null-amount", "raised=0 contributions=0 address=-"),
-        ("example-progress", f"raised=60 contributions=12 address={A1}"),
-        ("example-completed", "raised=100 contributions=30 address=-"),
-        ("minus-zero", "raised=0 contributions=0 address=-"),
-    ],
-    ids=[
-        "a slug with spaces",
-        "a slug with plus signs, and a malformed address",
-        "a string amount, and a null address",
-        "a null amount",
-        "a proposal in progress keeps its address",
-        "a completed proposal",
-        "-0.0 prints as 0",
+        pytest.param(
+            "fcmp++-development",
+            "raised=0.00001 contributions=1 address=-",
+            id="a slug with plus signs, and a malformed address",
+        ),
+        pytest.param(
+            "text-amount",
+            "raised=10.5 contributions=0 address=-",
+            id="a string amount, and a null address",
+        ),
+        pytest.param(
+            "null-amount", "raised=0 contributions=0 address=-", id="a null amount"
+        ),
+        pytest.param(
+            "example-progress",
+            f"raised=60 contributions=12 address={A1}",
+            id="a proposal in progress keeps its address",
+        ),
+        pytest.param(
+            "example-completed",
+            "raised=100 contributions=30 address=-",
+            id="a completed proposal",
+        ),
+        pytest.param(
+            "minus-zero", "raised=0 contributions=0 address=-", id="-0.0 prints as 0"
+        ),
     ],
 )
 def test_each_proposal_becomes_one_line(slug, expected, ccs_back, out):
@@ -149,8 +161,11 @@ def test_each_proposal_becomes_one_line(slug, expected, ccs_back, out):
 
 @pytest.mark.parametrize(
     "slug",
-    ["negative", "huge", "bool"],
-    ids=["a negative amount", "a 13-digit amount", "a boolean count"],
+    [
+        pytest.param("negative", id="a negative amount"),
+        pytest.param("huge", id="a 13-digit amount"),
+        pytest.param("bool", id="a boolean count"),
+    ],
 )
 def test_a_malformed_value_leaves_its_proposal_out(slug, ccs_back, out):
     written = ccs_back.values(out)
