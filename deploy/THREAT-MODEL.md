@@ -14,7 +14,7 @@ unexpected.
 | Input                                    | From                              | Arrives by                       | Checked by                                 | Lands in                                 |
 | ---------------------------------------- | --------------------------------- | -------------------------------- | ------------------------------------------ | ---------------------------------------- |
 | Values                                   | ccs-back, on the backend          | `values.py`, then the SSH push   | `checks.py values`, then `checks.py apply` | `/var/lib/ccs/state/values`              |
-| The address list                         | The address signer                | By hand, into `/etc/ccs/`        | `checks.py addresses`                      | `values`, `general-fund` and `qr`        |
+| The address list                         | The address signer                | By hand, into `/etc/ccs/`        | `checks.py addresses`                      | `values` and `addresses`                 |
 | Proposal texts and their merge history   | GitLab: `ccs-proposals`           | `fetch.sh`, with `git fetch`     | TLS; the render escapes the text           | `/var/lib/ccs/fetch/trees/`              |
 | Open merge requests                      | GitLab's merge request API        | `fetch.sh`, with `mrs.py`        | TLS; the render escapes the text           | `/var/lib/ccs/fetch/mr-*/`               |
 | A release: templates, render and scripts | GitHub, signed by two maintainers | `install.sh`, run by an operator | `checks.py release`                        | `/usr/local/lib/ccs/releases/`           |

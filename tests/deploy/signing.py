@@ -13,7 +13,7 @@ NAMES = ("signer-a", "signer-b", "outsider", "addresser")
 RELEASE_SIGNERS = ("signer-a", "signer-b")
 # 37 by 37 modules, one bit each: the size of a Monero address's QR code
 CODE = base64.b64encode(bytes(172)).decode()
-GENERAL_FUND = (REPO / "example-data/general-fund").read_text().strip()
+GENERAL_FUND = (REPO / "example-data/addresses").read_text().split()[1]
 
 
 @dataclass

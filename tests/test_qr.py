@@ -9,7 +9,7 @@ import pytest
 
 import qr
 
-ADDRESS = Path("example-data/general-fund").read_text().strip()
+ADDRESS = Path("example-data/addresses").read_text().split()[1]
 OTHER = "4" + "B" * 94
 TOOL = runpy.run_path("deploy/address-list.py")
 
