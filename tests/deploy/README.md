@@ -21,6 +21,10 @@ sh tests/deploy/run.sh 'tests/deploy/test_update.py::test_a_bad_values_line_keep
 `run.sh` needs only podman, and tests the `dist/` that is already built. After a change in
 `src/`, build the site again first, or use `pnpm test:deploy`.
 
+`test_systemd.py` runs in a privileged container that boots systemd, so that each unit runs
+in its own sandbox. When systemd does not boot, the file is skipped, and in CI it fails.
+The reason given says what to fix.
+
 ## Read a failure
 
 1. The test's name states the guarantee that broke, such as
@@ -29,6 +33,7 @@ sh tests/deploy/run.sh 'tests/deploy/test_update.py::test_a_bad_values_line_keep
    shows the command, the exit status and the last 40 lines of its output.
 3. A test can also fail on a later check, after its scripts ran as expected. Then each
    run shows under "Captured stdout": the command, its exit status and its output.
+   A failure about a systemd unit also shows the end of the unit's journal.
 4. Open the script that the command names. Its output usually names the check that
    refused, such as `values: a line doesn't match`.
 
@@ -52,7 +57,7 @@ podman run --rm --network=none -v "$PWD:/w:ro,z" \
   python3 -B -m pytest -c tests/deploy/pytest.ini tests/deploy/test_update.py
 ```
 
-The shared setup is in eight files:
+The shared setup is in nine files:
 
 | File | Holds |
 |---|---|
@@ -60,7 +65,8 @@ The shared setup is in eight files:
 | `signing.py` | The test keys, made for each run, signed address lists and signed releases |
 | `web.py` | A web server's folders and actions, as `update.sh` sees them |
 | `fetching.py` | `fetch.sh`'s folders, and a proposals repository for it to fetch |
-| `fake_server.py` | A fake GitLab and alert channel, in the test's own process |
+| `fake_server.py` | A fake GitLab, alert channel and release host, in the test's own process |
+| `fake_tor.py` | A stand-in for Tor's socket, which sends each request to this machine |
 | `monitoring.py` | A site for the monitor to check, built once for each test file and copied for each test |
 | `installing.py` | Both servers in one container for `install.sh`, and the saved states that the tests start from |
 | `conftest.py` | The fixtures that the tests ask for |
