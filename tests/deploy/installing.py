@@ -42,6 +42,17 @@ def push_key() -> str:
     return Path(f"{PUSH_KEY}.pub").read_text().strip()
 
 
+def make_certificate() -> Path:
+    """Make a certificate in /etc/ssl/ccs; return its key, readable by root only."""
+    folder = Path("/etc/ssl/ccs")
+    folder.mkdir()
+    key = folder / "privkey.pem"
+    subject = ["-subj", "/CN=ccs.getmonero.org", "-days", "1", "-nodes"]
+    files = ["-keyout", key, "-out", folder / "fullchain.pem"]
+    run("openssl", "req", "-x509", "-newkey", "ed25519", *subject, *files)
+    return key
+
+
 class Machine:
     """One container as both servers: sshd for the push, and a release host.
 

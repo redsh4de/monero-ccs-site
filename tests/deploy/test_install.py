@@ -8,7 +8,16 @@ from subprocess import CompletedProcess
 
 import pytest
 
-from installing import CCS_BACK, LIB, MERGE, PUSH_KEY, Machine, push_key, values
+from installing import (
+    CCS_BACK,
+    LIB,
+    MERGE,
+    PUSH_KEY,
+    Machine,
+    make_certificate,
+    push_key,
+    values,
+)
 from scripts import DEPLOY, replaced, run, stand_in
 from signing import publish
 from web import lay_out
@@ -529,14 +538,7 @@ def test_a_damaged_release_is_fetched_again_and_a_killed_download_cleared(upgrad
 
 @pytest.fixture
 def certificate(upgraded) -> Path:
-    """Make a certificate in /etc/ssl/ccs; return its key, readable by root only."""
-    folder = Path("/etc/ssl/ccs")
-    folder.mkdir()
-    key = folder / "privkey.pem"
-    subject = ["-subj", "/CN=ccs.getmonero.org", "-days", "1", "-nodes"]
-    files = ["-keyout", key, "-out", folder / "fullchain.pem"]
-    run("openssl", "req", "-x509", "-newkey", "ed25519", *subject, *files)
-    return key
+    return make_certificate()
 
 
 def test_a_tls_key_that_others_can_read_is_refused(upgraded, certificate):
