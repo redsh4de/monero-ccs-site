@@ -1,6 +1,6 @@
 export const stages = [
   {
-    status: "idea",
+    name: "idea",
     slug: "ideas",
     icon: "lightbulb",
     label: "Ideas",
@@ -9,7 +9,7 @@ export const stages = [
       "Anyone with an idea for a feature, task, or service can pitch it for discussion.",
   },
   {
-    status: "funding-required",
+    name: "funding-required",
     slug: "funding-required",
     icon: "hand-coins",
     label: "Funding Required",
@@ -17,7 +17,7 @@ export const stages = [
     description: "Once approved, the idea moves to community fundraising.",
   },
   {
-    status: "work-in-progress",
+    name: "work-in-progress",
     slug: "work-in-progress",
     icon: "cog",
     label: "Work in Progress",
@@ -26,7 +26,7 @@ export const stages = [
       "Funded ideas get picked up, and their progress can be monitored.",
   },
   {
-    status: "completed",
+    name: "completed",
     slug: "completed-proposals",
     icon: "package",
     label: "Completed",
@@ -36,4 +36,4 @@ export const stages = [
   },
 ] as const;
 
-export type ProposalStatus = (typeof stages)[number]["status"];
+export type StageName = (typeof stages)[number]["name"];

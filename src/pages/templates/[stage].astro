@@ -4,7 +4,7 @@ import Button from "@/components/ui/Button.astro";
 import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
 import Layout from "@/layouts/Layout.astro";
 import StageLayout from "@/layouts/StageLayout.astro";
-import { type ProposalStatus, stages } from "@/lib/stages";
+import { type StageName, stages } from "@/lib/stages";
 
 export function getStaticPaths() {
   return stages.map((stage) => ({
@@ -14,19 +14,19 @@ export function getStaticPaths() {
 }
 
 interface Props {
-  status: ProposalStatus;
+  name: StageName;
   label: string;
 }
 
-const { status, label } = Astro.props;
+const { name, label } = Astro.props;
 ---
 
 <Layout title={label}>
-  <StageLayout current={status}>
+  <StageLayout current={name}>
     <div class="heading">
       <h1>{label}</h1>
       {
-        status === "funding-required" && (
+        name === "funding-required" && (
           <Button href="/feed.xml" variant="text" class="feed">
             <MaskIcon name="rss" />
             RSS feed
@@ -36,7 +36,7 @@ const { status, label } = Astro.props;
     </div>
 
     {
-      status === "idea" && (
+      name === "idea" && (
         <div class="idea-intro">
           <p>Pitch an idea to the community for discussion.</p>
           <Button href="/how-to-ccs/">Submit Idea</Button>

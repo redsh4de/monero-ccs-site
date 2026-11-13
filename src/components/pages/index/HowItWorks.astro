@@ -13,7 +13,7 @@ import { stages } from "@/lib/stages";
   <ol>
     {
       stages.map((stage) => (
-        <StageCard as="li" class={`step stage-${stage.status}`}>
+        <StageCard as="li" class={`step stage-${stage.name}`}>
           <div class="step-title">
             <span class="step-icon">
               <MaskIcon name={stage.icon} />

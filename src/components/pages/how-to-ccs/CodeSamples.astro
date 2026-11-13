@@ -1,0 +1,11 @@
+<div class="code-samples">
+  <slot />
+</div>
+
+<style>
+  .code-samples {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+    gap: var(--space-sm);
+  }
+</style>
