@@ -127,3 +127,66 @@ def test_unchanged_inputs_cause_no_render(monitored):
     (monitored.state / "expected/index.html").unlink()
     monitored.monitor()
     assert not (monitored.state / "expected/index.html").exists()
+
+
+MRS_DIFFER = "ccs monitor: the site's merge requests differ from GitLab's"
+
+
+def test_merge_requests_unlike_gitlabs_alert_only_after_75_minutes(monitored):
+    monitored.edit_merge_requests(lambda mrs: mrs[0].update(title="Not on GitLab"))
+    monitored.failing_for("merge-requests", 3000)
+    monitored.monitor()
+    assert monitored.server.alerts() == []
+    monitored.age("merge-requests", 5000)
+    monitored.monitor()
+    assert monitored.server.alerts() == [f"{MRS_DIFFER} (merge-requests)"]
+
+
+def test_a_missing_open_merge_request_fails_the_check(monitored):
+    monitored.edit_merge_requests(lambda mrs: mrs.pop(0))
+    monitored.monitor()
+    assert monitored.reason("merge-requests") == MRS_DIFFER
+
+
+def test_gitlab_not_answering_leaves_the_merge_requests_unverified(monitored):
+    monitored.forget_verification()
+    (monitored.server.state / "fail").touch()
+    monitored.failing_for("merge-requests", 5000)
+    monitored.monitor()
+    assert monitored.server.alerts() == [
+        "ccs monitor: GitLab's merge request API doesn't answer, so the site's"
+        " merge requests are unverified (merge-requests)"
+    ]
+
+
+def test_a_verified_set_is_asked_about_again_only_an_hour_on(monitored):
+    (monitored.server.state / "mrs.json").write_text("[]")
+    monitored.monitor()
+    assert monitored.server.calls("merge_requests") == 0
+    monitored.forget_verification()
+    monitored.monitor()
+    assert monitored.reason("merge-requests") == MRS_DIFFER
+
+
+def test_votes_cast_since_the_sites_fetch_are_no_mismatch(monitored):
+    path = monitored.server.state / "mrs.json"
+    path.write_text(replaced(path.read_text(), '"upvotes": 7,', '"upvotes": 12,'))
+    monitored.forget_verification()
+    monitored.monitor()
+    assert monitored.failures() == []
+    assert monitored.server.calls("merge_requests") > 0
+
+
+@pytest.mark.parametrize(
+    "edit, reason",
+    [
+        (lambda mrs: mrs[0].clear(), "snapshot: a merge request has other fields"),
+        (lambda mrs: mrs[0].update(upvotes="7"), "snapshot: a vote count is malformed"),
+    ],
+)
+def test_malformed_merge_requests_in_status_json_are_refused_not_a_crash(
+    monitored, edit, reason
+):
+    monitored.edit_merge_requests(edit)
+    assert reason in monitored.monitor().stderr
+    assert monitored.failures() == ["snapshot"]
