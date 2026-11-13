@@ -24,6 +24,7 @@ on:
       - tests/deploy/fetching.py
       - tests/deploy/run.sh
       - tests/deploy/Containerfile
+      - dev/Containerfile.render
       - .github/workflows/release.yml
       # the files the test's tags edit
       - astro.config.mjs

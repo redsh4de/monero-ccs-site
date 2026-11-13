@@ -63,6 +63,7 @@ nested() {
     python3 -B -m pytest -c tests/deploy/pytest.ini "$1"
 }
 
+podman build -q -t ccs-render -f dev/Containerfile.render dev >/dev/null
 podman build -q -t "$IMAGE" tests/deploy >/dev/null
 
 if [ "$#" -eq 0 ]; then

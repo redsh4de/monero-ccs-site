@@ -2,6 +2,7 @@
 
 import filecmp
 import os
+import re
 import shutil
 from pathlib import Path
 from subprocess import CompletedProcess
@@ -18,11 +19,21 @@ from installing import (
     push_key,
     values,
 )
-from scripts import DEPLOY, replaced, run, stand_in
+from scripts import DEPLOY, REPO, replaced, run, stand_in
 from signing import publish
 from web import lay_out
 
 USAGE = "usage: install.sh"
+
+
+def test_install_names_every_package_of_the_render_image():
+    image = (REPO / "dev/Containerfile.render").read_text()
+    packages = re.findall(r"python3-[a-z0-9-]+", image)
+    installed = (DEPLOY / "install.sh").read_text().split()
+    assert packages
+    assert [name for name in packages if name not in installed] == []
+
+
 BACKEND = ("backend", "site-v1", "127.0.0.1", CCS_BACK)
 PUSHED = Path("/var/lib/ccs/in/values")
 SSHD_CONFIG = Path("/etc/ssh/sshd_config.d")

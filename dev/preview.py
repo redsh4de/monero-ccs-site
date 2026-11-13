@@ -1,5 +1,5 @@
 # Serves dist/ on port 4321 with the headers that nginx.conf sends, so a page
-# that breaks the CSP breaks in the preview too. Run it from the repo root.
+# that breaks the CSP breaks in the preview too. dev/preview.sh runs it.
 import functools
 import http.server
 import re
