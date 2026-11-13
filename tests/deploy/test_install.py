@@ -556,7 +556,9 @@ def unloadable_nginx_site(tree: Path) -> None:
 
 def test_a_release_whose_nginx_site_does_not_load_is_refused(upgraded, certificate):
     upgraded.publish(8, edit=unloadable_nginx_site)
+    site = os.readlink("/var/lib/ccs/current")
     upgraded.refuses("web", "site-v8", reason='unknown directive "not_a_directive"')
     assert upgraded.installed() == str(LIB / "releases/2")
+    assert os.readlink("/var/lib/ccs/current") == site
     nginx_site = Path("/etc/nginx/sites-enabled/ccs.conf")
     assert differing({nginx_site: LIB / "releases/2/deploy/web/nginx.conf"}) == []
