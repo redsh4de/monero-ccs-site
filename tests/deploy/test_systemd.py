@@ -3,6 +3,7 @@
 import json
 import os
 import shutil
+import time
 from pathlib import Path
 
 import pytest
@@ -28,6 +29,9 @@ pytestmark = pytest.mark.skipif(not BOOTED, reason=REASON)
 ORIGIN = Path("/srv/origin.git")
 PATHS_AND_TIMERS = """ccs-values.path ccs-monitor.timer ccs-fetch.path
     ccs-fetch.timer""".split()
+PIPELINE = """ccs-values.service ccs-push.service ccs-fetch.service
+    ccs-update.service""".split()
+FUNDING = "proposals/example-funding.html"
 
 
 def systemctl(*args: str) -> str:
@@ -37,6 +41,29 @@ def systemctl(*args: str) -> str:
 def journal(*units: str) -> str:
     names = [arg for unit in units for arg in ("-u", unit)]
     return run("journalctl", "--no-pager", "-q", "-n", str(TAIL), *names).stdout
+
+
+def get(path: str) -> tuple[int, str]:
+    """Return the status and body of a page, as nginx serves it."""
+    resolve = "ccs.getmonero.org:443:127.0.0.1"
+    url = f"https://ccs.getmonero.org/{path}"
+    out = run("curl", "-sk", "--resolve", resolve, "-w", "%{http_code}", url).stdout
+    return int(out[-3:]), out[:-3]
+
+
+def outcomes(since: int) -> dict[str, str]:
+    """Return the result of each pipeline unit's run after since, or "no run since".
+
+    since is in microseconds of the monotonic clock, as systemd records starts.
+    A check of the result alone passes for ccs-update: the install already ran it.
+    """
+    found = {}
+    for unit in PIPELINE:
+        shown = systemctl("show", "-p", "Result,ExecMainStartTimestampMonotonic", unit)
+        properties = dict(line.split("=", 1) for line in shown.splitlines())
+        started = int(properties["ExecMainStartTimestampMonotonic"])
+        found[unit] = properties["Result"] if started > since else "no run since"
+    return found
 
 
 @pytest.fixture(scope="module")
@@ -113,3 +140,36 @@ def test_both_roles_install_and_start_their_paths_and_timers(installed):
     assert states == dict.fromkeys(PATHS_AND_TIMERS, "active\n"), journal(
         *PATHS_AND_TIMERS
     )
+
+
+@pytest.fixture(scope="module")
+def pushed(installed) -> int:
+    """Change ccs-back's JSON, and wait at most 60 s for the page to show A.
+
+    Return when the JSON changed, as outcomes() takes it.
+    """
+    since = time.monotonic_ns() // 1000
+    (CCS_BACK / "proposals.json").touch()
+    deadline = time.monotonic() + 60
+    while A not in get(FUNDING)[1] and time.monotonic() < deadline:
+        time.sleep(1)
+    return since
+
+
+def test_ccs_backs_json_reaches_the_served_page(pushed):
+    assert A in get(FUNDING)[1], f"{outcomes(pushed)}\n{journal(*PIPELINE)}"
+
+
+def test_each_unit_of_the_pipeline_ran_and_succeeded(pushed):
+    success = dict.fromkeys(PIPELINE, "success")
+    assert outcomes(pushed) == success, journal(*PIPELINE)
+
+
+def test_status_json_names_the_installed_release(pushed):
+    code, body = get("status.json")
+    assert code == 200, body
+    assert json.loads(body)["release"] == 1
+
+
+def test_the_push_lands_as_in_values_and_nowhere_else(pushed):
+    assert set(os.listdir("/var/lib/ccs/in")) == {"mr", "repo", "values"}
