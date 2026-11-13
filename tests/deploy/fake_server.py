@@ -1,4 +1,4 @@
-"""A fake GitLab API and alert channel, in the test's own process."""
+"""A fake GitLab API, alert channel and release host, in the test's own process."""
 
 import json
 import threading
@@ -10,13 +10,14 @@ PROJECT = "/api/v4/projects/monero-project%2Fccs-proposals"
 
 
 class FakeServer:
-    """Serve merge requests and the alert channel from a state folder.
+    """Serve merge requests, the alert channel and releases from a state folder.
 
     mrs.json holds the open merge requests, and changes/<iid>.json each one's
     diffs. A file named fail makes the API answer 500, fail-once makes it do so
     once, changes/<iid>.fail fails that merge request, and alert.fail refuses
     alerts. Each request goes to access.log, and each alert to alerts.log. The
     credentials folder holds the alert URL, as systemd's LoadCredential= gives it.
+    The releases that signing.publish() writes into the folder are served too.
     """
 
     def __init__(self, state: Path):
@@ -89,6 +90,9 @@ class Handler(BaseHTTPRequestHandler):
             path = self.server.state / "changes" / f"{iid}.json"
             diffs = json.loads(path.read_text())["changes"] if path.exists() else []
             return self.send(200, json.dumps(page(diffs, query)).encode())
+        release = self.server.state / url.path[1:]
+        if url.path.startswith("/download/") and release.is_file():
+            return self.send(200, release.read_bytes(), "application/octet-stream")
         self.send(404)
 
 

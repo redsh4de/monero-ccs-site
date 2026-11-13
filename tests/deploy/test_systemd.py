@@ -1,0 +1,294 @@
+"""Under systemd: both roles installed, the pipeline, nginx and the monitor."""
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import time
+from pathlib import Path
+
+import pytest
+
+from fake_server import FakeServer
+from fake_tor import serve_socks
+from fetching import Fetcher
+from installing import CCS_BACK, LIB, PUSH_KEY, make_certificate, push_key
+from monitoring import publish_merge_requests
+from scripts import DEPLOY, TAIL, refuses, run
+from signing import RELEASE_SIGNERS, publish, write_list
+from web import A, B, C
+
+BOOTED = Path("/proc/1/comm").read_text() == "systemd\n"
+REASON = (
+    "systemd is not PID 1 here: run the file with tests/deploy/run.sh, under "
+    "rootless podman. If systemd still does not boot, raise the host's inotify "
+    "limit: sudo sysctl -w fs.inotify.max_user_instances=1024"
+)
+if not BOOTED and os.environ.get("CI"):
+    pytest.fail(REASON, pytrace=False)
+pytestmark = pytest.mark.skipif(not BOOTED, reason=REASON)
+
+ORIGIN = Path("/srv/origin.git")
+PATHS_AND_TIMERS = """ccs-values.path ccs-monitor.timer ccs-fetch.path
+    ccs-fetch.timer""".split()
+PIPELINE = """ccs-values.service ccs-push.service ccs-fetch.service
+    ccs-update.service""".split()
+FUNDING = "proposals/example-funding.html"
+MONITOR = Path("/var/lib/private/ccs-monitor")
+
+
+def systemctl(*args: str) -> str:
+    return run("systemctl", *args).stdout
+
+
+def journal(*units: str) -> str:
+    names = [arg for unit in units for arg in ("-u", unit)]
+    return run("journalctl", "--no-pager", "-q", "-n", str(TAIL), *names).stdout
+
+
+def start(unit: str) -> None:
+    if subprocess.run(["systemctl", "start", unit], timeout=300).returncode:
+        pytest.fail(f"{unit} failed:\n{journal(unit)}", pytrace=False)
+
+
+def get(path: str) -> tuple[int, str]:
+    """Return the status and body of a page, as nginx serves it."""
+    resolve = "ccs.getmonero.org:443:127.0.0.1"
+    url = f"https://ccs.getmonero.org/{path}"
+    out = run("curl", "-sk", "--resolve", resolve, "-w", "%{http_code}", url).stdout
+    return int(out[-3:]), out[:-3]
+
+
+def outcomes(since: int) -> dict[str, str]:
+    """Return the result of each pipeline unit's run after since, or "no run since".
+
+    since is in microseconds of the monotonic clock, as systemd records starts.
+    A check of the result alone passes for ccs-update: the install already ran it.
+    """
+    found = {}
+    for unit in PIPELINE:
+        shown = systemctl("show", "-p", "Result,ExecMainStartTimestampMonotonic", unit)
+        properties = dict(line.split("=", 1) for line in shown.splitlines())
+        started = int(properties["ExecMainStartTimestampMonotonic"])
+        found[unit] = properties["Result"] if started > since else "no run since"
+    return found
+
+
+def nginx_pid() -> str:
+    return systemctl("show", "-P", "MainPID", "nginx").strip()
+
+
+def text(path: str | Path) -> str:
+    return Path(path).read_text().strip() if os.path.exists(path) else "no such file"
+
+
+@pytest.fixture(scope="module")
+def gitlab(tmp_path_factory):
+    server = FakeServer(tmp_path_factory.mktemp("gitlab"))
+    yield server
+    server.stop()
+
+
+@pytest.fixture(scope="module")
+def machine(tmp_path_factory, keys, gitlab) -> None:
+    """Set up both servers' outside world, nginx and ssh."""
+    root = tmp_path_factory.mktemp("machine")
+    fetcher = Fetcher(root, gitlab)
+    publish_merge_requests(gitlab)
+    shutil.copytree(fetcher.origin, ORIGIN)
+    shutil.copytree(fetcher.work, CCS_BACK / "proposals")
+    slugs = ["example-funding", "example-funded", "example-no-address"]
+    rows = [
+        {
+            "local-url": f"/proposals/{slug}.html",
+            "amount-funded": 1.5,
+            "contributions": 2,
+            "donate-address": address,
+        }
+        for slug, address in zip(slugs, [A, B, C])
+    ]
+    stages = [{"stage": "Funding Required", "proposals": rows}]
+    (CCS_BACK / "proposals.json").write_text(json.dumps(stages))
+    (CCS_BACK / "complete.json").write_text("[]")
+
+    publish(gitlab.state, 1, keys)
+    etc = Path("/etc/ccs")
+    etc.mkdir()
+    keys.keyring(etc / "release-signers.gpg", *RELEASE_SIGNERS)
+    keys.keyring(etc / "address-signers.gpg", "addresser")
+    write_list(etc / "addresses.txt", [A, B, C], keys)
+    config = (DEPLOY / "config.example").read_text()
+    config += f"RELEASES={gitlab.url}\nGITLAB_API={gitlab.api}\n"
+    config += f"PROPOSALS_GIT=file://{ORIGIN}\n"
+    (etc / "config").write_text(config)
+    make_certificate()
+    systemctl("start", "ssh", "nginx")
+
+
+@pytest.fixture(scope="module")
+def installed(machine) -> None:
+    """Install the backend, then the web server, as an operator does."""
+    run(DEPLOY / "install.sh", "backend", "site-v1", "127.0.0.1", CCS_BACK, timeout=300)
+    Path("/etc/ssh/sshd_config.d/50-admin.conf").write_text(
+        "PasswordAuthentication no\n"
+    )
+    web = ("web", "site-v1", "127.0.0.1", push_key())
+    run(LIB / "current/deploy/install.sh", *web, timeout=300)
+    # git refuses a local repository owned by another user; an https:// one,
+    # as live, never is
+    run("chown", "-R", "ccs-fetch:", ORIGIN)
+    # a rootless container sets up no systemd credentials, so the push key is
+    # bound where LoadCredential= puts it
+    key = Path("/run/ccs-test-push-key")
+    shutil.copy(PUSH_KEY, key)
+    key.chmod(0o644)
+    credential = Path("/etc/systemd/system/ccs-push.service.d/test-credential.conf")
+    credential.parent.mkdir(exist_ok=True)
+    target = "/run/credentials/ccs-push.service/push_key"
+    credential.write_text(f"[Service]\nBindReadOnlyPaths={key}:{target}\n")
+    systemctl("daemon-reload")
+
+
+def test_both_roles_install_and_start_their_paths_and_timers(installed):
+    states = {
+        unit: systemctl("show", "-P", "ActiveState", unit) for unit in PATHS_AND_TIMERS
+    }
+    assert states == dict.fromkeys(PATHS_AND_TIMERS, "active\n"), journal(
+        *PATHS_AND_TIMERS
+    )
+
+
+@pytest.fixture(scope="module")
+def pushed(installed) -> int:
+    """Change ccs-back's JSON, and wait at most 60 s for the page to show A.
+
+    Return when the JSON changed, as outcomes() takes it.
+    """
+    since = time.monotonic_ns() // 1000
+    (CCS_BACK / "proposals.json").touch()
+    deadline = time.monotonic() + 60
+    while A not in get(FUNDING)[1] and time.monotonic() < deadline:
+        time.sleep(1)
+    return since
+
+
+def test_ccs_backs_json_reaches_the_served_page(pushed):
+    assert A in get(FUNDING)[1], f"{outcomes(pushed)}\n{journal(*PIPELINE)}"
+
+
+def test_each_unit_of_the_pipeline_ran_and_succeeded(pushed):
+    success = dict.fromkeys(PIPELINE, "success")
+    assert outcomes(pushed) == success, journal(*PIPELINE)
+
+
+def test_status_json_names_the_installed_release(pushed):
+    code, body = get("status.json")
+    assert code == 200, body
+    assert json.loads(body)["release"] == 1
+
+
+def test_the_push_lands_as_in_values_and_nowhere_else(pushed):
+    assert set(os.listdir("/var/lib/ccs/in")) == {"mr", "repo", "values"}
+
+
+def test_nginxs_pid_file_is_in_its_own_run_and_linked_for_log_rotation(installed):
+    files = ["/run/nginx.pid", "/run/nginx/nginx.pid"]
+    assert {path: text(path) for path in files} == dict.fromkeys(files, nginx_pid())
+
+
+@pytest.mark.parametrize(
+    "command, reason",
+    [
+        pytest.param(
+            ("ls", "/run/systemd/private"),
+            "No such file or directory",
+            id="systemd's socket",
+        ),
+        pytest.param(
+            ("touch", "/var/lib/ccs/x"),
+            "Read-only file system",
+            id="a write to the site",
+        ),
+    ],
+)
+def test_nginxs_sandbox_refuses(installed, command, reason):
+    refuses("nsenter", "-t", nginx_pid(), "-m", *command, reason=reason)
+
+
+@pytest.mark.parametrize("action", ["reload", "restart"])
+def test_nginx_still_serves_after_a(pushed, action):
+    systemctl(action, "nginx")
+    assert get("index.html")[0] == 200
+
+
+def test_log_rotations_signal_makes_nginx_start_a_new_log(installed):
+    log = Path("/var/log/nginx/access.log")
+    log.rename(log.with_name("access.log.1"))
+    run("/etc/init.d/nginx", "rotate", env={"_SYSTEMCTL_SKIP_REDIRECT": "1"})
+    deadline = time.monotonic() + 5
+    while text(log) in ("", "no such file") and time.monotonic() < deadline:
+        get("index.html")
+        time.sleep(0.2)
+    assert text(log) not in ("", "no such file"), "nginx wrote no new access.log"
+
+
+@pytest.fixture(scope="module")
+def monitored(pushed) -> None:
+    """Run the monitor once, under its unit."""
+    # Tor cannot reach this machine, so a stand-in takes its socket; masked,
+    # Tor cannot take the socket back
+    systemctl("stop", "tor", "tor@default")
+    systemctl("mask", "tor@default")
+    Path("/run/tor").mkdir(exist_ok=True)
+    serve_socks(Path("/run/tor/socks"))
+    trusted = "/usr/local/share/ca-certificates/ccs-test.crt"
+    shutil.copy("/etc/ssl/ccs/fullchain.pem", trusted)
+    run("update-ca-certificates")
+    start("ccs-monitor.service")
+
+
+def test_a_monitor_run_under_its_unit_finds_nothing_wrong(monitored):
+    alerts = (MONITOR / "alerts").glob("[!.]*")
+    assert {path.name: path.read_text() for path in alerts} == {}
+
+
+def test_the_monitor_renders_the_site_inside_its_view(monitored):
+    assert A in text(MONITOR / "expected" / FUNDING)
+
+
+def test_the_monitors_view_shows_ccs_backs_json_and_hides_a_wallet_beside_it(
+    installed,
+):
+    wallet = Path("/srv/wallet.keys")
+    wallet.write_text("")
+    wallet.chmod(0o644)
+    units = Path("/run/systemd/system")
+    seen = Path("/run/ccs-view-test.out")
+    script = f"ls -A /srv && cat {CCS_BACK}/proposals.json"
+    (units / "ccs-view-test.service").write_text(
+        f"[Service]\nType=oneshot\nDynamicUser=yes\nStandardOutput=file:{seen}\n"
+        f"ExecStart=/bin/sh -c '{script}'\n"
+    )
+    (units / "ccs-view-test.service.d").mkdir()
+    view = "/etc/systemd/system/ccs-monitor.service.d/view.conf"
+    shutil.copy(view, units / "ccs-view-test.service.d")
+    systemctl("daemon-reload")
+    start("ccs-view-test.service")
+    assert seen.read_text() == "ccs-back\n" + (CCS_BACK / "proposals.json").read_text()
+
+
+def test_the_sandboxes_refused_nothing(monitored):
+    logged = run("journalctl", "--no-pager", "-q", "-u", "ccs-*", "-u", "nginx").stdout
+    error_log = Path("/var/log/nginx/error.log").read_text()
+    calls = "bad system call|SIGSYS|Permission denied|Operation not permitted|status=31"
+    files = "Permission denied|Operation not permitted|Read-only file system"
+    refused = {
+        "the units' journal": matching(calls, logged),
+        "nginx's error log": matching(files, error_log),
+    }
+    assert refused == dict.fromkeys(refused, [])
+
+
+def matching(pattern: str, log: str) -> list[str]:
+    return [line for line in log.splitlines() if re.search(pattern, line, re.I)]

@@ -43,4 +43,6 @@ jobs:
         with:
           node-version: 26.8.1 # the Node that release.sh builds with
       - run: pnpm install --frozen-lockfile
+      - name: raise the inotify limit, which systemd needs to boot in a container
+        run: sudo sysctl -w fs.inotify.max_user_instances=1024
       - run: pnpm test:deploy

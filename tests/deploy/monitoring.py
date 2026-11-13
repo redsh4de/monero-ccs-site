@@ -75,7 +75,7 @@ class Monitored:
         built = cls(root, server, site_server)
         fetcher = Fetcher(root / "web", server)
         shutil.copytree(fetcher.work, built.checkout)
-        built.publish_merge_requests()
+        publish_merge_requests(server)
         built.publish_release(keys)
 
         shutil.rmtree(ETC, ignore_errors=True)
@@ -104,17 +104,6 @@ class Monitored:
         server.stop()
         return built
 
-    def publish_merge_requests(self) -> None:
-        """Give the fake GitLab the example's open merge requests."""
-        shutil.copy(EXAMPLE / "mr/open.json", self.server.state / "mrs.json")
-        changes: dict[str, list] = {}
-        for line in (EXAMPLE / "mr/open.tsv").read_text().splitlines():
-            iid, name = line.split("\t")
-            changes.setdefault(iid, []).append({"new_path": name, "new_file": True})
-        for iid, diffs in changes.items():
-            path = self.server.state / "changes" / f"{iid}.json"
-            path.write_text(json.dumps({"changes": diffs}))
-
     def publish_release(self, keys: Keys) -> None:
         """Publish release 1 of this repo, signed, and install it."""
         tar = publish(self.root / "releases", 1, keys)
@@ -130,7 +119,7 @@ class Monitored:
             shutil.copytree(self.root / name, root / name)
         # ccs-back's checkout belongs to another user, as live
         run("chown", "-R", "1234:1234", copy.checkout)
-        copy.publish_merge_requests()
+        publish_merge_requests(server)
         self.site_server.serve(copy.site)
         return copy
 
@@ -188,6 +177,18 @@ class Monitored:
         status = json.loads(path.read_text())
         edit(status["merge_requests"])
         path.write_text(json.dumps(status))
+
+
+def publish_merge_requests(server: FakeServer) -> None:
+    """Give the fake GitLab the example's open merge requests."""
+    shutil.copy(EXAMPLE / "mr/open.json", server.state / "mrs.json")
+    changes: dict[str, list] = {}
+    for line in (EXAMPLE / "mr/open.tsv").read_text().splitlines():
+        iid, name = line.split("\t")
+        changes.setdefault(iid, []).append({"new_path": name, "new_file": True})
+    for iid, diffs in changes.items():
+        path = server.state / "changes" / f"{iid}.json"
+        path.write_text(json.dumps({"changes": diffs}))
 
 
 def page(path: str) -> str:
