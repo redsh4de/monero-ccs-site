@@ -15,7 +15,7 @@ dependencies' code as you, so read "Maintainer setup" in
 | Command            | Action                                                                      |
 | :----------------- | :-------------------------------------------------------------------------- |
 | `pnpm install`     | Install dependencies                                                        |
-| `pnpm dev`         | Start a local live-reload server, with the data pages unfilled              |
+| `pnpm dev`         | Serve the site on http://localhost:4321, and rebuild it on each change      |
 | `pnpm build`       | Build the static pages and templates                                        |
 | `pnpm render`      | Render `example-data/` into `dist/`, in the render container                |
 | `pnpm preview`     | Build, render, and serve `dist/` as plain files on http://localhost:4321    |
@@ -29,7 +29,7 @@ build use Node 26.8.1.
 
 The pages in `src/pages/templates/` are Jinja templates. Astro builds them with their
 `[[ ]]` and `[% %]` marks left in, and `deploy/render/` fills them with the proposal data.
-`dev/` holds the scripts behind `pnpm render` and `pnpm preview`.
+`dev/` holds the scripts behind `pnpm dev`, `pnpm render` and `pnpm preview`.
 
 [tests/deploy/README.md](tests/deploy/README.md) explains the deploy tests.
 [deploy/README.md](deploy/README.md) explains how to run the live site, and
