@@ -68,9 +68,9 @@ check_gnu_tar() {
 }
 
 # check_same_scripts <tag>: stops unless release.sh, lib.sh, checks.py and
-# the render's safety.py, which checks.py runs, are the tag's own. Both
-# signers then run the scripts they read first, and build with the same pins
-# and the tag's pnpm. release.sh is compared as the file that runs, $0.
+# the render's safety.py and qr.py, which checks.py runs, are the tag's own.
+# Both signers then run the scripts they read first, and build with the same
+# pins and the tag's pnpm. release.sh is compared as the file that runs, $0.
 check_same_scripts() {
   local tag="$1"
   local name=""
@@ -80,7 +80,7 @@ check_same_scripts() {
   if ! git show "$tag:deploy/release.sh" | cmp -s - "$0"; then
     stop "run the deploy/ of $tag"
   fi
-  for name in lib.sh checks.py render/safety.py; do
+  for name in lib.sh checks.py render/safety.py render/qr.py; do
     if ! git show "$tag:deploy/$name" | cmp -s - "$DEPLOY/$name"; then
       stop "run the deploy/ of $tag"
     fi

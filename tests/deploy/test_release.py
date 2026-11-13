@@ -537,6 +537,7 @@ def test_a_release_sh_other_than_the_tags_stops_it(tmp_path, repo, env):
     [
         pytest.param("lib.sh", id="lib.sh"),
         pytest.param("render/safety.py", id="safety.py, which checks.py runs"),
+        pytest.param("render/qr.py", id="qr.py, which checks.py also runs"),
     ],
 )
 def test_a_script_other_than_the_tags_stops_it(tmp_path, repo, env, script):
