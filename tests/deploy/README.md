@@ -52,16 +52,17 @@ podman run --rm --network=none -v "$PWD:/w:ro,z" \
   python3 -B -m pytest -c tests/deploy/pytest.ini tests/deploy/test_update.py
 ```
 
-The shared setup is in seven files:
+The shared setup is in eight files:
 
 | File | Holds |
 |---|---|
 | `scripts.py` | The repository's paths; `run()`, which shows a command's output on a failure; `refuses()`; `replaced()`; and `lib_sh()`, which calls a `lib.sh` function |
-| `signing.py` | The test keys, made for each run, and signed address lists |
+| `signing.py` | The test keys, made for each run, signed address lists and signed releases |
 | `web.py` | A web server's folders and actions, as `update.sh` sees them |
 | `fetching.py` | `fetch.sh`'s folders, and a proposals repository for it to fetch |
 | `fake_server.py` | A fake GitLab and alert channel, in the test's own process |
 | `monitoring.py` | A site for the monitor to check, built once for each test file and copied for each test |
+| `installing.py` | Both servers in one container for `install.sh`, and the saved states that the tests start from |
 | `conftest.py` | The fixtures that the tests ask for |
 
 A test that needs a package the image lacks adds it to `Containerfile`.

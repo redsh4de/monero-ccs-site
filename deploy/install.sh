@@ -297,12 +297,15 @@ write_push_key() {
 }
 
 # start_web <old-release> <new-release> <tag>: starts the units, and keeps
-# the new release only once it renders; on a failure the old one comes back.
+# the new release only once it renders; on a failure the old release, its
+# units and its site come back.
 start_web() {
   local old_release="$1"
   local new_release="$2"
   local tag="$3"
+  local site=""
 
+  site=$(readlink /var/lib/ccs/current) || site=""
   systemctl daemon-reload
   systemctl enable --now ccs-fetch.path ccs-fetch.timer
   if ! trial_render; then
@@ -311,6 +314,11 @@ start_web() {
       install_files "$old_release" web
       systemctl daemon-reload
       rm -rf -- "$new_release"
+      # nginx can refuse a release after its render went live; update.sh
+      # keeps the site before it
+      if [ -d "$site" ]; then
+        swap "$site" /var/lib/ccs/current
+      fi
     fi
     stop "$tag failed to render, or nginx refused its site;" \
       "the site and the release stay as they were"

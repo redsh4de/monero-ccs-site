@@ -21,6 +21,21 @@ B = "8" + "B" * 94
 C = "8" + "C" * 94
 
 
+def lay_out(ccs: Path) -> None:
+    """Lay out in ccs what fetch.sh leaves: the example proposals and merge requests."""
+    tree = ccs / "fetch/trees" / COMMIT
+    merge_requests = ccs / "fetch/mr-0000000000000000"
+    shutil.copytree(EXAMPLE / "proposals", tree / "proposals")
+    (tree / "mr").mkdir()
+    shutil.copy(EXAMPLE / "mr/merged.tsv", tree / "mr")
+    merge_requests.mkdir()
+    for name in ("open.json", "open.tsv"):
+        shutil.copy(EXAMPLE / "mr" / name, merge_requests)
+    (ccs / "in").mkdir(exist_ok=True)
+    (ccs / "in/repo").symlink_to(tree)
+    (ccs / "in/mr").symlink_to(merge_requests)
+
+
 class WebServer:
     """A web server laid out as fetch.sh leaves it, with its releases in lib/."""
 
@@ -29,17 +44,7 @@ class WebServer:
         self.lib = root / "lib"
         self.current = self.ccs / "current"
         self.pushed = int(time.time()) - 2000
-        tree = self.ccs / "fetch/trees" / COMMIT
-        merge_requests = self.ccs / "fetch/mr-0000000000000000"
-        shutil.copytree(EXAMPLE / "proposals", tree / "proposals")
-        (tree / "mr").mkdir()
-        shutil.copy(EXAMPLE / "mr/merged.tsv", tree / "mr")
-        merge_requests.mkdir()
-        for name in ("open.json", "open.tsv"):
-            shutil.copy(EXAMPLE / "mr" / name, merge_requests)
-        (self.ccs / "in").mkdir()
-        (self.ccs / "in/repo").symlink_to(tree)
-        (self.ccs / "in/mr").symlink_to(merge_requests)
+        lay_out(self.ccs)
 
     def install(self, version: int, dist: Path = DIST) -> None:
         """Lay out a release as install.sh does, and make it the current one."""
