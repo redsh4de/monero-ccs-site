@@ -197,8 +197,9 @@ way.
 
 ### Extend a signer key
 
-**An expired signer key fails every check of its signatures, old ones included.** A
-month before it expires:
+**An expired signer key fails every check of its signatures, old ones included.** The
+monitor runs `checks.py expiring` on both keyrings, and its `key-expiry` alert fires 30
+days before. Then:
 
 1. On the machine with the primary key, the owner extends the key and its subkeys:
 
