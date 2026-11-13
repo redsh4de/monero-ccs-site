@@ -7,7 +7,7 @@ Usage:
   status.py restore <status.json> <input-dir>     write <input-dir>/mr/open.json
                                                   and open.tsv
 
-<input-dir> is the render's input folder, which render.py describes.
+<input-dir> is the render's input folder, which render/README.md describes.
 
 The web server writes status.json after each render. The monitor checks each
 part against its own sources, then rebuilds the same input to render again.
@@ -52,7 +52,6 @@ def restore(status: Path, input_dir: Path) -> None:
 
 
 def main(argv: list[str]) -> int:
-    """Run one command, and return the exit status."""
     match argv:
         case ["write", input_dir, version, commit]:
             status = {

@@ -127,9 +127,8 @@ from the keys in `release-signers.gpg`, and skips any other.
 - installs dependencies without their build scripts, and builds with no network;
 - takes `deploy/` from the tag, so the build cannot change the scripts it ships;
 - checks release N-1 before it shows the changes since then;
-- refuses a build holding a file type the site never serves, a link to a host not in
-  `deploy/build-hosts`, or address-like text;
-- refuses a font or image that is not byte for byte a file of the tag;
+- refuses a build that holds what a release may not, as
+  [Read the changes](RELEASING.md#read-the-changes) lists;
 - stops when the build differs from a release signer's attestation.
 
 `install.sh` switches a machine to a release only after it checks it. It:

@@ -1,8 +1,5 @@
-"""Reading the render's input folder.
+"""Reading the render's input folder, whose files render/README.md lists.
 
-The folder holds proposals/, mr/open.json, mr/open.tsv, mr/merged.tsv, values,
-general-fund, qr, the signed list's QR code for each address, and site, the
-address the site is served at.
 This module only parses them; the rules live in proposals.py and content.py.
 """
 

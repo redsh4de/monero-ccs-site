@@ -57,7 +57,6 @@ def read_back(pixels: list[list[bool]]) -> list[str]:
 
 
 def main(argv: list[str]) -> int:
-    """Print the list's lines, and return the exit status."""
     if len(argv) != 2:
         print(__doc__, file=sys.stderr, end="")
         return 2
