@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import socket
 import time
 
@@ -173,6 +174,31 @@ def test_a_failed_git_rev_parse_fails_the_fetch(fetched, tmp_path):
     failed = fetched.fetch(ok=False, PATH=stand_in(tmp_path / "bin", "git", script))
     assert "fetch: content failed" in failed.stderr
     assert fetched.links() == links
+
+
+SLOW = {
+    "git": '#!/bin/sh\ncase "$*" in *fetch*) sleep 60 ;; esac\nexec /usr/bin/git "$@"\n',
+    "curl": '#!/bin/sh\ncase "$*" in */merge_requests*) sleep 60 ;; esac\n'
+    'exec /usr/bin/curl "$@"\n',
+}
+
+
+@pytest.mark.parametrize("command", ["git", "curl"])
+def test_a_gitlab_slower_than_the_steps_limit_fails_the_fetch(
+    fetched, tmp_path, command
+):
+    """A stand-in cuts each limit to 1 s, and logs the real ones."""
+    limits = tmp_path / "limits"
+    short = f'#!/bin/sh\necho "$1" >>{limits}\nshift\nexec /usr/bin/timeout 1 "$@"\n'
+    stand_in(tmp_path / "bin", "timeout", short)
+    fetched.values(32)
+    path = stand_in(tmp_path / "bin", command, SLOW[command])
+    failed = fetched.fetch(ok=False, PATH=path)
+    assert "fetch: content failed" in failed.stderr
+    assert (fetched.alerts / "fetch").exists()
+    unit = (DEPLOY / "web/ccs-fetch.service").read_text()
+    units_limit = int(re.search(r"^TimeoutStartSec=(\d+)$", unit, re.M)[1])
+    assert sum(map(int, limits.read_text().split())) < units_limit
 
 
 def alert_state(fetcher, name, since, sent, text):
