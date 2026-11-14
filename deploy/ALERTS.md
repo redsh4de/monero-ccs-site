@@ -59,9 +59,11 @@ An alert goes out only when its check still fails at the end of its hold.
   there. Later checks neither fire nor resolve until it passes.
 - Each run sends all its messages in one post, and to the journal. If the post fails,
   the next run sends them again.
-- Each failing check has one file in `/var/lib/ccs/fetch/alerts/` on the web server, or
-  `/var/lib/private/ccs-monitor/alerts/` on the backend. It holds
+- Each failing check has one file in `/run/ccs-fetch/alerts/` on the web server, or
+  `/run/private/ccs-monitor/alerts/` on the backend. It holds
   `<since> <sent> <message>`, with Unix times.
+- These files are in memory, so a full disk cannot stop an alert. After a reboot, each
+  hold starts again, and an alert that was out can repeat early.
 
 To pause alerts during known work, empty `/etc/ccs/alert_url`. Alerts that come due
 meanwhile go out once you restore it.

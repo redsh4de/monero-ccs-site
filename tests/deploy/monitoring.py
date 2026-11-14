@@ -58,6 +58,7 @@ class Monitored:
     def __init__(self, root: Path, server: FakeServer, site_server: SiteServer):
         self.root, self.server, self.site_server = root, server, site_server
         self.site, self.state = root / "site", root / "state"
+        self.alerts = root / "run/alerts"
         self.checkout = root / "storage/proposals"
         self.env = {
             "SITE": site_server.url,
@@ -65,6 +66,7 @@ class Monitored:
             "GITLAB_API": server.api,
             "CCS_BACK": str(root / "storage"),
             "STATE_DIRECTORY": str(self.state),
+            "RUNTIME_DIRECTORY": str(root / "run"),
             "CREDENTIALS_DIRECTORY": str(server.credentials),
         }
 
@@ -114,7 +116,7 @@ class Monitored:
         shutil.copytree(self.root / "etc", ETC)
         shutil.copy(self.root / "values", VALUES)
         copy = Monitored(root, server, self.site_server)
-        for name in ("site", "state", "storage", "lib", "releases"):
+        for name in ("site", "state", "run", "storage", "lib", "releases"):
             shutil.copytree(self.root / name, root / name)
         # ccs-back's checkout belongs to another user, as live
         run("chown", "-R", "1234:1234", copy.checkout)
@@ -131,17 +133,17 @@ class Monitored:
 
     def failures(self) -> list[str]:
         """Return the checks failing now, as the alert state names them."""
-        return sorted(path.name for path in (self.state / "alerts").glob("[!.]*"))
+        return sorted(path.name for path in self.alerts.glob("[!.]*"))
 
     def age(self, name: str, seconds: int, field: int = 0) -> None:
         """Date a check's first failure seconds ago, or with field=1 its last alert."""
         parts = self.alert_state(name)
         parts[field] = str(int(time.time()) - seconds)
-        (self.state / "alerts" / name).write_text(" ".join(parts))
+        (self.alerts / name).write_text(" ".join(parts))
 
     def failing_for(self, name: str, seconds: int) -> None:
         """Record a check as failing since seconds ago, so a failing run alerts."""
-        (self.state / "alerts" / name).write_text(f"{int(time.time()) - seconds} 0 -\n")
+        (self.alerts / name).write_text(f"{int(time.time()) - seconds} 0 -\n")
 
     def reason(self, name: str) -> str:
         """Return the text a failing check records."""
@@ -149,7 +151,7 @@ class Monitored:
 
     def alert_state(self, name: str) -> list[str]:
         """Return a failing check's first failure, last alert and text."""
-        path = self.state / "alerts" / name
+        path = self.alerts / name
         assert path.exists(), f"{name} is not failing; failing now: {self.failures()}"
         return path.read_text().split(" ", 2)
 

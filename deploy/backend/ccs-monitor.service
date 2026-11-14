@@ -7,6 +7,9 @@ After=tor.service
 Type=oneshot
 DynamicUser=yes
 StateDirectory=ccs-monitor
+# the alerts' state, in memory, and kept from one run to the next
+RuntimeDirectory=ccs-monitor
+RuntimeDirectoryPreserve=yes
 # every request, alerts included, goes through Tor's socket. Its own network has
 # nothing on it, so the machine's local services, the wallet's RPC among them,
 # are out of reach whatever ccs-back's settings.
