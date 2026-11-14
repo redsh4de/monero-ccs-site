@@ -119,7 +119,7 @@ def test_an_always_checked_page_missing_from_the_render_alerts(monitored):
 def test_a_failing_page_that_left_the_site_resolves(monitored):
     name, text = "page-ffffffffffffffff", "ccs monitor: page gone/away.html"
     state = f"{int(time.time())} 1 {text} differs from the expected render\n"
-    (monitored.state / "alerts" / name).write_text(state)
+    (monitored.alerts / name).write_text(state)
     monitored.monitor()
     assert monitored.server.alerts() == [f"resolved: {text} left the site ({name})"]
 
@@ -295,6 +295,14 @@ def test_an_older_site_release_with_other_site_files_alerts_and_compares_no_page
     assert monitored.server.alerts() == [
         "ccs monitor: the site runs release 1, older than release 2 here (old-release)"
     ]
+
+
+def test_a_run_that_cannot_make_its_folders_alerts_as_a_crash(monitored):
+    shutil.rmtree(monitored.state / "releases")
+    (monitored.state / "releases").symlink_to("/dev/full")
+    monitored.failing_for("monitor", 700)
+    monitored.monitor(ok=False)
+    assert monitored.server.alerts() == ["ccs monitor: the monitor crashed (monitor)"]
 
 
 def test_a_crash_alerts_and_a_good_run_clears_it(monitored):

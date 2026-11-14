@@ -181,6 +181,11 @@ def test_each_unit_of_the_pipeline_ran_and_succeeded(pushed):
     assert outcomes(pushed) == success, journal(*PIPELINE)
 
 
+def test_the_fetchs_alert_state_is_in_memory_and_stays_after_the_run(pushed):
+    assert Path("/run/ccs-fetch/alerts").is_dir()
+    assert run("stat", "-f", "-c", "%T", "/run/ccs-fetch").stdout == "tmpfs\n"
+
+
 def test_status_json_names_the_installed_release(pushed):
     code, body = get("status.json")
     assert code == 200, body
@@ -248,8 +253,9 @@ def monitored(pushed) -> None:
 
 
 def test_a_monitor_run_under_its_unit_finds_nothing_wrong(monitored):
-    alerts = (MONITOR / "alerts").glob("[!.]*")
-    assert {path.name: path.read_text() for path in alerts} == {}
+    alerts = Path("/run/private/ccs-monitor/alerts")
+    assert alerts.is_dir()
+    assert {path.name: path.read_text() for path in alerts.glob("[!.]*")} == {}
 
 
 def test_the_monitor_renders_the_site_inside_its_view(monitored):

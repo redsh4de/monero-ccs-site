@@ -44,6 +44,8 @@ class Fetcher:
         self.server = server
         self.ccs = root / "ccs"
         (self.ccs / "in").mkdir(parents=True)
+        (self.ccs / "fetch").mkdir()
+        self.alerts = root / "run/alerts"
         self.work, self.origin = root / "work", root / "origin.git"
         new_repository(self.work)
         proposals = sorted((EXAMPLE / "proposals").glob("*.md"))
@@ -56,6 +58,7 @@ class Fetcher:
             "GITLAB_API": server.api,
             "PROPOSALS_GIT": f"file://{self.origin}",
             "CREDENTIALS_DIRECTORY": str(server.credentials),
+            "RUNTIME_DIRECTORY": str(root / "run"),
         }
         self.mrs(3)
         server.changes(3, [("idea.md", True), ("old.md", False)])

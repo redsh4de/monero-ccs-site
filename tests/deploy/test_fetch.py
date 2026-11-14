@@ -177,9 +177,8 @@ def test_a_failed_git_rev_parse_fails_the_fetch(fetched, tmp_path):
 
 def alert_state(fetcher, name, since, sent, text):
     """Write a check's alert state, as an earlier run would have left it."""
-    folder = fetcher.ccs / "fetch/alerts"
-    folder.mkdir(exist_ok=True)
-    (folder / name).write_text(f"{since} {sent} {text}\n")
+    fetcher.alerts.mkdir(parents=True, exist_ok=True)
+    (fetcher.alerts / name).write_text(f"{since} {sent} {text}\n")
 
 
 FAILED = "ccs: content fetches have failed for 50 minutes"
@@ -192,7 +191,7 @@ def test_no_fetch_alert_without_a_fetch_attempt(fetched):
     alert_state(fetched, "fetch", since, 0, FAILED)
     fetched.fetch()
     assert fetched.server.alerts() == []
-    state = fetched.ccs / "fetch/alerts/fetch"
+    state = fetched.alerts / "fetch"
     assert (state.read_text() if state.exists() else None) == f"{since} 0 {FAILED}\n"
 
 
@@ -221,7 +220,7 @@ def test_fetches_failing_for_50_minutes_alert_once_an_hour_then_resolve(fetched)
     fetched.values(20)
     fetched.fetch()
     assert fetched.server.alerts()[-1] == f"resolved: {FAILED} (fetch)"
-    assert not (fetched.ccs / "fetch/alerts/fetch").exists()
+    assert not (fetched.alerts / "fetch").exists()
 
 
 def test_stale_values_alert_at_once_once_an_hour_then_resolve(fetched):
@@ -237,6 +236,15 @@ def test_stale_values_alert_at_once_once_an_hour_then_resolve(fetched):
     applied(fetched, int(time.time()))
     fetched.fetch()
     assert fetched.server.alerts()[-1] == f"resolved: {STALE} (stale-values)"
+
+
+def test_a_full_disk_still_sends_the_alert_that_is_due(fetched):
+    applied(fetched, int(time.time()) - 700)
+    (fetched.ccs / "fetch/last-fetch").unlink()
+    (fetched.ccs / "fetch/last-fetch").symlink_to("/dev/full")
+    fetched.values(40)
+    fetched.fetch(ok=False)
+    assert fetched.server.alerts() == [f"{STALE} (stale-values)"]
 
 
 def test_an_old_push_leftover_is_cleared_and_one_in_flight_is_left(fetched):
@@ -264,4 +272,4 @@ def test_a_gitlab_that_stalls_makes_the_fetch_give_up_in_time(fetched, stalling)
         "timeout", "150", DEPLOY / "web/fetch.sh", ok=False, env=env, timeout=200
     )
     assert failed.returncode == 1, "fetch.sh did not give up within 150 s"
-    assert (fetched.ccs / "fetch/alerts/fetch").exists()
+    assert (fetched.alerts / "fetch").exists()

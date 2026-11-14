@@ -10,7 +10,8 @@
 #          Tor's socket (ALL_PROXY), so the wallet's RPC stays out of reach.
 # Reads:   the live site, GitLab's merge request API, the signed releases,
 #          ccs-back's checkout of the proposals, and the backend's values.
-# Writes:  its state folder, which systemd makes (StateDirectory=).
+# Writes:  its state folder, and the alerts' state in its runtime folder;
+#          systemd makes both (StateDirectory=, RuntimeDirectory=).
 # Alerts:  each step below names its alert. A crash raises "monitor".
 # Exit:    0 when the run ends, whatever it found; it reports through alerts.
 set -eu
@@ -28,7 +29,8 @@ readonly INSTALLED_DIR="${DEPLOY%/deploy}"
 readonly INSTALLED_VERSION="${INSTALLED_DIR##*/}"
 readonly STATE_DIR="${STATE_DIRECTORY:?}"
 readonly RUN_DIR="$STATE_DIR/run"
-readonly ALERTS_DIR="$STATE_DIR/alerts"
+# in memory, so a full disk can still alert
+readonly ALERTS_DIR="${RUNTIME_DIRECTORY:?}/alerts"
 readonly EXPECTED_DIR="$STATE_DIR/expected"
 readonly PROPOSALS_CHECKOUT="$CCS_BACK/proposals"
 readonly BACKEND_VALUES=/var/lib/ccs-backend/values
@@ -68,16 +70,16 @@ require() {
   fi
 }
 
-# begin_run: clears the last run's files, and makes any crash from here on
-# raise the "monitor" alert.
+# begin_run: makes any crash from here on raise the "monitor" alert, then
+# clears the last run's files.
 begin_run() {
-  rm -rf -- "$RUN_DIR"
-  mkdir -p -- "$RUN_DIR" "$STATE_DIR/releases"
   alerts_begin
   trap 'check monitor 1 "the monitor crashed"; alerts_send' EXIT
   # dash runs no EXIT trap when a signal kills it, so a stop from systemd
   # exits instead, which runs it
   trap 'exit 1' TERM
+  rm -rf -- "$RUN_DIR"
+  mkdir -p -- "$RUN_DIR" "$STATE_DIR/releases"
 }
 
 # end_run: sends this run's messages, and exits. A run that gets here didn't

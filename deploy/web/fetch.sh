@@ -8,7 +8,9 @@
 #          update.sh after it, whatever the result.
 # Reads:   the "gitlab" line of the latest push, in /var/lib/ccs/in/values, and
 #          the time of the values applied last, in /var/lib/ccs/state/values.
-# Writes:  /var/lib/ccs/fetch, and the links /var/lib/ccs/in/repo and in/mr.
+# Writes:  /var/lib/ccs/fetch, the links /var/lib/ccs/in/repo and in/mr, and
+#          the alerts' state in /run/ccs-fetch, which systemd makes
+#          (RuntimeDirectory=).
 # Trust:   GitLab's content is only extracted here, and the render escapes it.
 # Exit:    0 when the content is current, 1 when a fetch failed.
 set -eu
@@ -23,7 +25,8 @@ readonly DEPLOY
 
 readonly IN_DIR="$CCS_DIR/in"
 readonly FETCH_DIR="$CCS_DIR/fetch"
-readonly ALERTS_DIR="$FETCH_DIR/alerts"
+# in memory, so a full disk can still alert
+readonly ALERTS_DIR="${RUNTIME_DIRECTORY:?}/alerts"
 # GitLab is called when the "gitlab" line changes, or 55 minutes after the last
 # call, so each hourly run calls it despite the timer's random delay
 readonly REFETCH_AFTER=3300
@@ -134,6 +137,11 @@ main() {
   local failing=0
 
   alerts_begin
+  # whatever stops the run, the alerts queued so far go out
+  trap alerts_send EXIT
+  # dash runs no EXIT trap when a signal kills it, so a stop from systemd
+  # exits instead, which runs it
+  trap 'exit 1' TERM
   drop_cut_off_pushes
   check_values_age
 
@@ -154,7 +162,6 @@ main() {
       "ccs: content fetches have failed for 50 minutes"
   fi
 
-  alerts_send
   exit "$failing"
 }
 
