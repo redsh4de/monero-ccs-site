@@ -190,6 +190,11 @@ def test_the_backend_writes_both_settings_to_its_config_and_no_alert_url(
     assert "ALERT_URL" not in config
 
 
+def test_the_heartbeat_url_file_starts_empty_and_root_only(installed_backend):
+    heartbeat_url = Path("/etc/ccs/heartbeat_url")
+    assert (ownership(heartbeat_url), heartbeat_url.read_text()) == ("root 600", "")
+
+
 def test_the_alert_url_file_starts_empty_and_root_only_and_the_install_says_so(
     installed_backend, backend_install
 ):

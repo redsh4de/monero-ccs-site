@@ -20,5 +20,6 @@ RestrictAddressFamilies=AF_UNIX
 UMask=0077
 ExecStart=/usr/local/lib/ccs/current/deploy/backend/monitor.sh
 LoadCredential=alert_url:/etc/ccs/alert_url
+LoadCredential=heartbeat_url:/etc/ccs/heartbeat_url
 MemoryMax=1G
 TimeoutStartSec=1800

@@ -132,6 +132,11 @@ Once both machines run the release:
 
 3. Put the same URL in the backend's `/etc/ccs/alert_url`. Leave it empty until now: the
    monitor finds no `status.json` on the old site, so it would alert.
+4. Optional: put a heartbeat URL in the backend's `/etc/ccs/heartbeat_url`. The monitor
+   requests it through Tor when each run ends. Use a service that alerts when the
+   requests stop, such as healthchecks.io, with a period of 25 minutes and a grace of
+   30. **Without it, nothing tells you when the monitor or Tor stops**: the monitor's
+   alerts leave through Tor too.
 
 From then on, each install posts a line to the channel. A channel that stops working
 shows at the next install.

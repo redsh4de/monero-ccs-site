@@ -13,8 +13,9 @@
 # Writes:  /etc/ccs/config and /etc/ccs/alert_url, the release in
 #          /usr/local/lib/ccs/releases/N, the link /usr/local/lib/ccs/current,
 #          the units, users, folders and nginx site; on the backend the push
-#          key and the web server's host key, and on the web server the push
-#          key's line in /home/ccs-fetch/.ssh/authorized_keys.
+#          key, the web server's host key and /etc/ccs/heartbeat_url, and on
+#          the web server the push key's line in
+#          /home/ccs-fetch/.ssh/authorized_keys.
 # Trust:   checks.py verifies the release: two signers, the version named, a
 #          tar that matches its hash.
 # Exit:    0 installed, 1 refused or failed, 2 usage.
@@ -240,13 +241,15 @@ install_files() {
 }
 
 # start_backend: makes the push key and reads the web server's host key on
-# the first install, points ccs-values.path at ccs-back's JSON, and starts
-# the units.
+# the first install, makes an empty /etc/ccs/heartbeat_url for the monitor's
+# unit to load, points ccs-values.path at ccs-back's JSON, and starts the
+# units.
 start_backend() {
   if [ ! -e /etc/ccs/push_key ]; then
     ssh-keygen -q -t ed25519 -N '' -C ccs-push -f /etc/ccs/push_key
   fi
-  chmod 600 /etc/ccs/push_key
+  touch /etc/ccs/heartbeat_url
+  chmod 600 /etc/ccs/push_key /etc/ccs/heartbeat_url
   if [ ! -s /etc/ccs/known_hosts ]; then
     ssh-keyscan -q -t ed25519 "$WEB_HOST" >/etc/ccs/known_hosts
     [ -s /etc/ccs/known_hosts ] || stop "can't read $WEB_HOST's host key"
@@ -373,7 +376,8 @@ announce() {
     if [ "$role" = backend ]; then
       export ALL_PROXY=socks5h://localhost/run/tor/socks
     fi
-    CREDENTIALS_DIRECTORY=/etc/ccs post_alerts "$message"
+    CREDENTIALS_DIRECTORY=/etc/ccs request_url alert_url \
+      --data-binary "@$message"
   ); then
     echo "The alert channel has the install."
   else
