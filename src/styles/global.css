@@ -149,19 +149,19 @@ tbody tr {
 }
 
 .stage-idea {
-  --stage-color: light-dark(#e8c24f, #b89336);
+  --stage-color: light-dark(#e8c24f, #dcb955);
 }
 
 .stage-funding-required {
-  --stage-color: light-dark(#f28080, #b85c5c);
+  --stage-color: light-dark(#f28080, #ea8383);
 }
 
 .stage-work-in-progress {
-  --stage-color: light-dark(#3a72aa, #4679a4);
+  --stage-color: light-dark(#3a72aa, #5890c8);
 }
 
 .stage-completed {
-  --stage-color: light-dark(#70af71, #548c6a);
+  --stage-color: light-dark(#70af71, #76ba78);
 }
 
 .stage-unlisted {
