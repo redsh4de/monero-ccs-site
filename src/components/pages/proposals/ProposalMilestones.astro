@@ -2,7 +2,7 @@
   [% for milestone in it.milestones %]
   <li>
     <h2>[[ milestone.name ]]</h2>
-    <span
+    <span class="status[% if milestone.finished %] stage-completed[% endif %]"
       >[% if milestone.finished %]Finished[% else %]Unfinished[% endif %]</span
     >
     [% if milestone.funds %]<p>To be paid: [[ milestone.funds ]]</p>[% endif %]
@@ -37,6 +37,19 @@
     margin: 0;
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-semibold);
+  }
+
+  .status {
+    padding: var(--space-2xs) var(--space-sm);
+    background: color-mix(
+      in srgb,
+      var(--stage-color, var(--text-secondary)) 22%,
+      transparent
+    );
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--heading-color);
   }
 
   p {
