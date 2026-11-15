@@ -135,8 +135,28 @@ read_site_status() {
   local circuit="$1"
 
   fetch_url "$SITE/status.json" "$RUN_DIR/status.json" "$circuit" \
-    || return 1
+    -w '%{certs}' >"$RUN_DIR/certs" || return 1
   "$DEPLOY/checks.py" status "$RUN_DIR/status.json" || return 1
+}
+
+# check_certificate: alerts 14 days before the site's TLS certificate expires.
+# It reads the certificate that served status.json, which curl lists first.
+check_certificate() {
+  local expires=""
+  local expiry=0
+  local failing=0
+
+  expires=$(sed -n '/^Expire date:/{s///p;q}' "$RUN_DIR/certs")
+  if [ -z "$expires" ]; then
+    return 0
+  fi
+  # a date that can't be read counts as expired, so it alerts
+  expiry=$(date -d "$expires" +%s 2>/dev/null) || expiry=0
+  if [ "$expiry" -lt $((NOW + 1209600)) ]; then
+    failing=1
+  fi
+  check cert-expiry "$failing" \
+    "the site's certificate expires on $(date -u -d "@$expiry" +%Y-%m-%d)"
 }
 
 # get_verified_release <version>: prints the folder of that release,
@@ -423,6 +443,7 @@ main() {
   page_circuit=$(new_circuit)
   failing=0
   status=$(read_site_status "$status_circuit") || failing=1
+  check_certificate
   require status "$failing" "status.json is missing or malformed"
   version="${status% *}"
   commit="${status#* }"

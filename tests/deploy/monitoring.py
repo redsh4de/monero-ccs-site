@@ -3,6 +3,7 @@
 import hashlib
 import json
 import shutil
+import ssl
 import threading
 import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -24,12 +25,21 @@ ALWAYS = """index.html ideas/index.html funding-required/index.html
 
 
 class SiteServer:
-    """Serve a folder as the live site, and note the path of each request."""
+    """Serve a folder as the live site, and note the path of each request.
 
-    def __init__(self):
+    Given a file that holds a certificate and its key, serve over TLS.
+    """
+
+    def __init__(self, certificate: Path | None = None):
         self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), SiteHandler)
         self.httpd.site = self
-        self.url = f"http://127.0.0.1:{self.httpd.server_port}"
+        scheme = "http"
+        if certificate:
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            context.load_cert_chain(certificate)
+            self.httpd.socket = context.wrap_socket(self.httpd.socket, server_side=True)
+            scheme = "https"
+        self.url = f"{scheme}://127.0.0.1:{self.httpd.server_port}"
         threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
 
     def serve(self, root: Path) -> None:
