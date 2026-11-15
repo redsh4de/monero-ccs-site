@@ -84,8 +84,10 @@ fetch_proposals() {
   if [ ! -d "$repo" ]; then
     git init -q --bare "$repo" || return 1
   fi
-  # a GitLab that stalls fails the fetch in a minute, inside the unit's limit
-  git -C "$repo" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 \
+  # a GitLab that stalls fails the fetch in a minute. One that is only slow
+  # fails at the limit, inside the unit's, so the "fetch" alert counts it
+  timeout 300 git -C "$repo" -c http.lowSpeedLimit=1000 \
+    -c http.lowSpeedTime=60 \
     fetch -q "$PROPOSALS_GIT" '+refs/heads/master:refs/heads/master' \
     || return 1
   commit=$(git -C "$repo" rev-parse master) || return 1
@@ -116,7 +118,9 @@ fetch_merge_requests() {
 
   rm -rf -- "$new" || return 1
   mkdir -- "$new" || return 1
-  "$DEPLOY/mrs.py" "$GITLAB_API" "$new" "$FETCH_DIR/changes" || return 1
+  # the changes fetched so far stay cached, so the next run goes further
+  timeout 420 "$DEPLOY/mrs.py" "$GITLAB_API" "$new" "$FETCH_DIR/changes" \
+    || return 1
   hash=$(sha256sum <"$new/open.json" | cut -c1-16) || return 1
 
   set="$FETCH_DIR/mr-$hash"
