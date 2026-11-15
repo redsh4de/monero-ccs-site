@@ -132,6 +132,19 @@ const meta = [
       --progress-text-align: start;
     }
 
+    /* no card here: the numbers carry on from the author and date */
+    .summary:not(.drawer) {
+      padding: 0;
+      background: none;
+      border: none;
+      box-shadow: none;
+
+      .numbers {
+        flex-direction: column-reverse;
+        gap: var(--space-md);
+      }
+    }
+
     /* without popover support the card stays on the page */
     @supports selector(:popover-open) {
       .summary.drawer {
