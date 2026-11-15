@@ -328,6 +328,25 @@ def test_a_run_that_cannot_make_its_folders_alerts_as_a_crash(monitored):
     assert monitored.server.alerts() == ["ccs monitor: the monitor crashed (monitor)"]
 
 
+def heartbeat_url(monitored, url: str) -> None:
+    (monitored.server.credentials / "heartbeat_url").write_text(f"{url}\n")
+
+
+def test_a_run_that_ends_requests_the_heartbeat_url_once(monitored):
+    """The fake server answers 404, so a refused heartbeat also fails no run."""
+    heartbeat_url(monitored, f"{monitored.server.url}/heartbeat")
+    monitored.monitor()
+    assert monitored.server.calls("/heartbeat") == 1
+
+
+def test_a_crashed_run_requests_no_heartbeat(monitored):
+    heartbeat_url(monitored, f"{monitored.server.url}/heartbeat")
+    shutil.rmtree(monitored.state / "releases/1/dist/templates")
+    (monitored.state / "rendered").unlink()
+    monitored.monitor(ok=False)
+    assert monitored.server.calls("/heartbeat") == 0
+
+
 def test_a_crash_alerts_and_a_good_run_clears_it(monitored):
     shutil.rmtree(monitored.state / "releases/1/dist/templates")
     (monitored.state / "rendered").unlink()

@@ -113,7 +113,8 @@ alerts_send() {
   messages=$(cat -- "$outbox") || return 1
   log "alert: $messages"
 
-  if post_alerts "$outbox"; then
+  # the text is read from the file, so a leading @ in a message stays text
+  if request_url alert_url --data-binary "@$outbox"; then
     while read -r action name; do
       mark_posted "$action" "$name" || return 1
     done <"$pending"
@@ -123,23 +124,21 @@ alerts_send() {
   rm -f -- "$outbox" "$pending" || return 1
 }
 
-# post_alerts <file>: posts the file's text to the alert URL. systemd hands
-# the URL, from /etc/ccs/alert_url, only to the units that send alerts
+# request_url <name> [<curl option>...]: requests the URL that /etc/ccs/<name>
+# holds. systemd hands the URL only to the units that use it
 # (LoadCredential=), so no other service, the render among them, ever sees
-# it. Fails when the post fails, or when there is no URL. The URL reaches
-# curl on stdin, so ps never shows it, and the text is read from the file,
-# so a leading @ in a message stays text.
-post_alerts() {
-  local file="$1"
-  local credential="${CREDENTIALS_DIRECTORY:-/nonexistent}/alert_url"
+# it. Fails when the request fails, or when there is no URL. The URL reaches
+# curl on stdin, so ps never shows it.
+request_url() {
+  local credential="${CREDENTIALS_DIRECTORY:-/nonexistent}/$1"
   local url=""
+  shift
 
   url=$(cat -- "$credential" 2>/dev/null) || return 1
   if [ -z "$url" ]; then
     return 1
   fi
-  printf 'url = %s\n' "$url" \
-    | curl -fsS -m 20 -K - --data-binary "@$file" >/dev/null
+  printf 'url = %s\n' "$url" | curl -fsS -m 20 -K - "$@" >/dev/null
 }
 
 # mark_posted <action> <name>: after a good post, records when a check

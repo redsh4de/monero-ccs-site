@@ -46,6 +46,10 @@ When nothing arrives, run
 `journalctl -u ccs-monitor -u ccs-fetch | grep 'alert not sent'` on both machines. Usual
 causes: the channel refuses posts, Tor is down, or `/etc/ccs/alert_url` is empty.
 
+A heartbeat URL tells you when the monitor or Tor stops: see step 4 of
+[Switch over](README.md#switch-over). When a request fails, the journal says
+`heartbeat not sent`.
+
 ---
 
 ## How alerts work

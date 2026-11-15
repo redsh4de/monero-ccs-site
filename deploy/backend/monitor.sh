@@ -82,12 +82,17 @@ begin_run() {
   mkdir -p -- "$RUN_DIR" "$STATE_DIR/releases"
 }
 
-# end_run: sends this run's messages, and exits. A run that gets here didn't
-# crash, so the "monitor" check passes.
+# end_run: sends this run's messages and the heartbeat, and exits. A run that
+# gets here didn't crash, so the "monitor" check passes.
 end_run() {
   check monitor 0 "the monitor crashed"
   trap - EXIT
   alerts_send
+  # a service that expects this request can tell that the monitor, or Tor,
+  # stopped, which the monitor's own alerts can't
+  if [ -s "${CREDENTIALS_DIRECTORY:-/nonexistent}/heartbeat_url" ]; then
+    request_url heartbeat_url || log "heartbeat not sent"
+  fi
   rm -rf -- "$RUN_DIR"
   exit 0
 }
