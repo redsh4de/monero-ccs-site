@@ -66,20 +66,12 @@ const tabs = [
         </Fragment>
 
         <Fragment slot="panel-2">
-          [% if it.payouts %]<table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Funds awarded</th>
-              </tr>
-            </thead>
-            <tbody>
-              [% for payout in it.payouts %]<tr>
-                <td>[[ payout.date ]]</td>
-                <td>[[ payout.amount ]]</td>
-              </tr>[% endfor %]
-            </tbody>
-          </table>[% else %]<p class="empty">No payouts yet.</p>[% endif %]
+          [% if it.payouts %]<ol class="payouts">
+            [% for payout in it.payouts %]<li>
+              <h2>[[ payout.date ]]</h2>
+              <span>Funds awarded: [[ payout.amount ]]</span>
+            </li>[% endfor %]
+          </ol>[% else %]<p class="empty">No payouts yet.</p>[% endif %]
         </Fragment>
       </SectionTabs>
     </div>
@@ -133,6 +125,34 @@ const tabs = [
   .empty {
     margin: 0;
     color: var(--text-secondary);
+  }
+
+  .payouts {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--space-2xs) var(--space-md);
+      padding: var(--space-md);
+      background: var(--card-color);
+      border-radius: var(--radius-md);
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    h2 {
+      margin: 0;
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-semibold);
+    }
   }
 
   /* phones only: desktop says so in the side card */
