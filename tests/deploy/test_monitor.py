@@ -7,7 +7,7 @@ import pytest
 
 from fetching import git
 from monitoring import ALWAYS, ETC, VALUES, Monitored, SiteServer, page
-from scripts import replaced
+from scripts import replaced, run
 from web import DIST, B, C
 
 
@@ -240,6 +240,29 @@ def test_a_signing_key_that_expires_soon_alerts_naming_it_and_its_day(monitored,
     assert monitored.server.alerts() == [
         f"ccs monitor: keys expire: soon-expiring: {day} (key-expiry)"
     ]
+
+
+@pytest.mark.parametrize("days, alerts", [(10, True), (30, False)])
+def test_a_site_certificate_that_expires_within_14_days_alerts_naming_its_day(
+    monitored, tmp_path, days, alerts
+):
+    """The site moves to a new URL, so feed.xml differs; only this check is read."""
+    pem = tmp_path / "site.pem"
+    subject = ["-subj", "/CN=site", "-addext", "subjectAltName=IP:127.0.0.1"]
+    files = ["-days", str(days), "-nodes", "-keyout", pem, "-out", pem]
+    run("openssl", "req", "-x509", "-newkey", "ed25519", *subject, *files)
+    day = time.strftime("%Y-%m-%d", time.gmtime(time.time() + days * 86400))
+    site = SiteServer(pem)
+    site.serve(monitored.site)
+    try:
+        monitored.monitor(SITE=site.url, CURL_CA_BUNDLE=str(pem))
+    finally:
+        site.stop()
+    failing = "cert-expiry" in monitored.failures()
+    text = f"ccs monitor: the site's certificate expires on {day}"
+    assert (monitored.reason("cert-expiry") if failing else None) == (
+        text if alerts else None
+    )
 
 
 def test_a_site_that_does_not_answer_is_recorded_with_curls_reason(monitored):

@@ -47,7 +47,7 @@ def make_certificate() -> Path:
     folder = Path("/etc/ssl/ccs")
     folder.mkdir()
     key = folder / "privkey.pem"
-    subject = ["-subj", "/CN=ccs.getmonero.org", "-days", "1", "-nodes"]
+    subject = ["-subj", "/CN=ccs.getmonero.org", "-days", "30", "-nodes"]
     files = ["-keyout", key, "-out", folder / "fullchain.pem"]
     run("openssl", "req", "-x509", "-newkey", "ed25519", *subject, *files)
     return key
