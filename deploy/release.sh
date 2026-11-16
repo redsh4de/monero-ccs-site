@@ -164,7 +164,7 @@ list_control_bytes() {
   local status=0
 
   LC_ALL=C grep -rlaP '[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]' \
-    "$dir/dist" "$dir/deploy" --exclude='*.avif' --exclude='*.webp' \
+    "$dir/dist" "$dir/deploy" --exclude='*.avif' \
     --exclude='*.png' --exclude='*.woff2' || status=$?
   # 1 means no file holds one
   [ "$status" -le 1 ]

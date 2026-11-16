@@ -81,7 +81,7 @@ VOTES = ("upvotes", "downvotes")
 SNAPSHOT_FIELDS = {"iid", "title", "author", "web_url", "created_at", "adds", *VOTES}
 MAX_MERGE_REQUESTS = 1_000  # mrs.py reads at most ten pages of 100
 MAX_TEXT = 1_000  # GitLab allows 255 characters for a title or a username
-BINARY_SUFFIXES = {".woff2", ".avif", ".webp", ".png"}
+BINARY_SUFFIXES = {".woff2", ".avif", ".png"}
 BUILD_SUFFIXES = {".html", ".css"} | BINARY_SUFFIXES
 # the authority after // in a URL, absolute or protocol-relative
 URL_AUTHORITY = re.compile(r"//([^/\s\"'<>()\\?#]+)")
