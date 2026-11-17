@@ -3,9 +3,23 @@
 Setup, upgrades and repairs for the two machines behind ccs.getmonero.org. The backend
 runs ccs-back and its wallet. The web server renders and serves the site.
 
-When an alert fires, see [ALERTS.md](ALERTS.md). Signers follow
-[RELEASING.md](RELEASING.md), and [ARCHITECTURE.md](ARCHITECTURE.md) explains the
-design.
+When an alert fires, see [ALERTS.md](ALERTS.md). [ARCHITECTURE.md](ARCHITECTURE.md)
+explains the design.
+
+---
+
+## Who does what
+
+Each role needs a named person before the first install.
+
+- **Two release signers** build each release from its tag, and both sign it. One person
+  cannot sign twice. They follow [RELEASING.md](RELEASING.md).
+- **The address signer**, a Core Team member, makes the address list from the CCS
+  wallet's view key, and signs it. See [The address list](RELEASING.md#the-address-list).
+- **The operators** set up and run the backend and the web server with this guide. They
+  also get the alerts in [ALERTS.md](ALERTS.md).
+- **Whoever runs getmonero.org's DNS** adds the CAA record. At the
+  [switch over](#switch-over), they point ccs.getmonero.org at the web server.
 
 ---
 
