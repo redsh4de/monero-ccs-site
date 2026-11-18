@@ -9,9 +9,10 @@ import dmSansFont from "@/assets/fonts/dm-sans-latin-wght-normal.woff2?url";
 
 interface Props {
   title?: string;
+  fill?: boolean;
 }
 
-const { title } = Astro.props;
+const { title, fill = false } = Astro.props;
 const fullTitle = title ? `${title} | Monero CCS` : "Monero CCS";
 ---
 
@@ -43,7 +44,7 @@ const fullTitle = title ? `${title} | Monero CCS` : "Monero CCS";
   <body>
     <Button href="#main" class="skip-link">Skip to content</Button>
     <Header />
-    <main id="main">
+    <main id="main" class:list={{ fill }}>
       <slot />
     </main>
     <Footer />
@@ -81,6 +82,12 @@ const fullTitle = title ? `${title} | Monero CCS` : "Monero CCS";
     width: 100%;
     max-width: var(--content-max-width);
     box-sizing: border-box;
+  }
+
+  .fill {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
   }
 
   @media (width >= 1200px) {
