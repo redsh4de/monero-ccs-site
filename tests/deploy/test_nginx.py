@@ -95,6 +95,7 @@ def test_the_site_config_loads_with_no_warnings(nginx):
         pytest.param("/ideas/", 200, id="a folder"),
         pytest.param("/proposals/with%20space.html", 200, id="a name with a space"),
         pytest.param("/missing.html", 404, id="a missing page"),
+        pytest.param("/404.html", 200, id="the 404 page, which the monitor fetches"),
         pytest.param("_astro/*.css", 200, id="a stylesheet"),
     ],
 )
@@ -130,6 +131,12 @@ def test_every_response_has_one_of_each_security_header(nginx, path, code):
 def test_each_file_has_its_type(nginx, path, kind):
     path = built(path) if "*" in path else path
     assert headers(path, "Content-Type") == [kind]
+
+
+def test_a_missing_page_shows_the_404_page(nginx):
+    resolve = ["--resolve", "ccs.getmonero.org:443:127.0.0.1"]
+    page = run("curl", "-sk", *resolve, ORIGIN + "/missing.html").stdout
+    assert page == (SITE / "404.html").read_text()
 
 
 def test_a_folder_without_its_slash_redirects(nginx):
