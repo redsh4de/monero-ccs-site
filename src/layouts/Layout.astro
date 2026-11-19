@@ -9,10 +9,11 @@ import dmSansFont from "@/assets/fonts/dm-sans-latin-wght-normal.woff2?url";
 
 interface Props {
   title?: string;
+  description?: string | undefined;
   fill?: boolean;
 }
 
-const { title, fill = false } = Astro.props;
+const { title, description, fill = false } = Astro.props;
 const fullTitle = title ? `${title} | Monero CCS` : "Monero CCS";
 ---
 
@@ -40,6 +41,21 @@ const fullTitle = title ? `${title} | Monero CCS` : "Monero CCS";
     />
 
     <title>{fullTitle}</title>
+    <meta property="og:site_name" content="Monero CCS" />
+    <meta property="og:title" content={title ?? "Monero CCS"} />
+    {
+      description && (
+        <>
+          <meta name="description" content={description} />
+          <meta property="og:description" content={description} />
+        </>
+      )
+    }
+    <meta
+      property="og:image"
+      content={new URL("/meta/og-logo.png", Astro.site).href}
+    />
+    <meta name="twitter:card" content="summary" />
   </head>
   <body>
     <Button href="#main" class="skip-link">Skip to content</Button>

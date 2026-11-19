@@ -3,6 +3,7 @@ import mdx from "@astrojs/mdx";
 import { defineConfig, passthroughImageService } from "astro/config";
 
 export default defineConfig({
+  site: "https://ccs.getmonero.org",
   build: { format: "preserve", inlineStylesheets: "never" },
   integrations: [mdx()],
   image: { service: passthroughImageService() },

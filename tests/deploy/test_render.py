@@ -45,6 +45,24 @@ def test_a_template_cannot_reach_python_internals(tmp_path):
     assert "unsafe" in failed.stderr
 
 
+def test_a_proposal_link_preview_gives_its_stage_and_funds(tmp_path):
+    render(DEPLOY / "render/render.py", EXAMPLE, TEMPLATES, tmp_path)
+    previews = {
+        page: re.findall(
+            r'<meta property="og:description" content="([^"]*)"',
+            (tmp_path / f"proposals/{page}.html").read_text(),
+        )
+        for page in ("example-funding", "example-progress", "example-completed")
+    }
+    assert previews == {
+        "example-funding": ["Funding required: 10 of 25 XMR raised. By example."],
+        "example-progress": [
+            "Work in progress: 60 XMR funded, 1 of 2 milestones done. By example."
+        ],
+        "example-completed": ["Completed: 9.9 XMR funded. By example."],
+    }
+
+
 def restore(rendered, tmp_path):
     """Return the render's input, rebuilt as the monitor does from status.json."""
     restored = tmp_path / "restored"
