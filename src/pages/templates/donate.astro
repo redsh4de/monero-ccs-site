@@ -6,7 +6,13 @@ import ContentLayout from "@/layouts/ContentLayout.astro";
 // a template: the render passes the General Fund as `it`
 ---
 
-<ContentLayout frontmatter={{ title: "Donate to the Monero Project" }}>
+<ContentLayout
+  frontmatter={{
+    title: "Donate to the Monero Project",
+    description:
+      "By donating to the General Fund, you are supporting the Monero Project.",
+  }}
+>
   <p>
     By donating to the following Monero address (General Fund), you are
     supporting the Monero Project. If you wish to donate to a specific proposal,

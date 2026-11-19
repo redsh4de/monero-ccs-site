@@ -156,6 +156,20 @@ class Proposal:
         return STAGES[self.stage].summary if self.listed else ""
 
     @property
+    def description(self) -> str:
+        """Return the line a link preview shows under the title."""
+        if self.funding:
+            state = f"Funding required: {self.raised} of {self.amount} XMR raised"
+        elif self.in_progress:
+            done = f"{self.milestones_done} of {len(self.milestones)} milestones done"
+            state = f"Work in progress: {self.amount} XMR funded, {done}"
+        elif self.completed:
+            state = f"Completed: {self.amount} XMR funded"
+        else:
+            return ""
+        return f"{state}. By {self.author}."
+
+    @property
     def funding(self) -> bool:
         return self.stage == "funding-required"
 

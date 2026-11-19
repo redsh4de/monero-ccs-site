@@ -16,12 +16,13 @@ export function getStaticPaths() {
 interface Props {
   name: StageName;
   label: string;
+  description: string;
 }
 
-const { name, label } = Astro.props;
+const { name, label, description } = Astro.props;
 ---
 
-<Layout title={label}>
+<Layout title={label} {description}>
   <StageLayout current={name}>
     <div class="heading">
       <h1>{label}</h1>

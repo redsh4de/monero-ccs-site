@@ -1,5 +1,6 @@
 # The hosts the built site may name, one a line. release.sh refuses a build
 # that names any other, so adding one here is a change both signers read.
+ccs.getmonero.org
 getmonero.org
 repo.getmonero.org
 translate.getmonero.org

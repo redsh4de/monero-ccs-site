@@ -4,12 +4,15 @@ import HowItWorks from "@/components/pages/index/HowItWorks.astro";
 import NeedsFunding from "@/components/pages/index/NeedsFunding.astro";
 import Layout from "@/layouts/Layout.astro";
 import StageLayout from "@/layouts/StageLayout.astro";
+
+const intro =
+  "Monero is a decentralized, community driven project. The CCS is a way for the community to fund development and other initiatives that benefit the Monero ecosystem.";
 ---
 
-<Layout>
+<Layout description={intro}>
   <StageLayout current="home">
     <div class="home">
-      <HomeHero />
+      <HomeHero {intro} />
       <NeedsFunding />
       <HowItWorks />
     </div>

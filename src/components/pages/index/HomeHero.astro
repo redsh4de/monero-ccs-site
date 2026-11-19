@@ -2,16 +2,18 @@
 import { Image } from "astro:assets";
 
 import landingImage from "@/assets/funding-required.avif";
+
+interface Props {
+  intro: string;
+}
+
+const { intro } = Astro.props;
 ---
 
 <div class="hero">
   <Image src={landingImage} alt="" width={232} loading="eager" />
   <h1>Community Crowdfunding System</h1>
-  <p>
-    Monero is a decentralized, community driven project. The CCS is a way for
-    the community to fund development and other initiatives that benefit the
-    Monero ecosystem.
-  </p>
+  <p>{intro}</p>
 </div>
 
 <style>
