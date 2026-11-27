@@ -16,7 +16,7 @@ TAIL = 40
 
 def run(
     *cmd: str | Path,
-    ok: bool = True,
+    refusal: str | None = None,
     env: dict[str, str] | None = None,
     input: str | None = None,
     cwd: Path | None = None,
@@ -24,9 +24,8 @@ def run(
 ) -> subprocess.CompletedProcess[str]:
     """Run a command, and fail the test with its output on an unexpected exit.
 
-    ok=True needs exit 0, and ok=False needs any other exit. env adds to the
-    test's environment. Each run is also printed, so pytest shows it when a
-    later assert in the test fails.
+    With a refusal, the command must fail and say it on stderr, so a crash never
+    passes for the expected failure. An empty refusal expects a silent failure.
     """
     command = [str(part) for part in cmd]
     try:
@@ -46,10 +45,16 @@ def run(
             for stream in (hung.stdout, hung.stderr)
         ]
         fail(command, f"timed out after {timeout} s", *output)
+    # pytest shows what a run printed when a later assert fails
     print(f"$ {shlex.join(command)} -> exit {result.returncode}")
     print(result.stdout + result.stderr, end="")
-    if (result.returncode == 0) != ok:
-        expected = "0" if ok else "a failure"
+    if refusal is None:
+        wrong = result.returncode != 0
+    else:
+        said = refusal in result.stderr if refusal else not result.stderr
+        wrong = result.returncode == 0 or not said
+    if wrong:
+        expected = "0" if refusal is None else f"a failure saying {refusal!r}"
         headline = f"exited {result.returncode}, expected {expected}"
         fail(command, headline, result.stdout, result.stderr)
     return result
@@ -64,32 +69,15 @@ def fail(command: list[str], headline: str, stdout: str, stderr: str) -> None:
     )
 
 
-def refuses(
-    *cmd: str | Path, reason: str, **options
-) -> subprocess.CompletedProcess[str]:
-    """Run a command that must refuse, and check that it says why, not crash.
-
-    options go to run(), such as env. Return the run, as run() does.
-    """
-    result = run(*cmd, ok=False, **options)
-    assert (
-        reason in result.stderr
-    ), f"expected {reason!r} on stderr, got:\n{result.stderr}"
-    return result
-
-
 def lib_sh(
     snippet: str,
     *args: str | Path,
-    ok: bool = True,
+    refusal: str | None = None,
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    """Run a shell snippet with lib.sh loaded, its arguments as $1, $2 and on.
-
-    The shell runs as every deploy script does: set -eu, and pipefail.
-    """
+    """Run a shell snippet with lib.sh loaded, its arguments as $1, $2 and on."""
     lib = f"set -eu; set -o pipefail; DEPLOY={DEPLOY}; . {DEPLOY}/lib.sh"
-    return run("sh", "-c", f"{lib}; {snippet}", "sh", *args, ok=ok, env=env)
+    return run("sh", "-c", f"{lib}; {snippet}", "sh", *args, refusal=refusal, env=env)
 
 
 def stand_in(folder: Path, name: str, script: str) -> str:
@@ -105,14 +93,24 @@ def tail(text: str) -> str:
 
 
 def replaced(text: str, old: str, new: str) -> str:
-    """Return the text with old replaced by new, and fail the test if old is gone.
-
-    A test edits fixture data or a template to cause a case. When that data
-    changes, the edit fails here, and the test does not blame the script.
-    """
+    """Return the text with old replaced by new, and fail the test if old is gone."""
     if old not in text:
         pytest.fail(
             f"the test's own edit did not apply: {old!r} is no longer in the text",
             pytrace=False,
         )
     return text.replace(old, new)
+
+
+def bomb(repo: Path, base: str) -> str:
+    """Return a commit on base that adds 10**12 folders, from a few objects."""
+    git = ["git", "-C", repo]
+    entry = "040000 tree " + run(*git, "mktree", input="").stdout.strip()
+    for _ in range(12):
+        lines = "".join(f"{entry}\t{n}\n" for n in range(10))
+        entry = "040000 tree " + run(*git, "mktree", input=lines).stdout.strip()
+    root = run(*git, "ls-tree", base).stdout + f"{entry}\tbomb\n"
+    root = run(*git, "mktree", input=root).stdout.strip()
+    user = ["-c", "user.name=t", "-c", "user.email=t@example.org"]
+    commit = run(*git, *user, "commit-tree", root, "-p", base, "-m", "bomb")
+    return commit.stdout.strip()

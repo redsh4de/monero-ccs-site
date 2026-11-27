@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts import DEPLOY, run
+from harness import DEPLOY, run
 
 UNITS = sorted(DEPLOY.glob("*/ccs-*"))
 SERVICES = [unit.name for unit in UNITS if unit.suffix == ".service"]

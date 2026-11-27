@@ -8,7 +8,7 @@ from collections.abc import Callable
 from pathlib import Path
 from subprocess import CompletedProcess
 
-from scripts import DEPLOY, EXAMPLE, REPO, replaced, run
+from harness import DEPLOY, EXAMPLE, REPO, replaced, run
 
 DIST = REPO / "dist"
 COMMIT = "0" * 39 + "7"
@@ -72,9 +72,9 @@ class WebServer:
         text = as_pushed(text, self.pushed)
         (self.ccs / "in/values").write_text(edit(text) if edit else text)
 
-    def update(self, ok: bool = True, **env: str) -> CompletedProcess[str]:
+    def update(self, refusal: str | None = None, **env: str) -> CompletedProcess[str]:
         script = self.lib / "current/deploy/web/update.sh"
-        return run(script, ok=ok, env={"CCS_DIR": str(self.ccs), **env})
+        return run(script, refusal=refusal, env={"CCS_DIR": str(self.ccs), **env})
 
     def applied(self) -> int:
         values = (self.ccs / "state/values").read_text().splitlines()

@@ -34,7 +34,7 @@ sh tests/deploy/run.sh tests/deploy/test_release.py
 ```
 
 CI runs it each Monday, and on each pull request that changes `release.sh` or a file it
-uses. `.github/workflows/release.yml` lists these files.
+uses. `.github/workflows/test-release.yml` lists these files.
 
 ## Read a failure
 
@@ -55,7 +55,8 @@ uses. `.github/workflows/release.yml` lists these files.
   `deploy/web/update.sh`.
 - Take the setup from the fixtures in `conftest.py`. For example, `rendered` gives a web
   server that has rendered the site once. A file can also have its own fixtures, such as
-  `monitored` in `test_monitor.py`. Do not copy setup into a test file.
+  `monitored` in `test_monitor.py`. Do not copy setup into a test file. Setup that several
+  test files share goes in `helpers/`.
 - Test one guarantee, and name the test after it.
 - Change example data or a template only through `replaced()`. When the data changes
   later, the test then fails with its own message, and does not blame the script.
@@ -69,18 +70,18 @@ podman run --rm --network=none -v "$PWD:/w:ro,z" \
   python3 -B -m pytest -c tests/deploy/pytest.ini tests/deploy/test_update.py
 ```
 
-The shared setup is in nine files:
+The shared setup is in `conftest.py` and in `helpers/`:
 
 | File | Holds |
 |---|---|
-| `scripts.py` | The repository's paths; `run()`, which shows a command's output on a failure; `refuses()`; `replaced()`; and `lib_sh()`, which calls a `lib.sh` function |
-| `signing.py` | The test keys, made for each run, signed address lists and signed releases |
-| `web.py` | A web server's folders and actions, as `update.sh` sees them |
-| `fetching.py` | `fetch.sh`'s folders, and a proposals repository for it to fetch |
-| `fake_server.py` | A fake GitLab, alert channel and release host, in the test's own process |
-| `fake_tor.py` | A stand-in for Tor's socket, which sends each request to this machine |
-| `monitoring.py` | A site for the monitor to check, built once for each test file and copied for each test |
-| `installing.py` | Both servers in one container for `install.sh`, and the saved states that the tests start from |
+| `helpers/harness.py` | The repository's paths; `run()`, which shows a command's output on a failure, and passes an expected failure only when it says what the test names; `replaced()`; and `lib_sh()`, which calls a `lib.sh` function |
+| `helpers/signing.py` | The test keys, made for each run, signed address lists and signed releases |
+| `helpers/web.py` | A web server's folders and actions, as `update.sh` sees them |
+| `helpers/fetching.py` | `fetch.sh`'s folders, and a proposals repository for it to fetch |
+| `helpers/fake_server.py` | A fake GitLab, alert channel and release host, in the test's own process |
+| `helpers/fake_tor.py` | A stand-in for Tor's socket, which sends each request to this machine |
+| `helpers/monitoring.py` | A site for the monitor to check, built once for each test file and copied for each test |
+| `helpers/installing.py` | Both servers in one container for `install.sh`, and the saved states that the tests start from |
 | `conftest.py` | The fixtures that the tests ask for |
 
 A test that needs a package the image lacks adds it to `Containerfile`.

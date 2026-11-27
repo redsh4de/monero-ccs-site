@@ -1,8 +1,5 @@
 #!/bin/sh
-# Runs the deploy tests, each test file in a fresh container of its own, with
-# the repo read-only at /w and no network. test_systemd.py runs in a container
-# that boots systemd. test_release.py runs in one with the network, where
-# podman builds the release.
+# Runs the deploy tests, each test file in a fresh container of its own.
 #
 # Usage: tests/deploy/run.sh [<test file>...]
 #        run from the repo's root; with no file, it runs every one but
@@ -20,8 +17,7 @@ plain() {
     python3 -B -m pytest -c tests/deploy/pytest.ini "$1"
 }
 
-# rootless: true when podman runs rootless, else says so. Only then does
-# --privileged keep its privileges inside the container, off the host.
+# rootless: true under rootless podman, where --privileged cannot reach the host.
 rootless() {
   if [ "$(podman info -f '{{.Host.Security.Rootless}}')" = true ]; then
     return 0
@@ -55,8 +51,7 @@ booted() {
   return "$status"
 }
 
-# nested <file>: runs the file's tests in a privileged container with the
-# network. podman runs its own containers in it.
+# nested <file>: runs the file's tests where podman can run its own containers.
 nested() {
   rootless || { plain "$1"; return; }
   podman run --rm --privileged -e CI -v "$PWD:/w:ro,z" -w /w "$IMAGE" \
