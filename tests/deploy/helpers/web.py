@@ -51,7 +51,7 @@ class WebServer:
         lay_out(self.ccs)
 
     def install(self, version: int, dist: Path = DIST) -> None:
-        """Lay out a release as install.sh does, and make it the current one."""
+        """Lay out a release as install.py does, and make it the current one."""
         release = self.lib / "releases" / str(version)
         shutil.rmtree(release, ignore_errors=True)
         shutil.copytree(dist, release / "dist")

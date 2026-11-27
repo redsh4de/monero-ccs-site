@@ -1,4 +1,4 @@
-"""install.sh: both roles, the push, upgrades, and the releases it refuses."""
+"""install.py: both roles, the push, upgrades, and the releases it refuses."""
 
 import filecmp
 import os
@@ -27,8 +27,8 @@ from harness import DEPLOY, REPO, replaced, run, stand_in
 from signing import publish
 from web import lay_out
 
-USAGE = "usage: install.sh"
-INSTALL = (DEPLOY / "install.sh").read_text()
+USAGE = "usage: install.py"
+INSTALL = (DEPLOY / "install.py").read_text()
 
 
 def test_a_push_holds_one_byte_more_than_the_values_cap():
@@ -166,6 +166,14 @@ def test_the_public_name_as_web_host_is_refused(fresh):
     fresh.refuses(*args, reason=reason, first=True)
 
 
+def test_a_config_value_in_quotes_is_refused(fresh):
+    """systemd strips the quotes that install.py would keep, so the two would differ."""
+    Path("/etc/ccs").mkdir(exist_ok=True)
+    Path("/etc/ccs/config").write_text('SITE="https://ccs.getmonero.org"\n')
+    reason = 'with no quotes: SITE="https://ccs.getmonero.org"'
+    fresh.refuses(*BACKEND, reason=reason, first=True)
+
+
 def test_ccs_backs_json_that_others_cannot_read_is_refused(fresh):
     unreadable = CCS_BACK / "proposals.json"
     unreadable.touch(mode=0o600)
@@ -265,7 +273,7 @@ def test_the_backend_prints_the_files_still_to_place_and_the_web_servers_command
 ):
     lines = backend_install.stdout.splitlines()
     assert "Still to place by hand: /etc/ccs/addresses.txt" in lines
-    assert f"  install.sh web site-v1 <backend IP address> '{push_key()}'" in lines
+    assert f"  install.py web site-v1 <backend IP address> '{push_key()}'" in lines
 
 
 AUTHORIZED_KEYS = Path("/home/ccs-fetch/.ssh/authorized_keys")
@@ -436,20 +444,22 @@ def test_an_upgrade_is_announced_on_the_alert_channel(installed_web, server):
 
 
 @pytest.fixture
-def mktemp_log(tmp_path) -> Path:
-    """Write a mktemp in tmp_path that logs its arguments, and return the log."""
-    log = tmp_path / "mktemp.log"
-    script = f'#!/bin/sh\necho "$*" >>{log}\nexec /usr/bin/mktemp "$@"\n'
-    stand_in(tmp_path, "mktemp", script)
+def curl_log(tmp_path) -> Path:
+    """Write a curl in tmp_path that logs its arguments, and return the log."""
+    log = tmp_path / "curl.log"
+    script = f'#!/bin/sh\necho "$*" >>{log}\nexec /usr/bin/curl "$@"\n'
+    stand_in(tmp_path, "curl", script)
     return log
 
 
 def test_the_download_goes_beside_releases_and_leaves_nothing_behind(
-    installed_web, mktemp_log
+    installed_web, curl_log
 ):
-    path = f"{mktemp_log.parent}:{installed_web.env['PATH']}"
+    path = f"{curl_log.parent}:{installed_web.env['PATH']}"
     installed_web.install("web", "site-v2", PATH=path)
-    assert f"-d -p {LIB}" in mktemp_log.read_text().splitlines()
+    folders = re.findall(r" -o (\S+)/[^/ ]+ ", curl_log.read_text())
+    assert len(folders) == 3
+    assert {Path(folder).parent for folder in folders} == {LIB}
     assert list(LIB.glob("tmp.*")) == []
 
 
@@ -526,7 +536,7 @@ def test_a_failed_reinstall_keeps_the_release_it_fetched_again(upgraded, tmp_pat
     path = f"{tmp_path}:{upgraded.env['PATH']}"
     reason = "Back on release 2"
     upgraded.refuses("web", "site-v2", reason=reason, first=True, PATH=path)
-    assert (LIB / "releases/2/deploy/install.sh").exists()
+    assert (LIB / "releases/2/deploy/install.py").exists()
 
 
 def hang_up(machine: Machine, tmp_path: Path, tag: str) -> int:
@@ -534,7 +544,7 @@ def hang_up(machine: Machine, tmp_path: Path, tag: str) -> int:
     switching = tmp_path / "switching"
     stand_in(tmp_path, "systemd-sysusers", f"#!/bin/sh\ntouch {switching}\nsleep 2\n")
     env = {**os.environ, **machine.env, "PATH": f"{tmp_path}:{machine.env['PATH']}"}
-    script = str(LIB / "current/deploy/install.sh")
+    script = str(LIB / "current/deploy/install.py")
     pid, terminal = pty.fork()
     if pid == 0:
         os.execve(script, [script, "web", tag], env)

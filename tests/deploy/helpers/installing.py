@@ -1,4 +1,4 @@
-"""One container as both servers, for install.sh, and its saved states."""
+"""One container as both servers, for install.py, and its saved states."""
 
 import json
 import os
@@ -37,7 +37,7 @@ def values() -> str:
 
 
 def push_key() -> str:
-    """Return the backend's public push key, as install.sh backend prints it."""
+    """Return the backend's public push key, as install.py backend prints it."""
     return Path(f"{PUSH_KEY}.pub").read_text().strip()
 
 
@@ -83,7 +83,7 @@ class Machine:
     def install(
         self, *args: str | Path, first: bool = False, **env: str
     ) -> CompletedProcess[str]:
-        """Run install.sh with args: the installed copy, or with first, the repo's."""
+        """Run install.py with args: the installed copy, or with first, the repo's."""
         return run(*self.script(first), *args, env={**self.env, **env}, timeout=300)
 
     def refuses(
@@ -94,9 +94,9 @@ class Machine:
 
     def script(self, first: bool) -> list[str | Path]:
         if first:
-            # an operator's strict umask, which install.sh must not pass on
-            return ["sh", "-c", 'umask 077 && exec "$0" "$@"', DEPLOY / "install.sh"]
-        return [LIB / "current/deploy/install.sh"]
+            # an operator's strict umask, which install.py must not pass on
+            return ["sh", "-c", 'umask 077 && exec "$0" "$@"', DEPLOY / "install.py"]
+        return [LIB / "current/deploy/install.py"]
 
     def push(
         self,

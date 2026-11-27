@@ -256,7 +256,7 @@ def test_sha256sums_is_sha256sums_own_output(first):
 
 def test_the_first_release_is_reviewed_whole_against_nothing(first):
     assert first.review.startswith("Changes since nothing:\n")
-    assert "new/deploy/install.sh" in first.review
+    assert "new/deploy/install.py" in first.review
     assert "+lockfileVersion: " in first.review
 
 
@@ -362,7 +362,7 @@ def test_no_attestation_without_a_yes(second):
 
 def test_the_review_shows_only_what_changed_since_the_release_before(second):
     assert second.review.startswith("Changes since site-v1:\n")
-    assert "new/deploy/install.sh" not in second.review
+    assert "new/deploy/install.py" not in second.review
 
 
 def test_a_changed_page_shows_in_the_review(second):

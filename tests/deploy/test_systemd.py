@@ -128,12 +128,12 @@ def machine(tmp_path_factory, keys, gitlab) -> None:
 @pytest.fixture(scope="module")
 def installed(machine) -> None:
     """Install the backend, then the web server, as an operator does."""
-    run(DEPLOY / "install.sh", "backend", "site-v1", "127.0.0.1", CCS_BACK, timeout=300)
+    run(DEPLOY / "install.py", "backend", "site-v1", "127.0.0.1", CCS_BACK, timeout=300)
     Path("/etc/ssh/sshd_config.d/50-admin.conf").write_text(
         "PasswordAuthentication no\n"
     )
     web = ("web", "site-v1", "127.0.0.1", push_key())
-    run(LIB / "current/deploy/install.sh", *web, timeout=300)
+    run(LIB / "current/deploy/install.py", *web, timeout=300)
     # git refuses a local repository owned by another user; live uses https://
     run("chown", "-R", "ccs-fetch:", ORIGIN)
     # a rootless container sets up no systemd credentials, so bind the key in place
