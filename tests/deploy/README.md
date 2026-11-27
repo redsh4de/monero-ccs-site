@@ -25,7 +25,7 @@ sh tests/deploy/run.sh 'tests/deploy/test_update.py::test_a_bad_values_line_keep
 in its own sandbox. When systemd does not boot, the file is skipped, and in CI it fails.
 The reason given says what to fix.
 
-`test_release.py` runs `release.sh`, which builds the site in podman. So the file runs in a
+`test_release.py` runs `release.py`, which builds the site in podman. So the file runs in a
 privileged container that has the network and a podman of its own. Each run downloads
 pnpm, two build images and the site's packages, and takes about 5 minutes. Run it by name:
 
@@ -33,7 +33,7 @@ pnpm, two build images and the site's packages, and takes about 5 minutes. Run i
 sh tests/deploy/run.sh tests/deploy/test_release.py
 ```
 
-CI runs it each Monday, and on each pull request that changes `release.sh` or a file it
+CI runs it each Monday, and on each pull request that changes `release.py` or a file it
 uses. `.github/workflows/test-release.yml` lists these files.
 
 ## Read a failure
@@ -45,7 +45,7 @@ uses. `.github/workflows/test-release.yml` lists these files.
 3. A test can also fail on a later check, after its scripts ran as expected. Then each
    run shows under "Captured stdout": the command, its exit status and its output.
    A failure about a systemd unit also shows the end of the unit's journal. A failure
-   about a `release.sh` run shows the end of what it said, without the review.
+   about a `release.py` run shows the end of what it said, without the review.
 4. Open the script that the command names. Its output usually names the check that
    refused, such as `values: a line doesn't match`.
 
@@ -81,7 +81,7 @@ The shared setup is in `conftest.py` and in `helpers/`:
 | `helpers/fake_server.py` | A fake GitLab, alert channel and release host, in the test's own process |
 | `helpers/fake_tor.py` | A stand-in for Tor's socket, which sends each request to this machine |
 | `helpers/monitoring.py` | A site for the monitor to check, built once for each test file and copied for each test |
-| `helpers/installing.py` | Both servers in one container for `install.sh`, and the saved states that the tests start from |
+| `helpers/installing.py` | Both servers in one container for `install.py`, and the saved states that the tests start from |
 | `conftest.py` | The fixtures that the tests ask for |
 
 A test that needs a package the image lacks adds it to `Containerfile`.

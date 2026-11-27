@@ -12,7 +12,7 @@ DOCS = [
     *sorted(DEPLOY.rglob("*.md")),
 ]
 IDS = [str(doc.relative_to(REPO)) for doc in DOCS]
-SCRIPTS = sorted([*DEPLOY.glob("*/*.sh"), *DEPLOY.glob("*/*.py")])
+SCRIPTS = sorted(DEPLOY.rglob("*.py"))
 
 
 def anchors(text):
@@ -70,10 +70,7 @@ def test_the_docs_name_every_alert_the_scripts_raise_and_every_checks_py_command
         for line in script.read_text().splitlines()
         if not line.lstrip().startswith("#")
     )
-    shell = r'\b(?:alert|check|require) ([a-z][a-z-]+) (?:"?\$|[01] )'
-    python = r'\b(?:check|require)\(\s*"([a-z][a-z-]+)"'
-    alerts = {name for pair in re.findall(f"{shell}|{python}", code) for name in pair}
-    alerts.discard("")
+    alerts = set(re.findall(r'\b(?:check|require)\(\s*"([a-z][a-z-]+)"', code))
     assert alerts, "no alert names found in the scripts"
     docs = "\n".join(doc.read_text() for doc in DOCS)
     names = re.findall(r'case \["([a-z]+)"', CHECKS.read_text())
@@ -90,7 +87,7 @@ def test_a_first_signer_reads_every_script_that_runs_as_them():
     listed = re.search(r'scripts="([^"]*)"', (DEPLOY / "docs/RELEASING.md").read_text())
     modules = (DEPLOY / "modules.py").read_text()
     loaded = re.findall(r'^    "[\w.]+": "([\w/]+\.py)",$', modules, re.M)
-    run = ["signer/release.sh", "lib.sh", "gittree.py", "checks.py", "modules.py"]
+    run = ["signer/release.py", "gittree.py", "checks.py", "modules.py"]
     run += loaded
     assert sorted(listed[1].split()) == sorted(f"deploy/{n}" for n in run)
 

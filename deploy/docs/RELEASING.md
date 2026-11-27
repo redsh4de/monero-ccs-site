@@ -29,7 +29,7 @@ dependency code with your account's rights.
 
 - Sign on a second machine, or as a second user who logs in on their own console. Never
   switch to that user from your desktop's terminal.
-- Give that account rootless Podman, GNU `tar` and `grep`, `git` 2.41 or later, `curl`,
+- Give that account rootless Podman, GNU `tar`, `git` 2.41 or later, `curl`,
   `gpg`, `less` and Python 3.12 or later. Its OpenSSL must be 3.2 or later, whose Keccak
   checks an address. Give it no Node, pnpm, editor or AI agent.
 - Clone over HTTPS without credentials. The signing account holds no GitHub token and no
@@ -76,7 +76,7 @@ goes out once two release signers have attested the same bytes.
    ```
 
 2. In the signing account, fetch the tag, the tag before it and the attestations so far.
-   `release.sh` compares the lockfile with the one before. Do not check out `site-vN`:
+   `release.py` compares the lockfile with the one before. Do not check out `site-vN`:
    its scripts run only after two signers have read them.
 
    ```sh
@@ -90,8 +90,8 @@ goes out once two release signers have attested the same bytes.
    scripts whole. For release 1, check out `site-v1` itself, and read them whole:
 
    ```sh
-   scripts="deploy/signer/release.sh deploy/lib.sh deploy/gittree.py deploy/checks.py
-     deploy/modules.py deploy/lib.py deploy/alerts.py
+   scripts="deploy/signer/release.py deploy/modules.py deploy/lib.py deploy/alerts.py
+     deploy/gittree.py deploy/checks.py
      deploy/guards/__init__.py deploy/guards/common.py deploy/guards/style.py
      deploy/guards/values.py deploy/guards/snapshot.py deploy/guards/build.py
      deploy/guards/lockfile.py deploy/guards/site.py deploy/guards/keys.py
@@ -100,7 +100,7 @@ goes out once two release signers have attested the same bytes.
    ```
 
 4. Build, with your name for your attestation's folder:
-   `deploy/signer/release.sh site-vN <your name>`. If it says your build differs from
+   `deploy/signer/release.py site-vN <your name>`. If it says your build differs from
    another release signer's, do not sign, and tell them.
 5. Read every change it shows, as in [Read the changes](#read-the-changes). Answer `y`
    only if you expect each change.
@@ -112,7 +112,7 @@ goes out once two release signers have attested the same bytes.
    git add attestations/site-vN/<your name>
    ```
 
-7. When `release.sh` says to create the GitHub release, two release signers have
+7. When `release.py` says to create the GitHub release, two release signers have
    attested. Publish it from your development account, and tell the operators which
    machines need it, as in [Upgrade](../README.md#upgrade). Every install checks the
    signatures, so that account needs no trust:
@@ -123,15 +123,15 @@ goes out once two release signers have attested the same bytes.
    ```
 
 **The second signer builds once the first signer's attestation is on `main`.** Until
-then, `release.sh` cannot see it, and says the release needs two attestations.
+then, `release.py` cannot see it, and says the release needs two attestations.
 
 **A change to the scripts takes effect one release later.** Release N-1's scripts build
-release N. So a new pnpm pin goes into `release.sh` one release before the new
+release N. So a new pnpm pin goes into `release.py` one release before the new
 `packageManager` goes into `package.json`.
 
 ### Read the changes
 
-**Refuse any change you do not expect.** `release.sh` shows every change since release
+**Refuse any change you do not expect.** `release.py` shows every change since release
 N-1: the lockfile, against tag N-1 in your clone, and `deploy/` line by line, then
 `dist/` word by word. Release 1 compares with nothing, so it shows each of them whole.
 
@@ -169,7 +169,7 @@ Every good signature should show the same line.
 
 The folder follows the layout of Bitcoin Core's `guix.sigs`. To move the attestations to
 a repository of their own, keep that layout, and change only `get_attestations` in
-`release.sh`.
+`release.py`.
 
 ---
 
@@ -225,7 +225,7 @@ Extending keeps old signatures good, so nothing needs signing again.
 ### Remove or replace a release signer
 
 When a release signer leaves or replaces their key, the current signers sign each
-installed release again. **Until then, rebuilds, the monitor and `release.sh` refuse
+installed release again. **Until then, rebuilds, the monitor and `release.py` refuse
 those releases.**
 
 1. Update `release-signers.gpg` on both machines, and in each signing account.

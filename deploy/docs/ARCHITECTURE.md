@@ -14,7 +14,7 @@ result.
 .. BACKEND .............................................................
 :                                                                      :
 : +------------+    +------------+                      +------------+ :
-: |  ccs-back  |--->| values.py  |                      | monitor.sh | :
+: |  ccs-back  |--->| values.py  |                      | monitor.py | :
 : +------------+    +------------+                      +------------+ :
 :                          |                                   ^       :
 ...........................|...................................|........
@@ -23,7 +23,7 @@ result.
 .. WEB SERVER .............|...................................|........
 :                          v                                   |       :
 :                   +------------+    +------------+    +------------+ :  +------------+
-:                   |  fetch.sh  |--->| update.sh  |--->|   nginx    |--->|  visitors  |
+:                   |  fetch.py  |--->| update.py  |--->|   nginx    |--->|  visitors  |
 :                   +------------+    +------------+    +------------+ :  +------------+
 :                          ^                                           :
 ...........................|............................................
@@ -37,9 +37,9 @@ result.
 1. `values.py` reads ccs-back's JSON about once a minute, and writes the values: each
    proposal's amount raised, contribution count and donation address. The push sends
    them to the web server over SSH.
-2. Each push starts `fetch.sh`. It calls GitLab only when the push's `gitlab` line
+2. Each push starts `fetch.py`. It calls GitLab only when the push's `gitlab` line
    changes, or once an hour.
-3. `update.sh` runs after each fetch, and checks the values and the address list. When
+3. `update.py` runs after each fetch, and checks the values and the address list. When
    something changed, it renders the site with [the render](../render/README.md). It
    switches to the new site only once `checks.py site` passes.
 4. nginx serves the site.
@@ -103,16 +103,17 @@ The folders in `deploy/` follow the machine that runs their files:
 
 | Folder           | Holds                                                                         | Runs on                                 |
 | :--------------- | :---------------------------------------------------------------------------- | :-------------------------------------- |
-| `deploy/` itself | `install.sh`, the settings, the README and the shared scripts                 | Both servers                            |
-| `web/`           | `fetch.sh`, `update.sh`, their units and nginx's settings                     | The web server                          |
-| `backend/`       | `values.py`, `monitor.sh` and their units                                     | The backend                             |
-| `signer/`        | `release.sh` and `address-list.py`                                            | The signers' machines                   |
+| `deploy/` itself | `install.py`, the settings, the README and the shared scripts                 | Both servers                            |
+| `web/`           | `fetch.py`, `update.py`, their units and nginx's settings                     | The web server                          |
+| `backend/`       | `values.py`, `monitor.py` and their units                                     | The backend                             |
+| `signer/`        | `release.py` and `address-list.py`                                            | The signers' machines                   |
 | `render/`        | `render.py`, `status.py` and their modules                                    | Both servers                            |
 | `guards/`        | The checks of `checks.py`, one module for each input                          | Wherever `checks.py` runs               |
 | `docs/`          | How the site works, why it is safe, how to release, and what each alert means | Read by people; each release ships them |
 
-The signers' scripts also run `checks.py`, `lib.sh` and `gittree.py`. `checks.py` loads
-`safety.py` and `qr.py` from `render/`.
+The signers' scripts also run `checks.py` and `gittree.py`. Every script loads the
+deploy's modules through `modules.py`, from their own source, so a planted folder or a
+cached `.pyc` never runs. It loads `safety.py` and `qr.py` from `render/`.
 
 Both servers keep the installed releases in `/usr/local/lib/ccs/releases/`. The link
 `/usr/local/lib/ccs/current` names the one in use.
@@ -121,13 +122,13 @@ The web server keeps its data in `/var/lib/ccs/`:
 
 | Path      | Holds                                                                         | Written by           |
 | :-------- | :---------------------------------------------------------------------------- | :------------------- |
-| `in/`     | The pushed `values`, and the links `repo` and `mr` to the fetched content     | The push, `fetch.sh` |
-| `fetch/`  | The proposals repository, its exported trees, and the merge request sets      | `fetch.sh`           |
-| `state/`  | The `values` applied last, with the pins, and the hash of the inputs rendered | `update.sh`          |
-| `work/`   | One run's input and output, made afresh each run                              | `update.sh`          |
-| `cache/`  | Rendered proposal bodies, kept between runs                                   | `update.sh`          |
-| `site/`   | The site that nginx serves, and the one before it                             | `update.sh`          |
-| `current` | A link to the site in `site/` that nginx serves                               | `update.sh`          |
+| `in/`     | The pushed `values`, and the links `repo` and `mr` to the fetched content     | The push, `fetch.py` |
+| `fetch/`  | The proposals repository, its exported trees, and the merge request sets      | `fetch.py`           |
+| `state/`  | The `values` applied last, with the pins, and the hash of the inputs rendered | `update.py`          |
+| `work/`   | One run's input and output, made afresh each run                              | `update.py`          |
+| `cache/`  | Rendered proposal bodies, kept between runs                                   | `update.py`          |
+| `site/`   | The site that nginx serves, and the one before it                             | `update.py`          |
+| `current` | A link to the site in `site/` that nginx serves                               | `update.py`          |
 
 So `/var/lib/ccs/current` is the served site, and `/usr/local/lib/ccs/current` is the
 installed release.
@@ -153,7 +154,7 @@ Every builder's signature also goes into `attestations/site-vN/<builder>/`, as B
 Core keeps them in `guix.sigs`. Anyone can attest. A machine counts only good signatures
 from the keys in `release-signers.gpg`, and skips any other.
 
-`release.sh` packs the same bytes on any machine, so every builder signs one build. It:
+`release.py` packs the same bytes on any machine, so every builder signs one build. It:
 
 - runs the scripts of release N-1, which two signers read, so a new script never runs
   before its review;
@@ -166,7 +167,7 @@ from the keys in `release-signers.gpg`, and skips any other.
 - refuses a build that holds what a release may not, as `checks.py build` lists;
 - stops when the build differs from a release signer's attestation.
 
-`install.sh` switches a machine to a release only after it checks it. It:
+`install.py` switches a machine to a release only after it checks it. It:
 
 - refuses a release older than the installed one, unless that release is still on disk;
 - unpacks the release into `/usr/local/lib/ccs/releases/N`, and points
@@ -189,12 +190,12 @@ Two path units and two timers start all the work.
 | Unit                 | Starts when                                        | Runs                                             |
 | -------------------- | -------------------------------------------------- | ------------------------------------------------ |
 | `ccs-values.path`    | ccs-back rewrites `proposals.json`                 | `values.py`, then the push in `ccs-push.service` |
-| `ccs-fetch.path`     | A push lands in `/var/lib/ccs/in/values`           | `fetch.sh`                                       |
-| `ccs-fetch.timer`    | Every hour, after a random wait of up to 5 minutes | `fetch.sh`, for when the backend is silent       |
-| `ccs-update.service` | After every fetch, whatever its result             | `update.sh`                                      |
-| `ccs-monitor.timer`  | Every 15 to 25 minutes                             | `monitor.sh`                                     |
+| `ccs-fetch.path`     | A push lands in `/var/lib/ccs/in/values`           | `fetch.py`                                       |
+| `ccs-fetch.timer`    | Every hour, after a random wait of up to 5 minutes | `fetch.py`, for when the backend is silent       |
+| `ccs-update.service` | After every fetch, whatever its result             | `update.py`                                      |
+| `ccs-monitor.timer`  | Every 15 to 25 minutes                             | `monitor.py`                                     |
 
-`install.sh` places one sandbox, `sandbox.conf`, beside each service on both machines.
+`install.py` places one sandbox, `sandbox.conf`, beside each service on both machines.
 It takes away every privilege, device and namespace, and limits the system calls. Each
 unit opens only the sockets it needs, and the monitor only Tor's.
 `systemd-analyze security` rates each service 0.4 to 1.2 out of 10: SAFE or OK.
