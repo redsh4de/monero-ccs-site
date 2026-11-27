@@ -1,8 +1,9 @@
-"""A build can't carry a font or image that isn't byte for byte a file of the tag."""
+"""A build carries no font or image that is not byte for byte a file of the tag."""
 
 import pytest
 
-import checks
+from guards.build import check_build
+from guards.common import Reject
 
 LOGO = b"\x89PNG the logo as committed"
 
@@ -27,10 +28,10 @@ def build(tmp_path, logo):
 
 def test_build_of_the_tags_own_images_passes(tmp_path, tag):
     dist = build(tmp_path, LOGO)
-    checks.check_build(dist, tmp_path / "hosts", tag)
+    check_build(dist, tmp_path / "hosts", tag)
 
 
 def test_planted_image_is_refused(tmp_path, tag):
     dist = build(tmp_path, b"\x89PNG an image of another address")
-    with pytest.raises(checks.Reject, match="logo.Bx1Kq3.png isn't byte for byte"):
-        checks.check_build(dist, tmp_path / "hosts", tag)
+    with pytest.raises(Reject, match="logo.Bx1Kq3.png isn't byte for byte"):
+        check_build(dist, tmp_path / "hosts", tag)

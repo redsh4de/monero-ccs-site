@@ -1,4 +1,4 @@
-name: release
+name: test-release
 
 # release.sh builds the site about eight times here, which takes too long for
 # every pull request
@@ -7,25 +7,24 @@ on:
     - cron: "0 5 * * 1"
   pull_request:
     paths:
-      - deploy/release.sh
-      - deploy/lib.sh
-      - deploy/checks.py
+      - "deploy/*.sh"
+      - "deploy/*.py"
+      - deploy/site-hosts
+      - "deploy/signer/**"
+      - "deploy/guards/**"
       - deploy/render/safety.py
       - deploy/render/qr.py
-      - deploy/build-hosts
       - package.json
       - pnpm-lock.yaml
+      - pnpm-workspace.yaml
       - tests/deploy/test_release.py
       - tests/deploy/conftest.py
-      - tests/deploy/scripts.py
-      - tests/deploy/signing.py
-      - tests/deploy/fake_server.py
-      - tests/deploy/web.py
-      - tests/deploy/fetching.py
+      - tests/deploy/pytest.ini
+      - "tests/deploy/helpers/**"
       - tests/deploy/run.sh
       - tests/deploy/Containerfile
       - dev/Containerfile.render
-      - .github/workflows/release.yml
+      - .github/workflows/test-release.yml
       # the files the test's tags edit
       - astro.config.mjs
       - src/layouts/Layout.astro

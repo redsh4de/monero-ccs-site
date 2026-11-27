@@ -11,7 +11,7 @@ import qr
 
 ADDRESS = Path("example-data/addresses").read_text().split()[1]
 OTHER = "4" + "B" * 94
-TOOL = runpy.run_path("deploy/address-list.py")
+TOOL = runpy.run_path("deploy/signer/address-list.py")
 
 
 def drawn(png: bytes) -> list[list[bool]]:

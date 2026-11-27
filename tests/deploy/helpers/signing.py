@@ -7,7 +7,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from scripts import REPO, fail, run
+from harness import REPO, fail, run
 
 NAMES = ("signer-a", "signer-b", "outsider", "addresser")
 RELEASE_SIGNERS = ("signer-a", "signer-b")

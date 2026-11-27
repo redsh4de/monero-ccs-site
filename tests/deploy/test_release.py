@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from fake_server import FakeServer
-from scripts import CHECKS, REPO, refuses, replaced, run, stand_in, tail
+from harness import CHECKS, REPO, bomb, replaced, run, stand_in, tail
 from signing import RELEASE_SIGNERS, Keys, publish
 
 CAP_SYS_ADMIN = 21
@@ -29,14 +29,17 @@ if not PRIVILEGED and os.environ.get("CI"):
     pytest.fail(REASON, pytrace=False)
 pytestmark = pytest.mark.skipif(not PRIVILEGED, reason=REASON)
 
-# an Astro hook that writes into deploy/ while the site builds
+# an Astro hook that writes into deploy/, and prints an escape that sets the clipboard
 PLANT = (
     'integrations: [mdx(), { name: "plant", hooks: { "astro:build:done": () => '
-    'import("node:fs").then((fs) => fs.appendFileSync("deploy/checks.py", '
-    '"# PLANTED\\n")) } }],'
+    '{ console.log("\\u001b]52;c;cGxhbnRlZA==\\u0007"); '
+    'return import("node:fs").then((fs) => fs.appendFileSync("deploy/checks.py", '
+    '"# PLANTED\\n")); } } }],'
 )
 ESCAPE = "\x1b[8mhidden\x1b[0m\n"
 OTHER_BYTES = f"{'0' * 64}  ccs-site-v2.tar\n"
+# a pnpm hook, which nothing may run
+PNPMFILE = 'throw new Error("the tag\'s .pnpmfile.cjs ran");\n'
 # a lockfile entry that no package uses, so pnpm never fetches it
 PACKAGE = (
     "  planted-package@1.0.0:\n"
@@ -74,12 +77,13 @@ class Build:
 
 
 def tag(repo: Path, name: str, edits: dict[str, Callable[[str], str]]):
-    """Commit edits to site-v1's files, and tag the commit as name."""
+    """Commit edits to site-v1's files, or new ones, and tag the commit as name."""
     run("git", "-C", repo, "checkout", "-q", "--detach", "site-v1")
     for path, edit in edits.items():
         file = repo / path
-        file.write_text(edit(file.read_text()))
-    run("git", "-C", repo, "commit", "-q", "-a", "-m", name)
+        file.write_text(edit(file.read_text() if file.exists() else ""))
+    run("git", "-C", repo, "add", "-A")
+    run("git", "-C", repo, "commit", "-q", "-m", name)
     run("git", "-C", repo, "tag", name)
 
 
@@ -95,24 +99,19 @@ def release(
     *args: str,
     env: dict[str, str],
     answer: str = "n",
-    refusal: str = "",
+    refusal: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    """Run the worktree's release.sh, and answer its question.
-
-    With refusal given, the run must stop and say it on stderr.
-    """
-    script = worktree / "deploy/release.sh"
+    """Run the worktree's release.sh, and answer its question."""
+    script = worktree / "deploy/signer/release.sh"
     options = {"cwd": worktree, "env": env, "input": f"{answer}\n", "timeout": 600}
-    if refusal:
-        return refuses(script, *args, reason=refusal, **options)
-    return run(script, *args, **options)
+    return run(script, *args, refusal=refusal, **options)
 
 
 def build(
     repo: Path, folder: Path, tag: str, builder: str, env: dict[str, str], answer="n"
 ) -> Build:
-    """Build the tag in a fresh worktree in folder."""
-    worktree = checkout(repo, tag, folder)
+    """Build the tag from a fresh worktree of site-v1, a release the builder read."""
+    worktree = checkout(repo, "site-v1", folder)
     result = release(worktree, tag, builder, env=env, answer=answer)
     return Build(tag, result, worktree / f"release-{tag}")
 
@@ -148,11 +147,7 @@ def digests(archive: Path, folder: str) -> dict[str, str]:
 
 @pytest.fixture(scope="module")
 def repo(tmp_path_factory) -> Path:
-    """Return a clone of the repo, tagged with the releases the tests build.
-
-    site-v1 holds the working tree's deploy/, which is the code under test. A
-    file a tag edits is also in release.yml's paths, so a change to it runs this.
-    """
+    """Return a clone of the repo, tagged with the releases the tests build."""
     repo = tmp_path_factory.mktemp("repo")
     run("git", "clone", "-q", "--no-tags", "--no-hardlinks", REPO, repo)
     run("git", "-C", repo, "config", "user.name", "tester")
@@ -162,6 +157,7 @@ def repo(tmp_path_factory) -> Path:
     run("git", "-C", repo, "add", "-A", "deploy")
     run("git", "-C", repo, "commit", "-q", "--allow-empty", "-m", "deploy/ under test")
     run("git", "-C", repo, "tag", "site-v1")
+    # test-release.yml lists each file a tag edits, so a change to one runs these tests
     layout = "src/layouts/Layout.astro"
     css = "src/styles/global.css"
     unit = "deploy/web/ccs-update.service"
@@ -191,9 +187,12 @@ def repo(tmp_path_factory) -> Path:
                 "\nignoredOptionalDependencies:",
                 f"\n{PACKAGE}ignoredOptionalDependencies:",
             ),
+            ".pnpmfile.cjs": lambda _: PNPMFILE,
+            "deploy/README.md": lambda text: text + "++ b/new/deploy/forged.sh\n",
         },
     )
-    tag(repo, "site-v4", {"deploy/README.md": lambda text: text + ESCAPE})
+    # a carriage return, which moves a terminal back to the start of the line
+    tag(repo, "site-v4", {"deploy/README.md": lambda text: text + "shown\rhidden\n"})
     tag(
         repo,
         "site-v5",
@@ -258,6 +257,7 @@ def test_sha256sums_is_sha256sums_own_output(first):
 def test_the_first_release_is_reviewed_whole_against_nothing(first):
     assert first.review.startswith("Changes since nothing:\n")
     assert "new/deploy/install.sh" in first.review
+    assert "+lockfileVersion: " in first.review
 
 
 def test_the_archive_holds_dist_and_deploy(first):
@@ -338,14 +338,12 @@ def test_two_builds_of_a_tag_give_the_same_sha256sums(bob, first):
 
 @pytest.fixture(scope="module")
 def published(tmp_path_factory, host, keys, first) -> None:
-    """Publish releases 1 to 3 on the release host, each with first's files.
-
-    Release 2's deploy/README.md also ends in a terminal escape.
-    """
+    """Publish releases 1 to 4 on the release host, each with first's files."""
     files = tmp_path_factory.mktemp("first-files")
     run("tar", "-xf", first.out / "ccs-site-v1.tar", "-C", files)
     publish(host.state, 1, keys, tree=files)
     publish(host.state, 3, keys, tree=files)
+    publish(host.state, 4, keys, tree=files)
     readme = files / "deploy/README.md"
     readme.write_text(readme.read_text() + ESCAPE)
     publish(host.state, 2, keys, tree=files)
@@ -367,17 +365,24 @@ def test_the_review_shows_only_what_changed_since_the_release_before(second):
     assert "new/deploy/install.sh" not in second.review
 
 
-def test_the_review_lists_the_packages_first(second):
-    packages = "Packages since site-v1:\n  none changed\n"
-    assert second.review.startswith(f"Changes since site-v1:\n{packages}")
-
-
 def test_a_changed_page_shows_in_the_review(second):
     assert "(v2)" in second.review
 
 
 def test_a_planted_css_rule_shows_word_by_word(second):
-    assert "{+.planted" in second.review
+    assert "  +.planted{color:red}$" in second.review.splitlines()
+
+
+def test_a_brace_or_semicolon_that_moved_shows(tmp_path):
+    script = (REPO / "deploy/signer/release.sh").read_text()
+    words = re.search(r"--word-diff-regex='[^']+'", script)[0].replace("'", "")
+    old, new = tmp_path / "old.css", tmp_path / "new.css"
+    old.write_text("a{b:c}d{e:f}")
+    new.write_text("a{b:c;d{e:f}}")
+    command = ["git", "diff", "--no-index", "--word-diff=porcelain", words, old, new]
+    # git diff exits 1 when the files differ
+    shown = run(*command, refusal="").stdout.splitlines()[-6:]
+    assert shown == [" a{b:c", "-}", "+;", " d{e:f}", "+}", "~"]
 
 
 def test_a_renamed_stylesheet_is_paired_with_the_old_one(second):
@@ -385,37 +390,60 @@ def test_a_renamed_stylesheet_is_paired_with_the_old_one(second):
 
 
 @pytest.fixture(scope="module")
-def others(tmp_path_factory, repo, env, keys, homes, published) -> Build:
-    """Build release 2 with odd git settings, after two odd attestations.
-
-    eve, who is not a release signer, built other bytes. linky's attestation is
-    two links to a file on this machine.
-    """
+def others(tmp_path_factory, repo, env, keys, homes, second) -> Build:
+    """Build release 2 after odd attestations, with a setting in each file read."""
     root = tmp_path_factory.mktemp("attested-by-eve-and-linky")
     attest(root, "site-v2", "eve", OTHER_BYTES, keys, "outsider")
+    attest(root, "site-v2", "bob, a release signer", second.sums, keys, "outsider")
     linky = root / "attestations/site-v2/linky"
     linky.mkdir()
     for name in ("SHA256SUMS", "SHA256SUMS.asc"):
         (linky / name).symlink_to(homes["signer-a"] / "pubring.kbx")
-    settings = tmp_path_factory.mktemp("git-settings")
-    (settings / "attributes").write_text("deploy/README.md export-ignore\n")
-    gitconfig = settings / "config"
-    gitconfig.write_text(f"[core]\n\tattributesFile = {settings}/attributes\n")
+    home = tmp_path_factory.mktemp("home")
     odd = {
         **env,
         "ATTESTATIONS_REF": tree(repo, root),
-        "GIT_CONFIG_GLOBAL": str(gitconfig),
+        "HOME": str(home),
         "GIT_EXTERNAL_DIFF": "/bin/true",
+        "TAR_OPTIONS": "--exclude=*.css",
     }
-    return build(repo, tmp_path_factory.mktemp("others"), "site-v2", "tester", odd)
+    worktree = checkout(repo, "site-v1", tmp_path_factory.mktemp("others"))
+    crlf = "[core]\n\tautocrlf = true\n"
+    settings = {
+        Path("/etc/gitconfig"): crlf,
+        Path("/etc/gitattributes"): "deploy/README.md export-ignore\n",
+        home / ".gitconfig": crlf,
+        home / ".config/git/attributes": "deploy/docs/ALERTS.md export-ignore\n",
+        home / ".curlrc": "proxy = http://127.0.0.1:9\n",
+        repo / ".git/config": crlf,
+        repo / ".git/info/attributes": "deploy/docs/RELEASING.md export-ignore\n",
+    }
+    readme = run("git", "-C", repo, "rev-parse", "site-v2:deploy/README.md").stdout
+    other = run("git", "-C", repo, "hash-object", "-w", "--stdin", input="swapped")
+    run("git", "-C", repo, "replace", readme.strip(), other.stdout.strip())
+    saved = {path: path.read_text() if path.exists() else None for path in settings}
+    for path, setting in settings.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text((saved[path] or "") + setting)
+    try:
+        result = release(worktree, "site-v2", "tester", env=odd)
+    finally:
+        for path, text in saved.items():
+            path.write_text(text) if text is not None else path.unlink()
+        run("git", "-C", repo, "replace", "-d", readme.strip())
+    return Build("site-v2", result, worktree / "release-site-v2")
 
 
-def test_the_builders_git_settings_do_not_change_the_build(others, second):
+def test_the_builders_settings_do_not_change_the_build(others, second):
     assert others.sums == second.sums
 
 
 def test_an_external_diff_tool_does_not_replace_the_review(others):
     assert "(v2)" in others.review
+
+
+def test_a_builder_cannot_claim_to_be_a_signer_by_name(others):
+    assert "bob, a release signer" not in others.said, others.said
 
 
 def test_an_outsiders_different_build_is_only_reported(others):
@@ -439,12 +467,19 @@ def test_a_tag_off_an_old_branch_compares_with_the_release_before_it(third):
 
 
 def test_deploy_is_compared_line_by_line_so_a_joined_line_shows(third):
-    assert "+Type=oneshot User=ccs-update" in third.review.splitlines()
+    assert "  +Type=oneshot User=ccs-update$" in third.review.splitlines()
+
+
+def test_no_changed_line_passes_for_the_header_of_a_file(third):
+    review = third.review.splitlines()
+    assert "  +++ b/new/deploy/forged.sh$" in review
+    assert "+++ b/new/deploy/forged.sh$" not in review
 
 
 def test_no_raw_escape_reaches_the_terminal(third):
-    assert "\x1b" not in third.review
+    assert "\x1b" not in third.result.stdout + third.result.stderr
     assert "^[[8mhidden^[[0m" in third.review
+    assert "^[]52;c;cGxhbnRlZA==^G" in third.result.stdout
 
 
 def test_deploy_in_the_archive_is_the_tags_own_even_when_the_build_writes_to_it(
@@ -457,7 +492,7 @@ def test_deploy_in_the_archive_is_the_tags_own_even_when_the_build_writes_to_it(
 
 
 def test_the_review_lists_a_package_the_tag_added(third):
-    assert "  + planted-package@1.0.0" in third.review.splitlines()
+    assert "  +  planted-package@1.0.0:$" in third.review.splitlines()
 
 
 def test_a_build_that_differs_from_a_release_signers_is_not_signed(
@@ -481,6 +516,101 @@ def test_a_control_byte_in_a_text_file_stops_the_build(tmp_path, repo, env, publ
     refusal = "a control byte in a text file"
     release(worktree, "site-v4", "tester", env=env, answer="y", refusal=refusal)
     assert not (worktree / "release-site-v4").exists()
+
+
+def submodule(repo: Path) -> None:
+    entry = f"160000,{'1' * 40},deploy/web/zz.service"
+    run("git", "-C", repo, "update-index", "--add", "--cacheinfo", entry)
+
+
+def attributes(repo: Path) -> None:
+    (repo / "src/.gitattributes").write_text("* export-subst\n")
+    run("git", "-C", repo, "add", "src/.gitattributes")
+
+
+def odd_name(repo: Path) -> None:
+    (repo / "src/x\x1b[8mtxt.sj").write_text("")
+    run("git", "-C", repo, "add", "src")
+
+
+def tarball(repo: Path) -> None:
+    """Fetch one package from another address than the registry's."""
+    lock = repo / "pnpm-lock.yaml"
+    text = lock.read_text()
+    entry = re.search(r"\n  undici-types@.*\n    resolution: {integrity: [^}]*", text)
+    entry = entry[0]
+    lock.write_text(text.replace(entry, f"{entry}, tarball: https://elsewhere.example"))
+    run("git", "-C", repo, "add", "pnpm-lock.yaml")
+
+
+def copies(size: int, count: int) -> Callable[[Path], None]:
+    """Return a plant that adds one blob of size bytes at count paths."""
+
+    def plant(repo: Path) -> None:
+        made = run("git", "-C", repo, "hash-object", "-w", "--stdin", input="x" * size)
+        blob = made.stdout.strip()
+        lines = "".join(f"100644 {blob}\tsrc/{n}\n" for n in range(count))
+        run("git", "-C", repo, "update-index", "--index-info", input=lines)
+
+    return plant
+
+
+@pytest.mark.parametrize(
+    "plant, refusal",
+    [
+        (submodule, "more than plain files"),
+        (attributes, "more than plain files"),
+        (odd_name, "more than plain files"),
+        (copies(10**6, 101), "holds more than 10000 entries or 100000000 bytes"),
+        (tarball, "is not YAML as pnpm writes it"),
+    ],
+    ids=["submodule", "attributes", "odd name", "big", "tarball"],
+)
+def test_a_tag_holding_what_a_release_may_not_is_refused(
+    tmp_path, repo, env, plant, refusal
+):
+    hostile = tmp_path / "hostile"
+    run("git", "clone", "-q", "--no-hardlinks", repo, hostile)
+    run("git", "-C", hostile, "checkout", "-q", "--detach", "site-v1")
+    plant(hostile)
+    user = ["-c", "user.name=t", "-c", "user.email=t@example.org"]
+    run("git", "-C", hostile, *user, "commit", "-q", "-m", "hostile")
+    run("git", "-C", hostile, "tag", "-f", "site-v1")
+    refused = release(hostile, "site-v1", "tester", env=env, refusal=refusal)
+    assert "\x1b" not in refused.stderr
+    assert not (hostile / "release-site-v1").exists()
+
+
+def test_a_tag_of_endless_paths_stops_before_it_lists_them(tmp_path, repo, env):
+    """A tree of a few objects lists 10**12 folders."""
+    hostile = tmp_path / "hostile"
+    run("git", "clone", "-q", "--no-hardlinks", repo, hostile)
+    run("git", "-C", hostile, "checkout", "-q", "--detach", "site-v1")
+    run("git", "-C", hostile, "tag", "-f", "site-v1", bomb(hostile, "site-v1"))
+    refusal = "holds more than 10000 entries"
+    release(hostile, "site-v1", "tester", env=env, refusal=refusal)
+
+
+def test_more_attestations_than_any_release_needs_stop_it(
+    tmp_path, repo, env, published
+):
+    root = tmp_path / "attested"
+    for n in range(1001):
+        (root / f"attestations/site-v2/b{n}").mkdir(parents=True)
+        (root / f"attestations/site-v2/b{n}/SHA256SUMS").write_text("")
+    many = {**env, "ATTESTATIONS_REF": tree(repo, root)}
+    worktree = checkout(repo, "site-v1", tmp_path)
+    release(worktree, "site-v2", "tester", env=many, refusal="more than 1000 entries")
+
+
+def test_a_release_whose_tag_before_is_missing_stops(tmp_path, repo, env):
+    """Its lockfile is what the review compares with."""
+    clone = tmp_path / "clone"
+    run("git", "clone", "-q", "--no-hardlinks", repo, clone)
+    run("git", "-C", clone, "checkout", "-q", "--detach", "site-v2")
+    run("git", "-C", clone, "tag", "-d", "site-v1")
+    refusal = "there is no tag site-v1 here to compare the lockfile with"
+    release(clone, "site-v2", "tester", env=env, refusal=refusal)
 
 
 def test_an_output_folder_already_there_stops_it(tmp_path, repo, env):
@@ -524,40 +654,22 @@ def test_a_tar_that_is_not_gnu_tar_stops_it(tmp_path, repo, env):
     release(worktree, "site-v1", "tester", env=bsd, refusal="needs GNU tar")
 
 
-def test_a_release_sh_other_than_the_tags_stops_it(tmp_path, repo, env):
-    worktree = checkout(repo, "site-v1", tmp_path)
-    other = worktree / "deploy/other.sh"
-    other.write_text((worktree / "deploy/release.sh").read_text() + "# changed\n")
-    other.chmod(0o755)
-    refusal = "run the deploy/ of site-v1"
-    refuses(other, "site-v1", "tester", reason=refusal, cwd=worktree, env=env)
-
-
 @pytest.mark.parametrize(
-    "script",
-    [
-        pytest.param("lib.sh", id="lib.sh"),
-        pytest.param("render/safety.py", id="safety.py, which checks.py runs"),
-        pytest.param("render/qr.py", id="qr.py, which checks.py also runs"),
-    ],
+    "name", [pytest.param("checks.py", id="changed"), pytest.param("x", id="added")]
 )
-def test_a_script_other_than_the_tags_stops_it(tmp_path, repo, env, script):
+def test_release_1_runs_only_from_a_checkout_of_its_tag(tmp_path, repo, env, name):
+    """Nothing has signed its scripts, so only the ones the signer read may run."""
     worktree = checkout(repo, "site-v1", tmp_path)
-    changed = worktree / "deploy" / script
-    changed.write_text(changed.read_text() + "# changed\n")
-    refusal = "run the deploy/ of site-v1"
+    with open(worktree / "deploy" / name, "a") as script:
+        script.write("# changed\n")
+    refusal = "run release 1 from a checkout of site-v1 itself"
     release(worktree, "site-v1", "tester", env=env, refusal=refusal)
 
 
-def test_a_pnpm_that_does_not_match_its_hash_stops_it(tmp_path, repo, env):
-    worktree = checkout(repo, "site-v1", tmp_path)
-    path = stand_in(tmp_path / "bin", "curl", '#!/bin/sh\necho planted >"$3"\n')
-    swapped = {**env, "PATH": path}
-    refusal = "pnpm doesn't match its hash"
-    release(worktree, "site-v1", "tester", env=swapped, refusal=refusal)
-
-
-def test_a_tag_asking_for_another_pnpm_stops_it(tmp_path, repo, env):
+def test_older_scripts_hand_over_to_the_release_befores(tmp_path, repo, env, published):
     worktree = checkout(repo, "site-v5", tmp_path)
+    script = worktree / "deploy/signer/release.sh"
+    script.write_text(replaced(script.read_text(), "the packageManager", "older"))
     refusal = "the packageManager of site-v5"
-    release(worktree, "site-v5", "tester", env=env, refusal=refusal)
+    refused = release(worktree, "site-v5", "tester", env=env, refusal=refusal)
+    assert "Running the scripts of site-v4." in refused.stdout
