@@ -10,7 +10,7 @@ runs on neither server.
 Requires Node 22 or later, pnpm 11.4 or later, and podman. Run `pnpm dev` to see
 the site with the sample data in `example-data/`. Every pnpm command runs the
 dependencies' code as you, so read "Maintainer setup" in
-[deploy/RELEASING.md](deploy/RELEASING.md#maintainer-setup) first.
+[deploy/docs/RELEASING.md](deploy/docs/RELEASING.md#maintainer-setup) first.
 
 | Command            | Action                                                                      |
 | :----------------- | :-------------------------------------------------------------------------- |
@@ -30,6 +30,8 @@ The pages in `src/pages/templates/` are Jinja templates. Astro builds them with 
 `[[ ]]` and `[% %]` marks left in, and `deploy/render/` fills them with the proposal data.
 `dev/` holds the scripts behind `pnpm dev` and `pnpm render`.
 
+A test of a rule goes in `tests/`, in the file for its boundary, such as `test_site.py`.
+A test of a deploy script goes in `tests/deploy/`, in the file named after the script.
 [tests/deploy/README.md](tests/deploy/README.md) explains the deploy tests.
 [deploy/README.md](deploy/README.md) explains how to run the live site, and
-[deploy/ARCHITECTURE.md](deploy/ARCHITECTURE.md) how it works.
+[deploy/docs/ARCHITECTURE.md](deploy/docs/ARCHITECTURE.md) how it works.

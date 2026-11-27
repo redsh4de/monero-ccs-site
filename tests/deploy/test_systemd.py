@@ -15,7 +15,7 @@ from fake_tor import serve_socks
 from fetching import Fetcher
 from installing import CCS_BACK, LIB, PUSH_KEY, make_certificate, push_key
 from monitoring import publish_merge_requests
-from scripts import DEPLOY, TAIL, refuses, run
+from harness import DEPLOY, TAIL, run
 from signing import place_keyrings, publish, write_list
 from web import A, B, C
 
@@ -63,8 +63,8 @@ def get(path: str) -> tuple[int, str]:
 def outcomes(since: int) -> dict[str, str]:
     """Return the result of each pipeline unit's run after since, or "no run since".
 
-    since is in microseconds of the monotonic clock, as systemd records starts.
-    A check of the result alone passes for ccs-update: the install already ran it.
+    since is in monotonic microseconds, as systemd records starts. Without it,
+    ccs-update would pass on the run that the install made.
     """
     found = {}
     for unit in PIPELINE:
@@ -134,11 +134,9 @@ def installed(machine) -> None:
     )
     web = ("web", "site-v1", "127.0.0.1", push_key())
     run(LIB / "current/deploy/install.sh", *web, timeout=300)
-    # git refuses a local repository owned by another user; an https:// one,
-    # as live, never is
+    # git refuses a local repository owned by another user; live uses https://
     run("chown", "-R", "ccs-fetch:", ORIGIN)
-    # a rootless container sets up no systemd credentials, so the push key is
-    # bound where LoadCredential= puts it
+    # a rootless container sets up no systemd credentials, so bind the key in place
     key = Path("/run/ccs-test-push-key")
     shutil.copy(PUSH_KEY, key)
     key.chmod(0o644)
@@ -160,10 +158,7 @@ def test_both_roles_install_and_start_their_paths_and_timers(installed):
 
 @pytest.fixture(scope="module")
 def pushed(installed) -> int:
-    """Change ccs-back's JSON, and wait at most 60 s for the page to show A.
-
-    Return when the JSON changed, as outcomes() takes it.
-    """
+    """Change ccs-back's JSON; return its time when the page shows A, or after 60 s."""
     since = time.monotonic_ns() // 1000
     (CCS_BACK / "proposals.json").touch()
     deadline = time.monotonic() + 60
@@ -174,6 +169,11 @@ def pushed(installed) -> int:
 
 def test_ccs_backs_json_reaches_the_served_page(pushed):
     assert A in get(FUNDING)[1], f"{outcomes(pushed)}\n{journal(*PIPELINE)}"
+
+
+def test_the_served_page_shows_its_proposals_text(pushed):
+    """The render makes it in a child process that lowers its own limits."""
+    assert "too long to show here" not in get(FUNDING)[1]
 
 
 def test_each_unit_of_the_pipeline_ran_and_succeeded(pushed):
@@ -217,7 +217,7 @@ def test_nginxs_pid_file_is_in_its_own_run_and_linked_for_log_rotation(installed
     ],
 )
 def test_nginxs_sandbox_refuses(installed, command, reason):
-    refuses("nsenter", "-t", nginx_pid(), "-m", *command, reason=reason)
+    run("nsenter", "-t", nginx_pid(), "-m", *command, refusal=reason)
 
 
 @pytest.mark.parametrize("action", ["reload", "restart"])
@@ -240,8 +240,7 @@ def test_log_rotations_signal_makes_nginx_start_a_new_log(installed):
 @pytest.fixture(scope="module")
 def monitored(pushed) -> None:
     """Run the monitor once, under its unit."""
-    # Tor cannot reach this machine, so a stand-in takes its socket; masked,
-    # Tor cannot take the socket back
+    # a stand-in takes Tor's socket; masked, Tor cannot take it back
     systemctl("stop", "tor", "tor@default")
     systemctl("mask", "tor@default")
     Path("/run/tor").mkdir(exist_ok=True)

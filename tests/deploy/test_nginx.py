@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts import DEPLOY, EXAMPLE, REPO, run
+from harness import DEPLOY, EXAMPLE, REPO, run
 
 CSP = (
     "default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self';"
@@ -175,9 +175,9 @@ def test_a_forged_host_does_not_steer_the_redirect(nginx):
     )
 
 
-def tls(*options, ok=True):
+def tls(*options, refusal=None):
     target = ["-connect", "127.0.0.1:443", "-servername", "ccs.getmonero.org"]
-    return run("openssl", "s_client", *target, *options, input="", ok=ok)
+    return run("openssl", "s_client", *target, *options, input="", refusal=refusal)
 
 
 @pytest.mark.parametrize("version", ["-tls1_3", "-tls1_2"])
@@ -186,8 +186,7 @@ def test_tls_1_3_and_1_2_are_offered(nginx, version):
 
 
 def test_tls_1_1_is_refused_even_to_a_client_that_offers_it(nginx):
-    refused = tls("-tls1_1", "-cipher", "DEFAULT:@SECLEVEL=0", ok=False)
-    assert "alert protocol version" in refused.stdout + refused.stderr
+    tls("-tls1_1", "-cipher", "DEFAULT:@SECLEVEL=0", refusal="alert protocol version")
 
 
 def test_no_session_ticket_is_handed_out(nginx):

@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ET
 
 import pytest
 
-from scripts import replaced
+from harness import replaced
 from web import A, B, C, COMMIT, DIST
 
 UNLISTED = "4" + "U" * 94
@@ -214,13 +214,23 @@ def test_a_release_whose_template_shows_an_unlisted_address_is_refused(
     dist = broken_release(tmp_path, "home.html", "</body>", f"<p>{UNLISTED}</p></body>")
     rendered.install(3, dist)
     rendered.push(raised="14")
-    refused = rendered.update(ok=False)
-    assert "address the signed list lacks" in refused.stderr
+    rendered.update(refusal="which isn't on the signed list")
     assert rendered.tree() == tree
     served = rendered.current.rglob("*")
     assert not any(
         UNLISTED in f.read_text(errors="replace") for f in served if f.is_file()
     )
+
+
+@pytest.mark.parametrize("template", ["home.html", "proposal.html"])
+def test_a_release_that_hides_a_link_to_an_unlisted_host_is_refused(
+    rendered, tmp_path, template
+):
+    tree = rendered.tree()
+    hidden = '<a href="https:/[[ "/" ]]evil.example/">x</a></body>'
+    rendered.install(3, broken_release(tmp_path, template, "</body>", hidden))
+    rendered.update(refusal="links where it may not: https://evil.example/")
+    assert rendered.tree() == tree
 
 
 def test_a_bad_values_line_keeps_the_old_values(rendered):
@@ -236,7 +246,7 @@ def test_a_release_whose_render_fails_keeps_the_site_and_leaves_the_values_unapp
     dist = broken_release(tmp_path, "proposal.html", "[[ it.title ]]", "[[ it.nope ]]")
     rendered.install(4, dist)
     rendered.push(raised="15")
-    rendered.update(ok=False)
+    rendered.update(refusal="has no attribute 'nope'")
     assert rendered.applied() == applied
     assert rendered.tree() == tree
     assert rendered.served("release") == 1
@@ -247,7 +257,7 @@ def test_values_count_as_applied_only_once_shown(rendered, tmp_path):
     dist = broken_release(tmp_path, "proposal.html", "[[ it.title ]]", "[[ it.nope ]]")
     rendered.install(4, dist)
     rendered.push(raised="15")
-    rendered.update(ok=False)
+    rendered.update(refusal="has no attribute 'nope'")
     rendered.install(5)
     rendered.update()
     assert rendered.raised() == 15.0

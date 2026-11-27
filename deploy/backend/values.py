@@ -1,19 +1,5 @@
 #!/usr/bin/python3 -I
-"""Write the values the backend pushes to a file, replacing it whole.
-
-The values are, in order:
-- one line per proposal: its name, the amount raised, the contributions and
-  the address;
-- what ccs-back sees of GitLab;
-- the time.
-
-It reads only ccs-back's JSON and its checkout of ccs-proposals, in the CCS_BACK
-folder that systemd passes from /etc/ccs/config. It never reaches the network.
-
-Usage: values.py <file>
-
-Exit: 0 written, 1 when ccs-back's files can't be read, 2 usage.
-"""
+"""Write the values the backend pushes, read from ccs-back's files in CCS_BACK."""
 
 import hashlib
 import json
@@ -26,18 +12,17 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from urllib.parse import quote
 
-# the web server's own patterns, from the same release: it refuses the whole file
-# over one line that doesn't match VALUE, so such a line is left out here.
-# Nothing is cached in __pycache__, where the monitor compares releases.
+# no __pycache__ in the release, which the monitor compares
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from checks import ADDRESS, VALUE  # noqa: E402
+# the web server's own patterns, as it refuses the whole file over one bad line
+from checks import values as web  # noqa: E402
 
 URL = re.compile(r"/proposals/(.+)\.html")
 
 
 def amount(value: object) -> str | None:
-    """Return the amount as plain decimals, or None if it can't be one."""
+    """Return the amount as plain decimals, or None if it cannot be one."""
     try:
         number = Decimal(str(0 if value is None else value)).quantize(Decimal("1e-12"))
     except InvalidOperation:
@@ -67,36 +52,42 @@ def read_groups(folder: Path) -> list:
 
 
 def value_line(row: dict) -> str | None:
-    """Return one proposal's line, or None when it has no page or doesn't fit."""
+    """Return one proposal's line, or None when it has no page or does not fit."""
     slug = URL.fullmatch(str(row.get("local-url", "")))
     if not slug:
         return None
     raised = amount(row.get("amount-funded"))
     contributions = row.get("contributions")
     address = row.get("donate-address")
-    if not isinstance(address, str) or not re.fullmatch(ADDRESS, address):
+    if not isinstance(address, str) or not re.fullmatch(web.ADDRESS, address):
         address = "-"
     name = quote(slug[1], safe="")
     line = (
         f"proposal {name} raised={raised} contributions={contributions}"
         f" address={address}"
     )
-    if not VALUE.fullmatch(line):
+    if not web.VALUE.fullmatch(line):
         print(f"values: left out {slug[1]}", file=sys.stderr)
         return None
     return line
 
 
 def gitlab_line(commit: str, groups: list) -> str:
-    """Return the "gitlab" line: a hash of what ccs-back knows of GitLab.
-
-    That is the proposals commit and the Ideas stage, which lists the open merge
-    requests. The web server calls GitLab when this changes.
-    """
+    """Return the "gitlab" line: a hash of the proposals commit and the Ideas stage."""
     ideas = [group for group in groups if group.get("stage") == "Ideas"]
     ideas_json = json.dumps(ideas, sort_keys=True, ensure_ascii=False, default=str)
     known = f"{commit}\n{ideas_json}"
     return f"gitlab sha256={hashlib.sha256(known.encode()).hexdigest()}"
+
+
+def write_whole(path: Path, text: str) -> None:
+    """Replace the file in one rename, so no reader ever sees part of it."""
+    new = path.with_name(f"{path.name}.new")
+    with open(new, "w", encoding="utf-8") as file:
+        file.write(text)
+        os.fchmod(file.fileno(), 0o644)
+        os.fsync(file.fileno())
+    os.replace(new, path)
 
 
 def main(argv: list[str]) -> int:
@@ -116,16 +107,6 @@ def main(argv: list[str]) -> int:
     lines += [gitlab_line(commit, groups), f"updated {int(time.time())}"]
     write_whole(Path(argv[0]), "".join(f"{line}\n" for line in lines))
     return 0
-
-
-def write_whole(path: Path, text: str) -> None:
-    """Replace the file in one rename, so no reader ever sees part of it."""
-    new = path.with_name(f"{path.name}.new")
-    with open(new, "w", encoding="utf-8") as file:
-        file.write(text)
-        os.fchmod(file.fileno(), 0o644)
-        os.fsync(file.fileno())
-    os.replace(new, path)
 
 
 if __name__ == "__main__":

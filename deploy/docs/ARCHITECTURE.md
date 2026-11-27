@@ -1,6 +1,6 @@
 # Architecture
 
-To run the deploy, see [README.md](README.md). [THREAT-MODEL.md](THREAT-MODEL.md) covers
+To run the deploy, see [README.md](../README.md). [THREAT-MODEL.md](THREAT-MODEL.md) covers
 the threats and the input checks.
 
 ---
@@ -40,8 +40,8 @@ result.
 2. Each push starts `fetch.sh`. It calls GitLab only when the push's `gitlab` line
    changes, or once an hour.
 3. `update.sh` runs after each fetch, and checks the values and the address list. When
-   something changed, it renders the site with [the render](render/README.md). It
-   switches to the new site only if no page shows an address the list lacks.
+   something changed, it renders the site with [the render](../render/README.md). It
+   switches to the new site only once `checks.py site` passes.
 4. nginx serves the site.
 5. The monitor renders the site again, and compares it with the live site over Tor, byte
    for byte.
@@ -99,9 +99,20 @@ decoder.
 
 ### Files
 
-Each folder in `deploy/` names the machine that runs it. `web/` runs on the web server
-and `backend/` on the backend. `render/` and the scripts at the top run on both, except
-`release.sh` and `address-list.py`, which the signers run.
+The folders in `deploy/` follow the machine that runs their files:
+
+| Folder           | Holds                                                                         | Runs on                                 |
+| :--------------- | :---------------------------------------------------------------------------- | :-------------------------------------- |
+| `deploy/` itself | `install.sh`, the settings, the README and the shared scripts                 | Both servers                            |
+| `web/`           | `fetch.sh`, `update.sh`, their units and nginx's settings                     | The web server                          |
+| `backend/`       | `values.py`, `monitor.sh` and their units                                     | The backend                             |
+| `signer/`        | `release.sh` and `address-list.py`                                            | The signers' machines                   |
+| `render/`        | `render.py`, `status.py` and their modules                                    | Both servers                            |
+| `guards/`        | The checks of `checks.py`, one module for each input                          | Wherever `checks.py` runs               |
+| `docs/`          | How the site works, why it is safe, how to release, and what each alert means | Read by people; each release ships them |
+
+The signers' scripts also run `checks.py`, `lib.sh` and `gittree.py`. `checks.py` loads
+`safety.py` and `qr.py` from `render/`.
 
 Both servers keep the installed releases in `/usr/local/lib/ccs/releases/`. The link
 `/usr/local/lib/ccs/current` names the one in use.
@@ -144,12 +155,15 @@ from the keys in `release-signers.gpg`, and skips any other.
 
 `release.sh` packs the same bytes on any machine, so every builder signs one build. It:
 
+- runs the scripts of release N-1, which two signers read, so a new script never runs
+  before its review;
 - builds in a StageX Node image pinned by digest, with a pinned pnpm;
-- installs dependencies without their build scripts, and builds with no network;
+- fetches packages with only the lockfile in reach, once `checks.py lockfile` finds that
+  each comes from the registry by name and version;
+- installs them without their build scripts and builds, both with no network;
 - takes `deploy/` from the tag, so the build cannot change the scripts it ships;
 - checks release N-1 before it shows the changes since then;
-- refuses a build that holds what a release may not, as
-  [Read the changes](RELEASING.md#read-the-changes) lists;
+- refuses a build that holds what a release may not, as `checks.py build` lists;
 - stops when the build differs from a release signer's attestation.
 
 `install.sh` switches a machine to a release only after it checks it. It:
@@ -158,7 +172,11 @@ from the keys in `release-signers.gpg`, and skips any other.
 - unpacks the release into `/usr/local/lib/ccs/releases/N`, and points
   `/usr/local/lib/ccs/current` at it;
 - on the web server, renders with the new release and lets nginx check the new site
-  first, and changes nothing if either fails.
+  first;
+- goes back to the old release and its settings when any part of the switch fails or is
+  stopped by INT, TERM or QUIT;
+- logs the switch and any undo to `/var/log/ccs-install.log`, and goes on after a
+  dropped SSH session.
 
 The units run from `current`, so scripts, render and design change together.
 

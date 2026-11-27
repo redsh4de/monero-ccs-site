@@ -3,7 +3,9 @@
 import os
 import subprocess
 
-from scripts import REPO
+import pytest
+
+from harness import REPO
 
 pytest_plugins = ["pytester"]
 
@@ -19,7 +21,7 @@ def failed_run(pytester, source):
 def test_a_failing_command_shows_its_output_in_the_failure(pytester):
     output = failed_run(
         pytester,
-        "from scripts import run\n"
+        "from harness import run\n"
         "def test_x():\n"
         "    run('sh', '-c', 'echo the-stdout; echo the-stderr >&2; exit 3')\n",
     )
@@ -29,7 +31,7 @@ def test_a_failing_command_shows_its_output_in_the_failure(pytester):
 def test_a_failed_assert_after_a_run_shows_the_run_s_output(pytester):
     output = failed_run(
         pytester,
-        "from scripts import run\n"
+        "from harness import run\n"
         "def test_x():\n"
         "    run('sh', '-c', 'echo the-reason >&2')\n"
         "    assert False\n",
@@ -40,11 +42,29 @@ def test_a_failed_assert_after_a_run_shows_the_run_s_output(pytester):
 def test_a_command_that_hangs_shows_its_output(pytester):
     output = failed_run(
         pytester,
-        "from scripts import run\n"
+        "from harness import run\n"
         "def test_x():\n"
         "    run('sh', '-c', 'echo the-reason >&2; sleep 5', timeout=1)\n",
     )
     output.fnmatch_lines(["*timed out after 1 s*", "*the-reason*"])
+
+
+@pytest.mark.parametrize(
+    "script, refusal",
+    [
+        pytest.param("echo another-reason >&2; exit 1", "the-reason", id="another"),
+        pytest.param("echo a-crash >&2; exit 1", "", id="a crash, not silence"),
+        pytest.param("echo the-reason >&2", "the-reason", id="no failure"),
+    ],
+)
+def test_an_expected_failure_must_be_the_one_named(pytester, script, refusal):
+    output = failed_run(
+        pytester,
+        "from harness import run\n"
+        "def test_x():\n"
+        f"    run('sh', '-c', {script!r}, refusal={refusal!r})\n",
+    )
+    output.fnmatch_lines([f"*expected a failure saying {refusal!r}*"])
 
 
 def test_a_failing_gpg_shows_its_error(pytester):
@@ -60,7 +80,7 @@ def test_a_failing_gpg_shows_its_error(pytester):
 def test_a_test_edit_that_no_longer_applies_says_so(pytester):
     output = failed_run(
         pytester,
-        "from scripts import replaced\n"
+        "from harness import replaced\n"
         "def test_x():\n"
         "    replaced('the page', 'gone', 'new')\n",
     )
@@ -77,5 +97,5 @@ def test_the_tests_refuse_to_run_outside_a_container():
         capture_output=True,
         text=True,
     )
-    assert result.returncode != 0
-    assert "run them with tests/deploy/run.sh" in result.stdout + result.stderr
+    assert result.returncode == 2
+    assert "run them with tests/deploy/run.sh, in a container" in result.stderr

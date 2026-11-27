@@ -7,12 +7,11 @@ After=tor.service
 Type=oneshot
 DynamicUser=yes
 StateDirectory=ccs-monitor
-# the alerts' state, in memory, and kept from one run to the next
+# the alerts' state: in memory, and kept between runs
 RuntimeDirectory=ccs-monitor
 RuntimeDirectoryPreserve=yes
-# every request, alerts included, goes through Tor's socket. Its own network has
-# nothing on it, so the machine's local services, the wallet's RPC among them,
-# are out of reach whatever ccs-back's settings.
+# every request goes through Tor's socket, and the empty network of its own
+# keeps the wallet's RPC and other local services out of reach
 Environment=ALL_PROXY=socks5h://localhost/run/tor/socks
 PrivateNetwork=yes
 IPAddressDeny=any

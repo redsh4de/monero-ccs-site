@@ -1,19 +1,8 @@
 #!/bin/sh
 # shellcheck shell=dash
-# Checks the live site against what it should be. It reads what the site
-# says it was built from, checks each part against the backend's own
-# sources, renders the same pages again with the signed release, and
-# compares them byte for byte.
+# Checks the live site against its sources and a render of its release.
 #
-# Runs as: ccs-monitor.service, as a temporary user, every 15 to 25 minutes.
-#          Its own network holds nothing, and every request goes through
-#          Tor's socket (ALL_PROXY), so the wallet's RPC stays out of reach.
-# Reads:   the live site, GitLab's merge request API, the signed releases,
-#          ccs-back's checkout of the proposals, and the backend's values.
-# Writes:  its state folder, and the alerts' state in its runtime folder;
-#          systemd makes both (StateDirectory=, RuntimeDirectory=).
-# Alerts:  each step below names its alert. A crash raises "monitor".
-# Exit:    0 when the run ends, whatever it found; it reports through alerts.
+# Exit: 0 when the run ends, whatever it found; it reports through alerts.
 set -eu
 # shellcheck disable=SC3040 # Debian 13's dash has pipefail
 set -o pipefail
@@ -24,7 +13,7 @@ readonly DEPLOY
 # shellcheck source=lib.sh
 . "$DEPLOY/lib.sh"
 
-# this backend's own release, /usr/local/lib/ccs/releases/<N>
+# DEPLOY is releases/<N>/deploy, so the release's folder name is its number
 readonly INSTALLED_DIR="${DEPLOY%/deploy}"
 readonly INSTALLED_VERSION="${INSTALLED_DIR##*/}"
 readonly STATE_DIR="${STATE_DIRECTORY:?}"
@@ -36,7 +25,7 @@ readonly PROPOSALS_CHECKOUT="$CCS_BACK/proposals"
 readonly BACKEND_VALUES=/var/lib/ccs-backend/values
 readonly MESSAGE_PREFIX="ccs monitor:"
 # what Tor Browser asks for a page; keep it to each Tor Browser major release
-readonly BROWSER_AGENT="Mozilla/5.0 (Windows NT 10.0; rv:140.0) Gecko/20100101 Firefox/140.0"
+readonly BROWSER_AGENT="Mozilla/5.0 (Windows NT 10.0; rv:153.0) Gecko/20100101 Firefox/153.0"
 readonly BROWSER_ACCEPT="text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
 readonly PAGE_DIFFERS=" differs from the expected render"
 NOW=$(date +%s)
@@ -47,8 +36,8 @@ export GIT_CONFIG_COUNT=1
 export GIT_CONFIG_KEY_0=safe.directory
 export GIT_CONFIG_VALUE_0="$PROPOSALS_CHECKOUT"
 
-# check <name> <failing> <text>: a monitor check. It alerts after failing for
-# ten minutes, so on its second failing run, and reminds once a day.
+# check <name> <failing> <text>: alerts after 10 minutes of failing, which is
+# the second failing run, and then once a day.
 check() {
   local name="$1"
   local failing="$2"
@@ -57,8 +46,7 @@ check() {
   alert "$name" "$failing" 600 86400 "$MESSAGE_PREFIX $text"
 }
 
-# require <name> <failing> <text>: a check the rest of the run depends on. A
-# failure ends the run here.
+# require <name> <failing> <text>: a check that ends the run when it fails.
 require() {
   local name="$1"
   local failing="$2"
@@ -75,21 +63,18 @@ require() {
 begin_run() {
   alerts_begin
   trap 'check monitor 1 "the monitor crashed"; alerts_send' EXIT
-  # dash runs no EXIT trap when a signal kills it, so a stop from systemd
-  # exits instead, which runs it
+  # dash skips the EXIT trap on a signal, so a stop from systemd exits instead
   trap 'exit 1' TERM
   rm -rf -- "$RUN_DIR"
   mkdir -p -- "$RUN_DIR" "$STATE_DIR/releases"
 }
 
-# end_run: sends this run's messages and the heartbeat, and exits. A run that
-# gets here didn't crash, so the "monitor" check passes.
+# end_run: passes "monitor", sends the alerts and the heartbeat, and exits.
 end_run() {
   check monitor 0 "the monitor crashed"
   trap - EXIT
   alerts_send
-  # a service that expects this request can tell that the monitor, or Tor,
-  # stopped, which the monitor's own alerts can't
+  # a heartbeat service sees the monitor or Tor stop, which no alert can show
   if [ -s "${CREDENTIALS_DIRECTORY:-/nonexistent}/heartbeat_url" ]; then
     request_url heartbeat_url || log "heartbeat not sent"
   fi
@@ -97,29 +82,26 @@ end_run() {
   exit 0
 }
 
-# new_circuit: prints a SOCKS user name never used before. Tor builds a
-# separate circuit for each name, so the web server can't tie one set of
-# requests to another by the exit they leave from.
+# new_circuit: prints a new SOCKS user name, for a Tor circuit of its own.
+# The web server then cannot tie one set of requests to another by their exit.
 new_circuit() {
   od -An -N8 -tx1 /dev/urandom | tr -d ' \n'
 }
 
-# fetch_url <url> <file> <circuit> [<curl option>...]: downloads one file
-# from the live site, on that Tor circuit; curl takes the proxy from
-# ALL_PROXY.
+# fetch_url <url> <file> <circuit> [<curl option>...]: downloads one file on
+# that Tor circuit, through the proxy in ALL_PROXY.
 fetch_url() {
   local url="$1"
   local file="$2"
   local circuit="$3"
   shift 3
 
-  curl -fsS -L --max-time 60 --max-filesize 200000000 \
+  curl --disable -fsS -L --max-time 60 --max-filesize 200000000 \
     --proxy-user "$circuit:x" "$@" -o "$file" "$url"
 }
 
 # fetch_page <url> <file> <circuit>: downloads one page as Tor Browser asks
-# for it, so a web server that tells visitors apart by their request can't
-# single out the monitor that way.
+# for it, so the web server cannot single out the monitor by its requests.
 fetch_page() {
   fetch_url "$1" "$2" "$3" --compressed -A "$BROWSER_AGENT" \
     -H "Accept: $BROWSER_ACCEPT" -H "Accept-Language: en-US,en;q=0.5"
@@ -133,9 +115,9 @@ status_py() {
   python3 -I -B "$release/deploy/render/status.py" "$@" 2>/dev/null
 }
 
-# read_site_status <circuit>: prints "<release> <commit>", what the site's
-# status.json says it was built from. The web server isn't trusted, so
-# checks.py checks both fields.
+# read_site_status <circuit>: prints the "<release> <commit>" that the site's
+# status.json names.
+# The web server is not trusted, so checks.py checks both fields.
 read_site_status() {
   local circuit="$1"
 
@@ -145,7 +127,7 @@ read_site_status() {
 }
 
 # check_certificate: alerts 14 days before the site's TLS certificate expires.
-# It reads the certificate that served status.json, which curl lists first.
+# curl lists the certificate that served status.json first.
 check_certificate() {
   local expires=""
   local expiry=0
@@ -155,7 +137,7 @@ check_certificate() {
   if [ -z "$expires" ]; then
     return 0
   fi
-  # a date that can't be read counts as expired, so it alerts
+  # a date that cannot be read counts as expired, so it alerts
   expiry=$(date -d "$expires" +%s 2>/dev/null) || expiry=0
   if [ "$expiry" -lt $((NOW + 1209600)) ]; then
     failing=1
@@ -164,9 +146,8 @@ check_certificate() {
     "the site's certificate expires on $(date -u -d "@$expiry" +%Y-%m-%d)"
 }
 
-# get_verified_release <version>: prints the folder of that release,
-# downloaded and verified as install.sh verifies it, the first time it is
-# needed.
+# get_verified_release <version>: prints the release's folder, which it first
+# downloads and verifies as install.sh does.
 get_verified_release() {
   local version="$1"
   local release="$STATE_DIR/releases/$version"
@@ -182,9 +163,8 @@ get_verified_release() {
 }
 
 # is_recent_enough <version> <release>: true unless the site runs an older
-# release that differs from this backend's in more than the backend's
-# scripts and the docs, which the web server never runs. So the site can't
-# fall back to a fixed bug, and no older render runs here.
+# release that differs from this one in more than backend/, signer/ and the docs.
+# So the site cannot fall back to a fixed bug, and no older render runs here.
 is_recent_enough() {
   local version="$1"
   local release="$2"
@@ -192,7 +172,7 @@ is_recent_enough() {
   if [ "$version" -ge "$INSTALLED_VERSION" ]; then
     return 0
   fi
-  diff -rq -x backend -x '*.md' "$release" "$INSTALLED_DIR" >/dev/null
+  diff -rq -x backend -x signer -x '*.md' "$release" "$INSTALLED_DIR" >/dev/null
 }
 
 # check_stall <commit>: alerts when the site's commit stays behind
@@ -212,8 +192,7 @@ check_stall() {
 }
 
 # is_recently_verified <snapshot sum>: true when GitLab confirmed this same
-# set of merge requests within the hour. After an hour it is asked again, so
-# a set that stops changing is still compared.
+# set of merge requests within the hour.
 is_recently_verified() {
   local snapshot_sum="$1"
   local verified=""
@@ -228,9 +207,9 @@ is_recently_verified() {
   [ "$verified_sum" = "$snapshot_sum" ] && [ "$age" -lt 3600 ]
 }
 
-# verify_merge_requests <release> <snapshot> <snapshot sum>: compares the
-# site's merge requests with GitLab's. Fails when they differ, or when GitLab
-# doesn't answer, and prints why in that case.
+# verify_merge_requests <release> <snapshot> <snapshot sum>: fails when the
+# site's merge requests differ from GitLab's.
+# When GitLab does not answer, it fails and prints why.
 verify_merge_requests() {
   local release="$1"
   local snapshot="$2"
@@ -255,8 +234,8 @@ verify_merge_requests() {
 }
 
 # build_values: builds the render's values from the backend's latest file,
-# as the web server builds them, and prints their hash. A site showing other
-# values fails the page compare, index.php/projects first.
+# as the web server builds them, and prints their hash.
+# A site with other values fails the page compare, index.php/projects first.
 build_values() {
   verify_list "$RUN_DIR/addresses"
   if ! "$DEPLOY/checks.py" values "$BACKEND_VALUES" /dev/null \
@@ -266,9 +245,8 @@ build_values() {
   render_values "$RUN_DIR/checked" "$RUN_DIR/in" "$RUN_DIR/addresses"
 }
 
-# render_expected <release> <commit> <inputs-hash>: renders the pages as
-# they should be into EXPECTED_DIR, but only when <inputs-hash>, a hash of
-# everything the render reads, changed since the last render.
+# render_expected <release> <commit> <inputs-hash>: renders the expected
+# pages into EXPECTED_DIR, when the render's inputs changed since last time.
 render_expected() {
   local release="$1"
   local commit="$2"
@@ -284,14 +262,13 @@ render_expected() {
   export_tree "$PROPOSALS_CHECKOUT" "$commit" "$RUN_DIR/in"
   cp -R -- "$release/dist" "$EXPECTED_DIR"
   rm -rf -- "$EXPECTED_DIR/templates"
-  python3 -I -B "$release/deploy/render/render.py" "$RUN_DIR/in" \
+  timeout 300 python3 -I -B "$release/deploy/render/render.py" "$RUN_DIR/in" \
     "$release/dist/templates" "$EXPECTED_DIR"
   printf '%s\n' "$inputs_hash" >"$STATE_DIR/rendered"
 }
 
-# check_addresses: alerts when the address list doesn't verify, or when a
-# proposal that takes donations shows no address. Either fix is a newly
-# signed list.
+# check_addresses: alerts when the address list does not verify, or when a
+# proposal that takes donations shows no address.
 check_addresses() {
   local missing=""
   local failing=0
@@ -301,8 +278,7 @@ check_addresses() {
       "the address list doesn't verify, so no donation address shows"
     return 0
   fi
-  # grep fails when every proposal shows an address, and when a page can't
-  # be read, yet still prints the matches; either way its status is ignored
+  # grep fails on no match or an unreadable page, but still prints the matches
   missing=$(cd -- "$EXPECTED_DIR" \
     && { grep -lF 'class="no-address"' proposals/*.html || true; } \
     | paste -sd' ' -)
@@ -321,6 +297,7 @@ list_always() {
   printf '%s\n' index.html ideas/index.html funding-required/index.html \
     work-in-progress/index.html completed-proposals/index.html \
     donate/index.html index.php/projects feed.xml
+  (cd -- "$EXPECTED_DIR" && find _astro -name '*.css')
   for qr in "$EXPECTED_DIR"/qr/*.png; do
     if [ ! -e "$qr" ]; then
       continue
@@ -331,8 +308,8 @@ list_always() {
   done
 }
 
-# list_sample <file-list>: prints the next ten files of the list, from where the
-# last run stopped, so that every file is compared within a few hours.
+# list_sample <file-list>: prints the next ten files of the list, from where
+# the last run stopped.
 list_sample() {
   local file_list="$1"
   local total=0
@@ -355,9 +332,8 @@ list_sample() {
   printf '%s\n' "$next" >"$STATE_DIR/sample-offset"
 }
 
-# list_failing <file-list> <always-list>: prints each failing page, so it is
-# compared again until it passes. One that left the site resolves, or is
-# forgotten if it never alerted.
+# list_failing <file-list> <always-list>: prints each failing page still on
+# the site, so it is compared again until it passes.
 list_failing() {
   local file_list="$1"
   local always_list="$2"
@@ -382,8 +358,7 @@ list_failing() {
 }
 
 # compare_page <path> <circuit>: fetches one file from the live site, and
-# checks it against the expected render, byte for byte. Its check is named
-# by a hash of the path.
+# checks it against the expected render, byte for byte.
 compare_page() {
   local path="$1"
   local circuit="$2"
@@ -418,43 +393,34 @@ compare_pages() {
   done <"$RUN_DIR/compare"
 }
 
-main() {
+# check_keys: alerts on a signing key that expires soon. It runs first, as it
+# does not depend on the site.
+check_keys() {
   local failing=0
-  local status=""
-  local version=""
-  local commit=""
-  local release=""
-  local snapshot=""
-  local snapshot_sum=""
   local text=""
-  local values_sum=""
-  local inputs_hash=""
-  local status_circuit=""
-  local page_circuit=""
 
-  begin_run
-
-  # 1. No signer's key stops signing within 30 days. It doesn't depend on the
-  #    site, so it runs before anything can end the run.
-  failing=0
   text=$("$DEPLOY/checks.py" expiring /etc/ccs/release-signers.gpg \
     /etc/ccs/address-signers.gpg 2>&1) || failing=1
   check key-expiry "$failing" "${text:-a signing key expires within 30 days}"
+}
 
-  # 2. What the site says it was built from. status.json and the pages are
-  #    fetched over two new circuits, so the web server can't tie the pages
-  #    to the request that marks the monitor.
-  status_circuit=$(new_circuit)
-  page_circuit=$(new_circuit)
-  failing=0
-  status=$(read_site_status "$status_circuit") || failing=1
+# read_status <circuit>: reads the site's status.json, and sets main's version
+# and commit.
+read_status() {
+  local failing=0
+  local status=""
+
+  status=$(read_site_status "$1") || failing=1
   check_certificate
   require status "$failing" "status.json is missing or malformed"
   version="${status% *}"
   commit="${status#* }"
+}
 
-  # 3. The release it names, and that it is no older than ours.
-  failing=0
+# take_release: verifies the site's release, and sets main's release.
+take_release() {
+  local failing=0
+
   release=$(get_verified_release "$version") || failing=1
   require release "$failing" "release $version doesn't download or verify"
   keep "$STATE_DIR/releases/" "$release" "$release"
@@ -462,18 +428,27 @@ main() {
   is_recent_enough "$version" "$release" || failing=1
   require old-release "$failing" \
     "the site runs release $version, older than release $INSTALLED_VERSION here"
+}
 
-  # 4. The proposals commit is ccs-back's, and not an hour behind it.
-  failing=0
+# check_site_commit: requires the site's commit in ccs-back's checkout.
+check_site_commit() {
+  local failing=0
+
   git -C "$PROPOSALS_CHECKOUT" cat-file -e "$commit^{commit}" 2>/dev/null \
     || failing=1
   require commit "$failing" \
     "the site's commit $commit isn't in ccs-back's checkout"
   check_stall "$commit"
+}
 
-  # 5. The merge requests match GitLab's. The web server can lag GitLab by up
-  #    to an hour, so only a mismatch lasting 75 minutes alerts.
-  failing=0
+# check_snapshot: restores the site's merge requests, and compares them with
+# GitLab's.
+check_snapshot() {
+  local failing=0
+  local snapshot=""
+  local snapshot_sum=""
+  local text=""
+
   "$DEPLOY/checks.py" snapshot "$RUN_DIR/status.json" || failing=1
   status_py "$release" restore "$RUN_DIR/status.json" "$RUN_DIR/in" \
     || failing=1
@@ -484,27 +459,45 @@ main() {
   text=$(verify_merge_requests "$release" "$snapshot" "$snapshot_sum") \
     || failing=1
   [ -n "$text" ] || text="the site's merge requests differ from GitLab's"
+  # the web server can lag GitLab by an hour, so the alert waits 75 minutes
   alert merge-requests "$failing" 4500 86400 "$MESSAGE_PREFIX $text"
+}
 
-  # 6. The backend's latest values, built as the web server builds them.
+# check_render: renders the site as it should be, and checks it.
+check_render() {
+  local failing=0
+  local values_sum=""
+  local inputs_hash=""
+
   values_sum=$(build_values)
-
-  # 7. The pages as they should be.
   inputs_hash=$(printf '%s\n' "$(sha256sum <"$RUN_DIR/status.json")" "$values_sum" \
     | sha256sum | cut -c1-64)
   render_expected "$release" "$commit" "$inputs_hash"
-
-  # 8. Every proposal that takes donations shows a signed address.
   check_addresses
+  "$DEPLOY/checks.py" site "$EXPECTED_DIR" "$RUN_DIR/addresses" \
+    "$release/deploy/site-hosts" || failing=1
+  check unlisted "$failing" "the render shows an address or a link it may not"
+}
 
-  # 9. The pages as they should be show only listed addresses.
-  failing=0
-  "$DEPLOY/checks.py" site "$EXPECTED_DIR" "$RUN_DIR/addresses" || failing=1
-  check unlisted "$failing" "the render shows an address the signed list lacks"
+main() {
+  local version=""
+  local commit=""
+  local release=""
+  local status_circuit=""
+  local page_circuit=""
 
-  # 10. The live site shows the same pages.
+  begin_run
+  check_keys
+  # two new circuits, so the web server cannot tie the pages to the request
+  # for status.json, which marks the monitor
+  status_circuit=$(new_circuit)
+  page_circuit=$(new_circuit)
+  read_status "$status_circuit"
+  take_release
+  check_site_commit
+  check_snapshot
+  check_render
   compare_pages "$page_circuit"
-
   end_run
 }
 

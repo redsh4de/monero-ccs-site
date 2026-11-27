@@ -2,8 +2,11 @@
 
 import filecmp
 import os
+import pty
 import re
+import select
 import shutil
+import time
 from pathlib import Path
 from subprocess import CompletedProcess
 
@@ -14,12 +17,13 @@ from installing import (
     LIB,
     MERGE,
     PUSH_KEY,
+    SYSTEMCTL_LOG,
     Machine,
     make_certificate,
     push_key,
     values,
 )
-from scripts import DEPLOY, REPO, replaced, run, stand_in
+from harness import DEPLOY, REPO, replaced, run, stand_in
 from signing import publish
 from web import lay_out
 
@@ -28,8 +32,8 @@ INSTALL = (DEPLOY / "install.sh").read_text()
 
 
 def test_a_push_holds_one_byte_more_than_the_values_cap():
-    checks = (DEPLOY / "checks.py").read_text()
-    cap = int(re.search(r"^VALUES_CAP = ([0-9_]+)$", checks, re.M)[1])
+    values = (DEPLOY / "guards/values.py").read_text()
+    cap = int(re.search(r"^VALUES_CAP = ([0-9_]+)$", values, re.M)[1])
     assert f"head -c {cap + 1} " in INSTALL
 
 
@@ -219,7 +223,7 @@ def test_a_release_installed_under_a_strict_umask_is_readable_by_the_services(
 
 def test_the_push_key_stays_root_only_and_no_push_user_is_made(installed_backend):
     assert ownership(PUSH_KEY) == "root 600"
-    run("id", "ccs-push", ok=False)
+    run("id", "ccs-push", refusal="no such user")
 
 
 def test_the_keyrings_are_made_readable_by_the_services(installed_backend):
@@ -383,7 +387,7 @@ def test_the_push_key_runs_nothing_but_the_values_write(installed_web):
 
 def test_the_push_key_works_only_from_the_backends_address(installed_web):
     logged = installed_web.sshd_log.read_text()
-    installed_web.push("pushed\n", source="127.0.0.2", ok=False)
+    installed_web.push("pushed\n", source="127.0.0.2", refusal="Permission denied")
     refusal = installed_web.sshd_log.read_text().removeprefix(logged)
     assert "with correct key but not from a permitted host" in refusal
     assert PUSHED.read_text() == installed_web.saved("web", PUSHED)
@@ -468,24 +472,27 @@ def test_installing_the_installed_release_again_changes_nothing(upgraded):
 
 
 def unrenderable(tree: Path) -> None:
-    """Make the proposal template fail to render, and mark three deploy files."""
+    """Make the proposal template fail to render, mark three deploy files, add a unit."""
     template = tree / "dist/templates/proposal.html"
     template.write_text(replaced(template.read_text(), "it.title", "it.nope"))
     for name in ("web/ccs-fetch.service", "sandbox.conf", "web/nginx.conf"):
         with open(tree / "deploy" / name, "a") as file:
             file.write("# a release that fails to render\n")
+    (tree / "deploy/web/ccs-extra.timer").write_text("[Timer]\nOnCalendar=daily\n")
 
 
 def test_a_release_that_fails_to_render_is_refused_and_the_old_one_comes_back(
     upgraded,
 ):
     upgraded.publish(3, edit=unrenderable)
-    site = os.readlink("/var/lib/ccs/current")
+    key = AUTHORIZED_KEYS.read_text()
     reason = "site-v3 failed to render, or nginx refused its site"
-    upgraded.refuses("web", "site-v3", reason=reason)
+    upgraded.refuses("web", "site-v3", "127.0.0.2", push_key(), reason=reason)
     assert upgraded.installed() == str(LIB / "releases/2")
     assert not (LIB / "releases/3").exists()
-    assert os.readlink("/var/lib/ccs/current") == site
+    assert upgraded.served() == 2
+    assert AUTHORIZED_KEYS.read_text() == key
+    assert not (UNITS / "ccs-extra.timer").exists()
     deploy = LIB / "releases/2/deploy"
     installed = {
         UNITS / "ccs-fetch.service": deploy / "web/ccs-fetch.service",
@@ -493,6 +500,89 @@ def test_a_release_that_fails_to_render_is_refused_and_the_old_one_comes_back(
         Path("/etc/nginx/sites-enabled/ccs.conf"): deploy / "web/nginx.conf",
     }
     assert differing(installed) == []
+
+
+def test_a_failed_backend_upgrade_brings_back_its_config(upgraded):
+    """The new web host's key cannot be read, after the config names it."""
+    upgraded.publish(11)
+    config = Path("/etc/ccs/config").read_text()
+    Path("/etc/ccs/known_hosts").write_text("")
+    args = ("backend", "site-v11", "other.example", CCS_BACK)
+    upgraded.refuses(*args, reason="Back on release 2")
+    assert upgraded.installed() == str(LIB / "releases/2")
+    assert Path("/etc/ccs/config").read_text() == config
+
+
+def test_a_failed_switch_back_keeps_the_release_it_switched_to(upgraded):
+    (LIB / "releases/1/deploy/web/tmpfiles.conf").unlink()
+    upgraded.refuses("web", "site-v1", reason="Back on release 2")
+    assert upgraded.installed() == str(LIB / "releases/2")
+    assert sorted(os.listdir(LIB / "releases")) == ["1", "2"]
+
+
+def test_a_failed_reinstall_keeps_the_release_it_fetched_again(upgraded, tmp_path):
+    shutil.rmtree(LIB / "releases/2")
+    stand_in(tmp_path, "systemd-sysusers", '#!/bin/sh\nkill -TERM "$PPID"\n')
+    path = f"{tmp_path}:{upgraded.env['PATH']}"
+    reason = "Back on release 2"
+    upgraded.refuses("web", "site-v2", reason=reason, first=True, PATH=path)
+    assert (LIB / "releases/2/deploy/install.sh").exists()
+
+
+def hang_up(machine: Machine, tmp_path: Path, tag: str) -> int:
+    """Return the exit code of an install whose SSH session drops mid-switch."""
+    switching = tmp_path / "switching"
+    stand_in(tmp_path, "systemd-sysusers", f"#!/bin/sh\ntouch {switching}\nsleep 2\n")
+    env = {**os.environ, **machine.env, "PATH": f"{tmp_path}:{machine.env['PATH']}"}
+    script = str(LIB / "current/deploy/install.sh")
+    pid, terminal = pty.fork()
+    if pid == 0:
+        os.execve(script, [script, "web", tag], env)
+    deadline = time.monotonic() + 120
+    while not switching.exists() and time.monotonic() < deadline:
+        if select.select([terminal], [], [], 0.1)[0]:
+            os.read(terminal, 4096)
+    os.close(terminal)
+    while time.monotonic() < deadline:
+        done, status = os.waitpid(pid, os.WNOHANG)
+        if done:
+            return os.waitstatus_to_exitcode(status)
+        time.sleep(0.1)
+    raise TimeoutError(f"the install of {tag} still runs")
+
+
+def test_a_hangup_during_a_switch_that_works_still_ends_the_install(upgraded, tmp_path):
+    upgraded.publish(14)
+    assert hang_up(upgraded, tmp_path, "site-v14") == 0
+    assert sorted(os.listdir(LIB / "releases")) == ["14", "2"]
+    said = "/etc/ccs/alert_url is empty, so no alert reaches anyone yet."
+    assert said in Path("/var/log/ccs-install.log").read_text()
+
+
+def test_a_signal_during_the_switch_brings_the_old_release_back(upgraded, tmp_path):
+    upgraded.publish(15)
+    stand_in(tmp_path, "systemd-sysusers", '#!/bin/sh\nkill -QUIT "$PPID"\n')
+    path = f"{tmp_path}:{upgraded.env['PATH']}"
+    upgraded.refuses("web", "site-v15", reason="Back on release 2", PATH=path)
+    assert upgraded.installed() == str(LIB / "releases/2")
+    assert not (LIB / "releases/15").exists()
+
+
+def test_an_undo_stops_only_the_units_that_were_installed(upgraded, tmp_path):
+    """The switch fails as it installs the new release's units."""
+    upgraded.publish(17, edit=unrenderable)
+    install = '#!/bin/sh\ncase "$*" in *ccs-extra*) exit 1 ;; esac\n'
+    stand_in(tmp_path, "install", install + 'exec /usr/bin/install "$@"\n')
+    path = f"{tmp_path}:{upgraded.env['PATH']}"
+    SYSTEMCTL_LOG.write_text("")
+    upgraded.refuses("web", "site-v17", reason="Back on release 2", PATH=path)
+    assert "ccs-extra.timer" not in SYSTEMCTL_LOG.read_text()
+
+
+def test_an_undo_that_stops_still_shows_its_log(upgraded):
+    (LIB / "releases/2/deploy/web/tmpfiles.conf").unlink()
+    upgraded.publish(18, edit=unrenderable)
+    upgraded.refuses("web", "site-v18", reason="The undo stopped")
 
 
 def test_a_failed_render_is_refused_even_when_its_first_start_joins_a_run_already_going(
@@ -586,9 +676,8 @@ def unloadable_nginx_site(tree: Path) -> None:
 
 def test_a_release_whose_nginx_site_does_not_load_is_refused(upgraded, certificate):
     upgraded.publish(8, edit=unloadable_nginx_site)
-    site = os.readlink("/var/lib/ccs/current")
     upgraded.refuses("web", "site-v8", reason='unknown directive "not_a_directive"')
     assert upgraded.installed() == str(LIB / "releases/2")
-    assert os.readlink("/var/lib/ccs/current") == site
+    assert upgraded.served() == 2
     nginx_site = Path("/etc/nginx/sites-enabled/ccs.conf")
     assert differing({nginx_site: LIB / "releases/2/deploy/web/nginx.conf"}) == []

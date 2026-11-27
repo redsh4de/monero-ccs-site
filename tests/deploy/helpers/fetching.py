@@ -7,7 +7,7 @@ from pathlib import Path
 from subprocess import CompletedProcess
 
 from fake_server import FakeServer
-from scripts import DEPLOY, EXAMPLE, run
+from harness import DEPLOY, EXAMPLE, run
 
 
 def git(repo: Path, *args: str) -> str:
@@ -34,11 +34,7 @@ def merge(repo: Path, branch: str, name: str, text: str, request: str) -> None:
 
 
 class Fetcher:
-    """A web server's fetch folders, and an origin with each example proposal.
-
-    Each proposal arrives in its own merge commit, as GitLab writes them. The
-    settings that systemd's EnvironmentFile= gives fetch.sh are in env.
-    """
+    """A web server's fetch folders, and an origin with each example proposal."""
 
     def __init__(self, root: Path, server: FakeServer):
         self.server = server
@@ -73,8 +69,9 @@ class Fetcher:
         text = f"gitlab sha256={gitlab:064d}\nupdated {int(time.time())}\n"
         (self.ccs / "in/values").write_text(text)
 
-    def fetch(self, ok: bool = True, **env: str) -> CompletedProcess[str]:
-        return run(DEPLOY / "web/fetch.sh", ok=ok, env={**self.env, **env}, timeout=200)
+    def fetch(self, refusal: str | None = None, **env: str) -> CompletedProcess[str]:
+        env = {**self.env, **env}
+        return run(DEPLOY / "web/fetch.sh", refusal=refusal, env=env, timeout=200)
 
     def links(self) -> tuple[str, str]:
         return os.readlink(self.ccs / "in/repo"), os.readlink(self.ccs / "in/mr")

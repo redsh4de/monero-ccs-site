@@ -3,8 +3,8 @@
 Setup, upgrades and repairs for the two machines behind ccs.getmonero.org. The backend
 runs ccs-back and its wallet. The web server renders and serves the site.
 
-When an alert fires, see [ALERTS.md](ALERTS.md). Signers follow
-[RELEASING.md](RELEASING.md), and [ARCHITECTURE.md](ARCHITECTURE.md) explains the
+When an alert fires, see [ALERTS.md](docs/ALERTS.md). Signers follow
+[RELEASING.md](docs/RELEASING.md), and [ARCHITECTURE.md](docs/ARCHITECTURE.md) explains the
 design.
 
 ---
@@ -41,7 +41,7 @@ Each machine needs four files in `/etc/ccs/`, and a release you checked by hand.
 `install.sh` runs as root before anything else checks it. The release signers give you
 `release-signers.gpg`. The address signer gives you `address-signers.gpg`,
 `addresses.txt` and `addresses.txt.asc`, made as in
-[The address list](RELEASING.md#the-address-list).
+[The address list](docs/RELEASING.md#the-address-list).
 
 1. Install the tools: `apt install gpgv gnupg curl systemd-timesyncd`. The web server
    refuses values that the backend stamped over 5 minutes ahead, so the clocks must
@@ -147,11 +147,12 @@ shows at the next install.
 
 Install a release only on the machines whose code it changes. The signers say which.
 
-| The release changes    | Install it on  |
-| ---------------------- | -------------- |
-| Only `deploy/backend/` | The backend    |
-| Only `deploy/web/`     | The web server |
-| Anything else          | Both           |
+| The release changes               | Install it on  |
+| --------------------------------- | -------------- |
+| Only `deploy/backend/`            | The backend    |
+| Only `deploy/web/`                | The web server |
+| Only `deploy/signer/` or the docs | Neither        |
+| Anything else                     | Both           |
 
 Upgrade the web server first: a site older than the backend raises `old-release`. On
 each machine, run:
@@ -162,6 +163,8 @@ each machine, run:
 
 To go back, use the opposite order: the backend first. The previous release stays on
 disk, so going back one release needs no download. Run the same command with its name.
+
+After a power loss or a `kill -9` during an install, install either release again.
 
 **Upgrade the render's Debian packages on both machines together.** Otherwise the
 monitor finds pages that differ. These are `python3-yaml`, `python3-markdown-it`,
@@ -256,7 +259,7 @@ stays pinned to its proposal.
 
 **An expired address signer key closes every donation box on both machines.** An expired
 release signer key stops installs, and the monitor raises `release`. Signers extend and
-replace keys as in [Keys](RELEASING.md#keys).
+replace keys as in [Keys](docs/RELEASING.md#keys).
 
 When the signers send a new keyring, install it on both machines:
 

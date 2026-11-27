@@ -1,17 +1,11 @@
 #!/usr/bin/python3 -I
-"""Print the address list's lines, each address with its QR code, for signing.
+"""Print the address list to sign: each address with its QR code.
 
 Usage: address-list.py <subaddresses-file> <general-fund-address>
 
-  <subaddresses-file>  a file of the CCS wallet's first subaddresses, one on
-                       each line
+  <subaddresses-file>  the CCS wallet's first subaddresses, one on each line
 
-Prints "<address> <code>" for each subaddress, then "general-fund <address>
-<code>". Each code is qrencode's, its modules a bit each, dark as 1, row by row,
-in base64. zbar reads each back from those bits, as the servers will draw them,
-before it is printed.
-
-Exit: 0 printed, 1 when an address is malformed or a code doesn't read back,
+Exit: 0 printed, 1 when an address is malformed or a code does not read back,
 2 usage.
 """
 
@@ -23,22 +17,11 @@ from pathlib import Path
 
 import zbar
 
-sys.path.insert(0, str(Path(__file__).resolve().parent / "render"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "render"))
 import qr  # noqa: E402
 from safety import is_address  # noqa: E402
 
 SCALE = 8
-
-
-def code(address: str) -> str:
-    """Return the address's QR code, once zbar reads it back as the address."""
-    qrencode = ["qrencode", "-t", "ASCII", "-m", "0", f"monero:{address}"]
-    run = subprocess.run(qrencode, check=True, capture_output=True, text=True)
-    dark = [pair == "##" for pair in re.findall("..", run.stdout.replace("\n", ""))]
-    encoded = base64.b64encode(qr.pack(dark)).decode()
-    if read_back(qr.framed(qr.modules(encoded) or [])) != [f"monero:{address}"]:
-        raise ValueError(f"the QR code for {address} doesn't read back")
-    return encoded
 
 
 def read_back(pixels: list[list[bool]]) -> list[str]:
@@ -54,6 +37,17 @@ def read_back(pixels: list[list[bool]]) -> list[str]:
     scanner.parse_config("qrcode.enable")
     scanner.scan(image)
     return [symbol.data for symbol in image]
+
+
+def code(address: str) -> str:
+    """Return the address's QR code, once zbar reads it back as the servers draw it."""
+    qrencode = ["qrencode", "-t", "ASCII", "-m", "0", f"monero:{address}"]
+    run = subprocess.run(qrencode, check=True, capture_output=True, text=True)
+    dark = [pair == "##" for pair in re.findall("..", run.stdout.replace("\n", ""))]
+    encoded = base64.b64encode(qr.pack(dark)).decode()
+    if read_back(qr.framed(qr.modules(encoded) or [])) != [f"monero:{address}"]:
+        raise ValueError(f"the QR code for {address} doesn't read back")
+    return encoded
 
 
 def main(argv: list[str]) -> int:

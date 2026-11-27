@@ -4,7 +4,7 @@ import re
 
 import pytest
 
-from scripts import CHECKS, DEPLOY, REPO
+from harness import CHECKS, DEPLOY, REPO
 
 DOCS = [
     REPO / "README.md",
@@ -82,6 +82,14 @@ def test_the_docs_name_every_alert_the_scripts_raise_and_every_checks_py_command
         name for name in [*sorted(alerts), "page-", *commands] if f"`{name}" not in docs
     ]
     assert unnamed == []
+
+
+def test_a_first_signer_reads_every_script_that_runs_as_them():
+    """checks.py runs each file of its RUNS list, so those count too."""
+    listed = re.search(r'scripts="([^"]*)"', (DEPLOY / "docs/RELEASING.md").read_text())
+    loaded = re.findall(r'^    "[\w.]+": "(\w+/\w+\.py)",$', CHECKS.read_text(), re.M)
+    run = ["signer/release.sh", "lib.sh", "gittree.py", "checks.py", *loaded]
+    assert sorted(listed[1].split()) == sorted(f"deploy/{n}" for n in run)
 
 
 @pytest.mark.parametrize("doc", DOCS, ids=IDS)

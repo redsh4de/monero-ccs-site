@@ -12,12 +12,7 @@ PROJECT = "/api/v4/projects/monero-project%2Fccs-proposals"
 class FakeServer:
     """Serve merge requests, the alert channel and releases from a state folder.
 
-    set_merge_requests() sets the open merge requests, and changes() the diffs of
-    one. A file named fail makes the API answer 500, fail-once makes it do so
-    once, changes/<iid>.fail fails that merge request, and alert.fail refuses
-    alerts. Each request goes to access.log, and each alert to alerts.log. The
-    credentials folder holds the alert URL, as systemd's LoadCredential= gives it.
-    The releases that signing.publish() writes into the folder are served too.
+    A file named fail, fail-once, changes/<iid>.fail or alert.fail makes a request fail.
     """
 
     def __init__(self, state: Path):
@@ -70,25 +65,54 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        if self.path == "/api/graphql":
+            return self.graphql(json.loads(body)["variables"])
         if (self.server.state / "alert.fail").exists():
             return self.send(500)
         with open(self.server.state / "alerts.log", "ab") as log:
             log.write(body.replace(b"\n", b"|") + b"\n")
         self.send(200)
 
-    def do_GET(self):
-        with open(self.server.state / "access.log", "a") as log:
-            log.write(self.path + "\n")
-        url = urlsplit(self.path)
-        if (self.server.state / "fail").exists():
+    def graphql(self, variables):
+        """Answer mrs.py's query from mrs.json, 100 nodes a page."""
+        if self.failed(f"/api/graphql after={variables['after']}"):
             return self.send(500)
+        mrs = json.loads((self.server.state / "mrs.json").read_text())
+        start = int(variables["after"] or 0)
+        nodes = [
+            {
+                "iid": str(mr["iid"]),
+                "title": mr.get("title"),
+                "author": mr.get("author"),
+                "webUrl": mr.get("web_url"),
+                "createdAt": mr.get("created_at"),
+                "upvotes": mr.get("upvotes", 0),
+                "downvotes": mr.get("downvotes", 0),
+                "diffHeadSha": mr.get("sha"),
+            }
+            for mr in mrs[start : start + 100]
+        ]
+        info = {"hasNextPage": start + 100 < len(mrs), "endCursor": str(start + 100)}
+        found = {"pageInfo": info, "nodes": nodes}
+        answer = {"data": {"project": {"mergeRequests": found}}}
+        self.send(200, json.dumps(answer).encode())
+
+    def failed(self, line):
+        """Log the request, and return True if a fail file says it fails."""
+        with open(self.server.state / "access.log", "a") as log:
+            log.write(line + "\n")
+        if (self.server.state / "fail").exists():
+            return True
         if (self.server.state / "fail-once").exists():
             (self.server.state / "fail-once").unlink()
+            return True
+        return False
+
+    def do_GET(self):
+        if self.failed(self.path):
             return self.send(500)
+        url = urlsplit(self.path)
         query = parse_qs(url.query)
-        if url.path == f"{PROJECT}/merge_requests":
-            mrs = json.loads((self.server.state / "mrs.json").read_text())
-            return self.send(200, json.dumps(page(mrs, query)).encode())
         if url.path.startswith(f"{PROJECT}/merge_requests/") and url.path.endswith(
             "/diffs"
         ):

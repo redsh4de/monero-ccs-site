@@ -1,18 +1,8 @@
 #!/bin/sh
 # shellcheck shell=dash
-# Fetches the render's content from GitLab: the proposals repository and the
-# open merge requests.
+# Fetches the proposals repository and the open merge requests from GitLab.
 #
-# Runs as: ccs-fetch.service, as the ccs-fetch user, after each values push
-#          (ccs-fetch.path) and hourly (ccs-fetch.timer). systemd runs
-#          update.sh after it, whatever the result.
-# Reads:   the "gitlab" line of the latest push, in /var/lib/ccs/in/values, and
-#          the time of the values applied last, in /var/lib/ccs/state/values.
-# Writes:  /var/lib/ccs/fetch, the links /var/lib/ccs/in/repo and in/mr, and
-#          the alerts' state in /run/ccs-fetch, which systemd makes
-#          (RuntimeDirectory=).
-# Trust:   GitLab's content is only extracted here, and the render escapes it.
-# Exit:    0 when the content is current, 1 when a fetch failed.
+# Exit: 0 when the content is current, 1 when a fetch failed.
 set -eu
 # shellcheck disable=SC3040 # Debian 13's dash has pipefail
 set -o pipefail
@@ -27,20 +17,19 @@ readonly IN_DIR="$CCS_DIR/in"
 readonly FETCH_DIR="$CCS_DIR/fetch"
 # in memory, so a full disk can still alert
 readonly ALERTS_DIR="${RUNTIME_DIRECTORY:?}/alerts"
-# GitLab is called when the "gitlab" line changes, or 55 minutes after the last
-# call, so each hourly run calls it despite the timer's random delay
+# 55 minutes, so each hourly run calls GitLab despite the timer's random delay
 readonly REFETCH_AFTER=3300
 NOW=$(date +%s)
 readonly NOW
 
-# drop_cut_off_pushes: deletes the temporary file a push cut off midway
-# leaves. One ten minutes old is no push in flight.
+# drop_cut_off_pushes: deletes the temporary files of pushes cut off midway.
+# A file ten minutes old is no push in flight.
 drop_cut_off_pushes() {
   find "$IN_DIR" -maxdepth 1 -name 'values.??????' -mmin +10 -delete
 }
 
-# check_values_age: alerts when the values applied last are over ten minutes
-# old. update.sh counts values as applied only once the site shows them.
+# check_values_age: alerts when the values applied last are over 10 minutes old.
+# update.sh counts values as applied only once the site shows them.
 check_values_age() {
   local updated=""
   local age=0
@@ -84,8 +73,8 @@ fetch_proposals() {
   if [ ! -d "$repo" ]; then
     git init -q --bare "$repo" || return 1
   fi
-  # a GitLab that stalls fails the fetch in a minute. One that is only slow
-  # fails at the limit, inside the unit's, so the "fetch" alert counts it
+  # a stall fails in a minute; the timeouts stay inside the unit's limit, so
+  # the "fetch" alert still runs
   timeout 300 git -C "$repo" -c http.lowSpeedLimit=1000 \
     -c http.lowSpeedTime=60 \
     fetch -q "$PROPOSALS_GIT" '+refs/heads/master:refs/heads/master' \
@@ -141,10 +130,8 @@ main() {
   local failing=0
 
   alerts_begin
-  # whatever stops the run, the alerts queued so far go out
   trap alerts_send EXIT
-  # dash runs no EXIT trap when a signal kills it, so a stop from systemd
-  # exits instead, which runs it
+  # dash skips the EXIT trap on a signal, so a stop from systemd exits instead
   trap 'exit 1' TERM
   drop_cut_off_pushes
   check_values_age
@@ -160,8 +147,7 @@ main() {
       failing=1
       log "fetch: content failed"
     fi
-    # a failed fetch is tried again on each push and each hour, and a repeat
-    # under an hour reaches even the hourly attempts
+    # under an hour, so the hourly tries alone raise and repeat the alert
     alert fetch "$failing" 3000 3000 \
       "ccs: content fetches have failed for 50 minutes"
   fi

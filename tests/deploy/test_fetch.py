@@ -8,7 +8,7 @@ import time
 
 import pytest
 
-from scripts import DEPLOY, EXAMPLE, run, stand_in
+from harness import DEPLOY, EXAMPLE, run, stand_in
 
 
 @pytest.fixture
@@ -100,23 +100,24 @@ def many(fetched):
     return fetched
 
 
-def test_150_merge_requests_arrive_in_api_order_over_two_pages(many):
+def test_150_merge_requests_arrive_in_api_order_over_pages(many):
     iids = [mr["iid"] for mr in json.loads(read(many, "mr/open.json"))]
     assert iids == list(range(150, 0, -1))
-    assert many.server.calls("page=2") >= 1
+    assert many.server.calls("/api/graphql after=100") == 1
 
 
 def test_paths_with_a_tab_or_newline_are_left_out(many):
     assert adds(many) == {150: ["ok.md"], 3: ["idea.md"]}
 
 
-def test_a_merge_requests_101_files_arrive_over_two_pages(many):
+def test_a_merge_requests_files_are_read_up_to_the_second(many):
+    """The render reads a merge request's file only when it adds just one."""
     many.server.changes(151, [(f"f{number:03}.md", True) for number in range(101)])
     many.mrs(151)
     many.values(6)
     many.fetch()
-    assert len(adds(many)[151]) == 101
-    assert many.server.calls("merge_requests/151/diffs") == 2
+    assert len(adds(many)[151]) == 2
+    assert many.server.calls("merge_requests/151/diffs") == 1
 
 
 def test_two_merge_request_sets_are_kept(many):
@@ -129,8 +130,7 @@ def test_two_merge_request_sets_are_kept(many):
 def test_over_1000_open_merge_requests_fails(fetched):
     fetched.mrs(1001)
     fetched.values(7)
-    failed = fetched.fetch(ok=False)
-    assert "more than 1000 entries" in failed.stderr
+    fetched.fetch(refusal="more than 1000 entries")
 
 
 def test_one_failing_merge_request_is_left_out_and_retried(fetched):
@@ -152,9 +152,8 @@ def test_a_failing_api_fails_the_fetch_and_keeps_the_links(fetched):
     (fetched.server.state / "fail").touch()
     fetched.values(16)
     links = fetched.links()
-    failed = fetched.fetch(ok=False)
+    failed = fetched.fetch(refusal="fetch: content failed")
     assert "GitLab's list didn't load" in failed.stderr
-    assert "fetch: content failed" in failed.stderr
     assert fetched.links() == links
 
 
@@ -171,13 +170,13 @@ def test_a_failed_git_rev_parse_fails_the_fetch(fetched, tmp_path):
     )
     links = fetched.links()
     fetched.values(30)
-    failed = fetched.fetch(ok=False, PATH=stand_in(tmp_path / "bin", "git", script))
-    assert "fetch: content failed" in failed.stderr
+    path = stand_in(tmp_path / "bin", "git", script)
+    fetched.fetch(refusal="fetch: content failed", PATH=path)
     assert fetched.links() == links
 
 
 @pytest.mark.parametrize(
-    "command, slow", [("git", "*fetch*"), ("curl", "*/merge_requests*")]
+    "command, slow", [("git", "*fetch*"), ("curl", "*/api/graphql*")]
 )
 def test_a_gitlab_slower_than_the_steps_limit_fails_the_fetch(
     fetched, tmp_path, command, slow
@@ -189,8 +188,7 @@ def test_a_gitlab_slower_than_the_steps_limit_fails_the_fetch(
     fetched.values(32)
     script = f'case "$*" in {slow}) sleep 60 ;; esac\nexec /usr/bin/{command} "$@"\n'
     path = stand_in(tmp_path / "bin", command, f"#!/bin/sh\n{script}")
-    failed = fetched.fetch(ok=False, PATH=path)
-    assert "fetch: content failed" in failed.stderr
+    fetched.fetch(refusal="fetch: content failed", PATH=path)
     assert (fetched.alerts / "fetch").exists()
     unit = (DEPLOY / "web/ccs-fetch.service").read_text()
     units_limit = int(re.search(r"^TimeoutStartSec=(\d+)$", unit, re.M)[1])
@@ -220,7 +218,7 @@ def test_no_fetch_alert_without_a_fetch_attempt(fetched):
 def test_a_first_failed_fetch_does_not_alert_at_once(fetched):
     (fetched.server.state / "fail").touch()
     fetched.values(18)
-    fetched.fetch(ok=False)
+    fetched.fetch(refusal="fetch: content failed")
     assert fetched.server.alerts() == []
 
 
@@ -228,15 +226,15 @@ def test_fetches_failing_for_50_minutes_alert_once_an_hour_then_resolve(fetched)
     (fetched.server.state / "fail").touch()
     alert_state(fetched, "fetch", int(time.time()) - 3100, 0, FAILED)
     fetched.values(18)
-    fetched.fetch(ok=False)
+    fetched.fetch(refusal="fetch: content failed")
     assert fetched.server.alerts() == [f"{FAILED} (fetch)"]
     fetched.values(19)
-    fetched.fetch(ok=False)
+    fetched.fetch(refusal="fetch: content failed")
     assert len(fetched.server.alerts()) == 1
     an_hour_ago = int(time.time()) - 3100
     alert_state(fetched, "fetch", an_hour_ago - 100, an_hour_ago, FAILED)
     fetched.values(21)
-    fetched.fetch(ok=False)
+    fetched.fetch(refusal="fetch: content failed")
     assert len(fetched.server.alerts()) == 2
     (fetched.server.state / "fail").unlink()
     fetched.values(20)
@@ -265,7 +263,7 @@ def test_a_full_disk_still_sends_the_alert_that_is_due(fetched):
     (fetched.ccs / "fetch/last-fetch").unlink()
     (fetched.ccs / "fetch/last-fetch").symlink_to("/dev/full")
     fetched.values(40)
-    fetched.fetch(ok=False)
+    fetched.fetch(refusal="I/O error")
     assert fetched.server.alerts() == [f"{STALE} (stale-values)"]
 
 
@@ -290,8 +288,7 @@ def stalling():
 def test_a_gitlab_that_stalls_makes_the_fetch_give_up_in_time(fetched, stalling):
     fetched.values(31)
     env = {**fetched.env, "PROPOSALS_GIT": f"http://127.0.0.1:{stalling}/p.git"}
-    failed = run(
-        "timeout", "150", DEPLOY / "web/fetch.sh", ok=False, env=env, timeout=200
-    )
+    command = ["timeout", "150", DEPLOY / "web/fetch.sh"]
+    failed = run(*command, refusal="fetch: content failed", env=env, timeout=200)
     assert failed.returncode == 1, "fetch.sh did not give up within 150 s"
     assert (fetched.alerts / "fetch").exists()

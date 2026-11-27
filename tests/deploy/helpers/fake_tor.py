@@ -8,11 +8,7 @@ from pathlib import Path
 
 
 def serve_socks(path: Path) -> None:
-    """Serve SOCKS5 on a Unix socket, and connect each request to 127.0.0.1.
-
-    The port is the one asked for, so a request for the live site reaches this
-    machine's nginx. curl always offers no login, so none is asked for.
-    """
+    """Serve SOCKS5 on a Unix socket; connect each request to its port on 127.0.0.1."""
     path.unlink(missing_ok=True)
     server = socketserver.ThreadingUnixStreamServer(str(path), Socks)
     server.daemon_threads = True
@@ -25,7 +21,7 @@ class Socks(socketserver.BaseRequestHandler):
         """Answer one SOCKS5 handshake, then relay the connection both ways."""
         client = self.request
         client.recv(client.recv(2)[1])
-        client.sendall(b"\x05\x00")
+        client.sendall(b"\x05\x00")  # no login, which curl always offers
         kind = client.recv(4)[3]
         if kind == 3:  # a host name
             client.recv(client.recv(1)[0])

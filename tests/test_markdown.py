@@ -1,6 +1,7 @@
 """Proposal Markdown can only become a small, fixed set of HTML."""
 
 import re
+import resource
 import unicodedata
 import urllib.parse
 from html.parser import HTMLParser
@@ -24,7 +25,7 @@ ALLOWED_TAGS = {
     "details", "summary",
 }
 # fmt: on
-ALLOWED_ATTRIBUTES = {"href", "class", "id", "start"}
+ALLOWED_ATTRIBUTES = {"href", "class", "id"}
 SAFE_SCHEMES = {"", "http", "https", "mailto"}
 
 KNOWN_ATTACKS = {
@@ -46,9 +47,10 @@ KNOWN_ATTACKS = {
     ),
     "address in groups": " ".join(ADDRESS[i : i + 4] for i in range(0, 95, 4)),
     "address split across paragraphs": f"{ADDRESS[:47]}\n\n{ADDRESS[47:]}",
+    # its marker would show the number, which could end an address
+    "a list number": "456918413. x\n",
 }
 # fmt: off
-# Markdown and raw HTML to mix the attacks with
 SYNTAX = [
     "**", "~~", "`", "```\n", "    ", "> ", "- ", "\n", "\n\n", "[^1]", "[^1]: ",
     "<details>", "</details>", "<summary>", "<sup>", "<!--", "-->",
@@ -86,8 +88,7 @@ class Page(HTMLParser):
 def shows_address(text):
     """Whether a visitor could copy an address out of the text.
 
-    Copying drops format characters, such as a zero-width space, and combining
-    marks, so they can't split an address, and a wallet may drop spaces.
+    Copying drops format characters and combining marks, and a wallet may drop spaces.
     """
     visible = "".join(c for c in text if unicodedata.category(c) not in ("Cf", "Mn"))
     return bool(re.search(r"[1-9A-HJ-NP-Za-km-z]{90,}", visible)) or ADDRESS in "".join(
@@ -113,3 +114,36 @@ def test_known_attack_renders_safely(markdown):
 @given(proposals)
 def test_any_mix_of_attacks_renders_safely(markdown):
     assert_safe(markdown)
+
+
+@pytest.mark.parametrize(
+    "block",
+    [
+        pytest.param(f"{ADDRESS}\n", id="a paragraph"),
+        pytest.param(f"[x](https://repo.getmonero.org/{ADDRESS})\n", id="a link"),
+        pytest.param(f"<details>{ADDRESS}</details>\n", id="raw HTML"),
+        pytest.param(f"```\n{ADDRESS}\n```\n", id="code"),
+    ],
+)
+def test_only_the_block_that_shows_an_address_is_removed(block):
+    page = bodies.render(f"Kept text.\n\n{block}")
+    assert "Kept text." in page and "[address removed]" in page and ADDRESS not in page
+
+
+def test_a_body_whose_cells_grow_past_its_memory_shows_a_notice():
+    """markdown-it fills each row of a table with the header's cells."""
+    table = "|" + "a|" * 1000 + "\n|" + "-|" * 1000 + "\n" + "x\n" * 1000
+    assert bodies.render(table) == bodies.TOO_LONG
+    used = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss * 1024
+    assert used < 2 * bodies.BODY_MEMORY
+
+
+def test_a_body_that_takes_too_long_shows_a_notice(monkeypatch):
+    """Each place an address could start is checked, and here the limit is 1 s."""
+    monkeypatch.setattr(bodies, "BODY_SECONDS", 1)
+    assert bodies.render("4 8 " * 24_000) == bodies.TOO_LONG
+
+
+def test_a_body_whose_footnotes_grow_past_the_cap_shows_a_notice():
+    footnotes = "[^a]" * 24_000 + "\n\n[^a]: x\n"
+    assert bodies.render(footnotes) == bodies.TOO_LONG

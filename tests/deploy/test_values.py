@@ -7,7 +7,7 @@ from urllib.parse import quote
 
 import pytest
 
-from scripts import CHECKS, DEPLOY, refuses, run
+from harness import CHECKS, DEPLOY, run
 
 A1 = "888tNkZrPN6JsEgekjMnABU4TBzc2Dt29EPAvkRxbANsAnjyPbb3iQ1YBRk1UXcdRsiKc9dhwMVgN5S9cQUiyoogDavup3H"
 VALUES_PY = DEPLOY / "backend/values.py"
@@ -114,7 +114,7 @@ def test_a_run_that_cannot_read_ccs_back_fails_and_keeps_the_last_file(
     ccs_back.values(out)
     last = out.read_text()
     missing = {"CCS_BACK": str(tmp_path / "missing")}
-    refuses(VALUES_PY, out, reason="can't read ccs-back's files", env=missing)
+    run(VALUES_PY, out, refusal="can't read ccs-back's files", env=missing)
     assert out.read_text() == last
 
 
@@ -211,9 +211,9 @@ def test_no_proposals_gives_only_the_gitlab_and_updated_lines(ccs_back, out):
 
 
 def test_values_py_without_ccs_back_fails_and_writes_nothing(out):
-    run(VALUES_PY, out, ok=False)
+    run(VALUES_PY, out, refusal="KeyError: 'CCS_BACK'")
     assert not out.exists()
 
 
 def test_values_py_needs_a_file_to_write():
-    refuses(VALUES_PY, reason="usage: values.py <file>")
+    run(VALUES_PY, refusal="usage: values.py <file>")

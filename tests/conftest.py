@@ -7,7 +7,7 @@ import tarfile
 import pytest
 from hypothesis import settings
 
-import checks
+from guards.release import release_name
 
 # the same examples every run, so a failure in CI fails the same way locally
 settings.register_profile("deterministic", derandomize=True, database=None)
@@ -49,7 +49,7 @@ def make_release(gpg, tmp_path):
 
         release = tmp_path / f"release-{version}"
         release.mkdir()
-        archive = release / checks.release_name(version)
+        archive = release / release_name(version)
         with tarfile.open(archive, "w") as tar:
             tar.add(site / "dist", arcname="dist")
 

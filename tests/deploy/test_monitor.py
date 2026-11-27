@@ -7,7 +7,7 @@ import pytest
 
 from fetching import git
 from monitoring import ALWAYS, ETC, VALUES, Monitored, SiteServer, page
-from scripts import replaced, run
+from harness import replaced, run
 from web import DIST, B, C
 
 
@@ -63,6 +63,19 @@ def test_a_failing_page_reminds_once_a_day(monitored):
     monitored.age(page("index.html"), 90000, field=1)
     monitored.monitor()
     assert monitored.server.alerts() == [differs("index.html")] * 2
+
+
+def test_a_host_that_only_the_sites_newer_release_lists_is_no_failure(monitored):
+    (monitored.release(1) / "deploy/site-hosts").write_text("")
+    monitored.monitor()
+    assert "unlisted" not in monitored.failures()
+
+
+def test_a_changed_stylesheet_alerts(monitored):
+    path = next(path for path in monitored.expected() if path.endswith(".css"))
+    monitored.flip(path)
+    monitored.monitor()
+    assert monitored.failures() == [page(path)]
 
 
 def test_a_changed_qr_code_alerts(monitored):
@@ -171,7 +184,7 @@ def test_gitlab_not_answering_leaves_the_merge_requests_unverified(monitored):
 def test_a_verified_set_is_asked_about_again_only_an_hour_on(monitored):
     monitored.server.set_merge_requests([])
     monitored.monitor()
-    assert monitored.server.calls("merge_requests") == 0
+    assert monitored.server.calls("/api/graphql") == 0
     monitored.forget_verification()
     monitored.monitor()
     assert monitored.reason("merge-requests") == MRS_DIFFER
@@ -183,7 +196,7 @@ def test_votes_cast_since_the_sites_fetch_are_no_mismatch(monitored):
     monitored.forget_verification()
     monitored.monitor()
     assert monitored.failures() == []
-    assert monitored.server.calls("merge_requests") > 0
+    assert monitored.server.calls("/api/graphql") > 0
 
 
 @pytest.mark.parametrize(
@@ -227,7 +240,7 @@ def test_a_render_that_shows_an_unlisted_address_alerts(monitored):
     monitored.failing_for("unlisted", 700)
     monitored.monitor()
     assert monitored.server.alerts() == [
-        "ccs monitor: the render shows an address the signed list lacks (unlisted)"
+        "ccs monitor: the render shows an address or a link it may not (unlisted)"
     ]
 
 
@@ -286,10 +299,15 @@ def install_newer(monitored, *changed: str) -> None:
             file.write("\n")
 
 
-def test_an_older_site_release_differing_only_in_backend_files_and_docs_is_checked(
+def test_an_older_site_release_differing_only_in_backend_signer_files_and_docs_is_checked(
     monitored,
 ):
-    install_newer(monitored, "deploy/backend/values.py", "deploy/README.md")
+    install_newer(
+        monitored,
+        "deploy/backend/values.py",
+        "deploy/signer/release.sh",
+        "deploy/README.md",
+    )
     monitored.monitor(release=2)
     assert monitored.failures() == []
     assert set(ALWAYS) <= set(monitored.site_server.requested)
@@ -320,7 +338,7 @@ def test_a_run_that_cannot_make_its_folders_alerts_as_a_crash(monitored):
     shutil.rmtree(monitored.state / "releases")
     (monitored.state / "releases").symlink_to("/dev/full")
     monitored.failing_for("monitor", 700)
-    monitored.monitor(ok=False)
+    monitored.monitor(refusal="cannot create directory")
     assert monitored.server.alerts() == ["ccs monitor: the monitor crashed (monitor)"]
 
 
@@ -339,7 +357,7 @@ def test_a_crashed_run_requests_no_heartbeat(monitored):
     heartbeat_url(monitored, f"{monitored.server.url}/heartbeat")
     shutil.rmtree(monitored.state / "releases/1/dist/templates")
     (monitored.state / "rendered").unlink()
-    monitored.monitor(ok=False)
+    monitored.monitor(refusal="TemplateNotFound")
     assert monitored.server.calls("/heartbeat") == 0
 
 
@@ -347,7 +365,7 @@ def test_a_crash_alerts_and_a_good_run_clears_it(monitored):
     shutil.rmtree(monitored.state / "releases/1/dist/templates")
     (monitored.state / "rendered").unlink()
     monitored.failing_for("monitor", 700)
-    monitored.monitor(ok=False)
+    monitored.monitor(refusal="TemplateNotFound")
     assert monitored.server.alerts() == ["ccs monitor: the monitor crashed (monitor)"]
     shutil.rmtree(monitored.state / "releases/1")
     monitored.monitor()
