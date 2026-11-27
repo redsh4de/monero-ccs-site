@@ -12,7 +12,7 @@ from urllib.parse import unquote, urlsplit
 
 from fake_server import FakeServer
 from fetching import Fetcher
-from scripts import EXAMPLE, replaced, run
+from harness import EXAMPLE, replaced, run
 from signing import Keys, place_keyrings, publish, write_list
 from web import A, B, as_pushed
 
@@ -25,10 +25,7 @@ ALWAYS = """index.html ideas/index.html funding-required/index.html
 
 
 class SiteServer:
-    """Serve a folder as the live site, and note the path of each request.
-
-    Given a file that holds a certificate and its key, serve over TLS.
-    """
+    """Serve a folder as the live site, and note the path of each request."""
 
     def __init__(self, certificate: Path | None = None):
         self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), SiteHandler)
@@ -61,8 +58,8 @@ class SiteHandler(SimpleHTTPRequestHandler):
 class Monitored:
     """A served site, ccs-back's checkout, and the monitor's state, under root.
 
-    The monitor also reads /etc/ccs and the backend's values, which only one
-    site at a time can own: copy() puts back the baseline's.
+    Only one site at a time owns /etc/ccs and the backend's values, so copy()
+    puts back the baseline's.
     """
 
     def __init__(self, root: Path, server: FakeServer, site_server: SiteServer):
@@ -137,9 +134,9 @@ class Monitored:
     def release(self, version: int) -> Path:
         return self.root / "lib/releases" / str(version)
 
-    def monitor(self, release: int = 1, ok: bool = True, **env: str):
+    def monitor(self, release: int = 1, refusal: str | None = None, **env: str):
         script = self.release(release) / "deploy/backend/monitor.sh"
-        return run(script, ok=ok, env={**self.env, **env})
+        return run(script, refusal=refusal, env={**self.env, **env})
 
     def failures(self) -> list[str]:
         """Return the checks failing now, as the alert state names them."""
