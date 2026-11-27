@@ -18,7 +18,7 @@ from web import A, B, as_pushed
 
 ETC = Path("/etc/ccs")
 VALUES = Path("/var/lib/ccs-backend/values")
-# monitor.sh's list_always, without the QR codes
+# monitor.py's ALWAYS
 ALWAYS = """index.html ideas/index.html funding-required/index.html
     work-in-progress/index.html completed-proposals/index.html donate/index.html
     index.php/projects feed.xml""".split()
@@ -135,7 +135,7 @@ class Monitored:
         return self.root / "lib/releases" / str(version)
 
     def monitor(self, release: int = 1, refusal: str | None = None, **env: str):
-        script = self.release(release) / "deploy/backend/monitor.sh"
+        script = self.release(release) / "deploy/backend/monitor.py"
         return run(script, refusal=refusal, env={**self.env, **env})
 
     def failures(self) -> list[str]:

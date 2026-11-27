@@ -1,4 +1,4 @@
-"""monitor.sh: the backend's checks of the live site."""
+"""monitor.py: the backend's checks of the live site."""
 
 import shutil
 import time
@@ -338,7 +338,7 @@ def test_a_run_that_cannot_make_its_folders_alerts_as_a_crash(monitored):
     shutil.rmtree(monitored.state / "releases")
     (monitored.state / "releases").symlink_to("/dev/full")
     monitored.failing_for("monitor", 700)
-    monitored.monitor(refusal="cannot create directory")
+    monitored.monitor(refusal="File exists")
     assert monitored.server.alerts() == ["ccs monitor: the monitor crashed (monitor)"]
 
 
