@@ -9,7 +9,7 @@ from collections.abc import Callable
 from pathlib import Path
 from subprocess import CompletedProcess
 
-from scripts import DEPLOY, EXAMPLE, REPO, refuses, run, stand_in
+from harness import DEPLOY, EXAMPLE, REPO, run, stand_in
 from signing import Keys, place_keyrings, publish
 from web import as_pushed
 
@@ -17,15 +17,14 @@ LIB = Path("/usr/local/lib/ccs")
 CCS_BACK = Path("/srv/ccs-back/storage/app")
 PUSH_KEY = Path("/etc/ccs/push_key")
 MERGE = Path("/etc/ccs/merge-once")
-# every system path that the scripts or the tests write; a test that writes
-# another one adds it here, or the change leaks into the tests after it
+SYSTEMCTL_LOG = Path("/run/systemctl.log")
+# each system path the scripts or tests write; one left out leaks into later tests
 STATE = """etc/ccs usr/local/lib/ccs etc/systemd/system etc/tmpfiles.d etc/sysusers.d
     etc/nginx/sites-enabled etc/ssh/sshd_config.d etc/ssl/ccs var/lib/ccs srv/ccs-back
     var/lib/systemd/linger home etc/passwd etc/group etc/shadow etc/gshadow""".split()
-# no systemd runs here. A start of ccs-update.service runs update.sh as its
-# user. With the merge file, a start returns at once, as when systemd joins it
-# to a run already going.
+# with MERGE, a start returns at once, as systemd does when a run is already going
 SYSTEMCTL = f"""#!/bin/sh
+echo "$*" >>{SYSTEMCTL_LOG}
 [ "$1 $2" = "start ccs-update.service" ] || exit 0
 if [ -e "{MERGE}" ]; then rm "{MERGE}"; exit 0; fi
 exec runuser -u ccs-update -- /usr/local/lib/ccs/current/deploy/web/update.sh
@@ -54,11 +53,7 @@ def make_certificate() -> Path:
 
 
 class Machine:
-    """One container as both servers: sshd for the push, and a release host.
-
-    The keyrings are in /etc/ccs, readable by root only, and release 1 is
-    published. save() and restore() keep and bring back every path in STATE.
-    """
+    """One container as both servers: sshd for the push, and a release host."""
 
     def __init__(self, root: Path, keys: Keys):
         self.root, self.keys = root, keys
@@ -91,8 +86,11 @@ class Machine:
         """Run install.sh with args: the installed copy, or with first, the repo's."""
         return run(*self.script(first), *args, env={**self.env, **env}, timeout=300)
 
-    def refuses(self, *args: str | Path, reason: str, first: bool = False) -> None:
-        refuses(*self.script(first), *args, reason=reason, env=self.env, timeout=300)
+    def refuses(
+        self, *args: str | Path, reason: str, first: bool = False, **env: str
+    ) -> None:
+        env = {**self.env, **env}
+        run(*self.script(first), *args, refusal=reason, env=env, timeout=300)
 
     def script(self, first: bool) -> list[str | Path]:
         if first:
@@ -101,12 +99,16 @@ class Machine:
         return [LIB / "current/deploy/install.sh"]
 
     def push(
-        self, text: str, *command: str, source: str = "127.0.0.1", ok: bool = True
+        self,
+        text: str,
+        *command: str,
+        source: str = "127.0.0.1",
+        refusal: str | None = None,
     ) -> CompletedProcess[str]:
         """Push text over ssh with the backend's push key, from the source address."""
         ssh = ["ssh", "-i", PUSH_KEY, "-b", source, "-o", "BatchMode=yes"]
         ssh += ["-o", "UserKnownHostsFile=/etc/ccs/known_hosts"]
-        return run(*ssh, "ccs-fetch@127.0.0.1", *command, input=text, ok=ok)
+        return run(*ssh, "ccs-fetch@127.0.0.1", *command, input=text, refusal=refusal)
 
     def save(self, name: str) -> None:
         paths = [path for path in STATE if os.path.lexists(f"/{path}")]

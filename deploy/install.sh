@@ -5,25 +5,11 @@
 #   install.sh backend site-vN [<web server address> <ccs-back folder>]
 #   install.sh web site-vN [<backend IP address> '<push key>']
 #
-# Runs as: root, by hand. Set up the backend first: it prints the web
-#          server's command. The first time, run this from a release you
-#          checked by hand (see deploy/README.md); after that, run
-#          /usr/local/lib/ccs/current/deploy/install.sh.
-# Reads:   /etc/ccs/: the config, the keyrings and the signed address list.
-# Writes:  /etc/ccs/config and /etc/ccs/alert_url, the release in
-#          /usr/local/lib/ccs/releases/N, the link /usr/local/lib/ccs/current,
-#          the units, users, folders and nginx site; on the backend the push
-#          key, the web server's host key and /etc/ccs/heartbeat_url, and on
-#          the web server the push key's line in
-#          /home/ccs-fetch/.ssh/authorized_keys.
-# Trust:   checks.py verifies the release: two signers, the version named, a
-#          tar that matches its hash.
-# Exit:    0 installed, 1 refused or failed, 2 usage.
+# Exit: 0 installed, 1 refused or failed, 2 usage.
 set -eu
 # shellcheck disable=SC3040 # Debian 13's dash has pipefail
 set -o pipefail
-# what it writes is readable by the services, whatever the operator's umask;
-# the config, the alert URL and the push key are made root-only by name
+# the services must read what this writes; the secrets are made root-only
 umask 022
 
 DEPLOY=$(cd -- "$(dirname -- "$0")" && pwd -P)
@@ -36,12 +22,13 @@ readonly UNITS=/etc/systemd/system
 readonly CONFIG=/etc/ccs/config
 readonly AUTHORIZED_KEYS=/home/ccs-fetch/.ssh/authorized_keys
 readonly CERT=/etc/ssl/ccs/fullchain.pem
+readonly INSTALL_LOG=/var/log/ccs-install.log
 readonly NL='
 '
 readonly USAGE="usage: install.sh backend site-vN [<web server address> <ccs-back folder>]
        install.sh web site-vN [<backend IP address> '<push key>']"
 
-# usage: prints how to run this, and exits 2.
+# usage: prints the usage, and exits 2.
 usage() {
   printf '%s\n' "$USAGE" >&2
   exit 2
@@ -59,9 +46,8 @@ matches() {
   printf '%s\n' "$value" | grep -Eqx -- "$regex"
 }
 
-# load_config: makes /etc/ccs/config from the example on the first install,
-# and an empty /etc/ccs/alert_url, keeps both root-only, and reads the config.
-# It comes first, since it can name another release host.
+# load_config: makes the config and alert URL files on the first install,
+# and reads the config.
 load_config() {
   install -d /etc/ccs
   if [ ! -e "$CONFIG" ]; then
@@ -73,12 +59,10 @@ load_config() {
   . "$CONFIG"
 }
 
-# check_keys_only: stops while sshd's global settings let a password alone log
-# in. They don't when both password methods are off, or when each
-# AuthenticationMethods list holds publickey. sshd -T reads the files, not the
-# running sshd, and skips most Match blocks. sshd's config stays the
-# operator's, second factor and all.
+# check_keys_only: stops while sshd's global settings let a password alone
+# log in.
 check_keys_only() {
+  # sshd -T reads the files, not the running sshd, and skips most Match blocks
   if ! sshd -T | awk '
     $1 == "passwordauthentication" { password = $2 }
     $1 == "kbdinteractiveauthentication" { kbd = $2 }
@@ -93,9 +77,8 @@ check_keys_only() {
   fi
 }
 
-# check_tls_key: stops when the TLS private key, or the file a link points
-# it at, can be read by other users. nginx reads it as root; nothing else
-# should.
+# check_tls_key: stops when other users can read the TLS private key, or the
+# file its link points at.
 check_tls_key() {
   local key=""
   local readable=""
@@ -110,10 +93,9 @@ check_tls_key() {
   fi
 }
 
-# set_backend_config <web host> <ccs-back folder>: checks the backend's two
-# settings and writes them to the config. Given once, they are kept there;
-# with neither given, the config's own are checked.
-set_backend_config() {
+# check_backend_config <web host> <ccs-back folder>: checks the two settings,
+# given or from the config, and uses them from here on.
+check_backend_config() {
   local web_host="$1"
   local ccs_back="$2"
   local public=""
@@ -122,9 +104,6 @@ set_backend_config() {
   if [ -n "$web_host$ccs_back" ]; then
     matches '[A-Za-z0-9.:-]+' "$web_host" || usage
     matches '/[A-Za-z0-9._/-]+' "$ccs_back" || usage
-    # neither pattern allows a |, so both are safe inside sed's s|||
-    sed -i "s|^WEB_HOST=.*|WEB_HOST=$web_host|" "$CONFIG"
-    sed -i "s|^CCS_BACK=.*|CCS_BACK=$ccs_back|" "$CONFIG"
     WEB_HOST="$web_host"
     CCS_BACK="$ccs_back"
   fi
@@ -132,17 +111,15 @@ set_backend_config() {
     usage
   fi
 
-  # the public name may still point at the old site, whose host key ssh
-  # would trust
+  # the public name can point at the old site, and ssh would trust its key
   public="${SITE#*://}"
   public="${public%%/*}"
   if [ "$WEB_HOST" = "$public" ]; then
     stop "set WEB_HOST to the web server's own address, not the public name"
   fi
 
-  # values.py and the monitor read these as temporary users. find fails
-  # when one is missing, yet still prints the unreadable ones, so its status
-  # is ignored.
+  # values.py and the monitor read these as temporary users. find fails on
+  # a missing file, but still prints the unreadable ones.
   unreadable=$(find "$CCS_BACK/proposals.json" "$CCS_BACK/complete.json" \
     "$CCS_BACK/proposals" -maxdepth 0 \
     \( -type f ! -perm -o=r \) -o \( -type d ! -perm -o=rx \) \
@@ -152,13 +129,13 @@ set_backend_config() {
   fi
 }
 
-# check_push_key_args <backend IP> <push key>: checks the two values the push
-# key line is built from. An IP address, since sshd matches from= against
-# host names only with UseDNS, which is off by default.
+# check_push_key_args <backend IP> <push key>: checks the two values of the
+# push key line.
 check_push_key_args() {
   local backend_ip="$1"
   local push_key="$2"
 
+  # sshd matches from= to a host name only with UseDNS on
   matches '[0-9A-Fa-f.:]+' "$backend_ip" || usage
   if ! matches 'ssh-ed25519 [A-Za-z0-9+/]+=*( [A-Za-z0-9@._-]+)?' \
     "$push_key"; then
@@ -166,8 +143,8 @@ check_push_key_args() {
   fi
 }
 
-# make_keyrings_readable: the services read the keyrings and the address list
-# as other users, so each file there is made readable by all.
+# make_keyrings_readable: makes the keyrings and the address list readable
+# by the services' users.
 make_keyrings_readable() {
   local file=""
 
@@ -179,12 +156,12 @@ make_keyrings_readable() {
   done
 }
 
-# install_packages <role>: installs what the role runs, and nothing they
-# merely recommend. ca-certificates is named, since curl and git need it to
-# check TLS but only recommend it.
+# install_packages <role>: installs the role's packages, but not the ones
+# they only recommend.
 install_packages() {
   local role="$1"
 
+  # curl and git need ca-certificates for TLS, but only recommend it
   set -- ca-certificates curl git gpgv python3-yaml \
     python3-markdown-it python3-mdit-py-plugins python3-jinja2
   if [ "$role" = web ]; then
@@ -195,18 +172,17 @@ install_packages() {
   apt-get install -y --no-upgrade --no-install-recommends "$@"
 }
 
-# download_release <tag> <version> <release-dir>: downloads the release,
-# has checks.py verify it, and moves it into place as <release-dir>.
+# download_release <tag> <version> <release-dir>: downloads the release, has
+# checks.py verify it, and moves it into place as <release-dir>.
 download_release() {
   local tag="$1"
   local version="$2"
   local release_dir="$3"
   local download=""
 
-  # beside releases/, on one filesystem, so moving the checked tree in is one
-  # rename: a cut-off copy never leaves a partial release a rerun trusts
   mkdir -p -- "$LIB/releases"
   rm -rf -- "$LIB"/tmp.*
+  # beside releases/, so the move is one rename and leaves no partial release
   download=$(mktemp -d -p "$LIB")
   # shellcheck disable=SC2064 # the folder's name is fixed now
   trap "rm -rf -- '$download'" EXIT
@@ -215,16 +191,28 @@ download_release() {
     "$version" "$download/tree" || stop "$tag doesn't verify"
   sync -f "$download/tree"
   mv -- "$download/tree" "$release_dir"
+  rm -rf -- "$download"
 }
 
-# install_files <release-dir> <role>: installs the role's units, sandboxes,
-# users, folders and nginx site from that release.
+# install_files <release-dir> <role> <other-release-dir>: installs the role's
+# units and files, and removes each unit that only the other release has.
 install_files() {
   local release="$1"
   local role="$2"
+  local other="$3"
   local from="$release/deploy/$role"
   local service=""
+  local unit=""
+  local name=""
 
+  for unit in "$other/deploy/$role"/*.service "$other/deploy/$role"/*.path \
+    "$other/deploy/$role"/*.timer; do
+    name="${unit##*/}"
+    if [ -n "$other" ] && [ -e "$UNITS/$name" ] && [ ! -e "$from/$name" ]; then
+      systemctl disable --now -- "$name"
+      rm -rf -- "$UNITS/${name:?}" "$UNITS/${name:?}.d"
+    fi
+  done
   install -m 0644 "$from"/*.service "$from"/*.path "$from"/*.timer "$UNITS/"
   for service in "$from"/*.service; do
     install -D -m 0644 "$release/deploy/sandbox.conf" \
@@ -240,14 +228,13 @@ install_files() {
   fi
 }
 
-# start_backend: makes the push key and reads the web server's host key on
-# the first install, makes an empty /etc/ccs/heartbeat_url for the monitor's
-# unit to load, points ccs-values.path at ccs-back's JSON, and starts the
-# units.
+# start_backend: makes the backend's keys and files on the first install,
+# and starts its units.
 start_backend() {
   if [ ! -e /etc/ccs/push_key ]; then
     ssh-keygen -q -t ed25519 -N '' -C ccs-push -f /etc/ccs/push_key
   fi
+  # the monitor's unit loads it, and does not start without it
   touch /etc/ccs/heartbeat_url
   chmod 600 /etc/ccs/push_key /etc/ccs/heartbeat_url
   if [ ! -s /etc/ccs/known_hosts ]; then
@@ -255,8 +242,7 @@ start_backend() {
     [ -s /etc/ccs/known_hosts ] || stop "can't read $WEB_HOST's host key"
   fi
 
-  # the empty PathChanged= clears the unit's own path, so only this one is
-  # watched
+  # the empty PathChanged= clears the unit's own path
   install -d "$UNITS/ccs-values.path.d"
   printf '[Path]\nPathChanged=\nPathChanged=%s/proposals.json\n' \
     "$CCS_BACK" >"$UNITS/ccs-values.path.d/path.conf"
@@ -269,10 +255,9 @@ start_backend() {
   ssh-keygen -lf /etc/ccs/known_hosts
 }
 
-# write_monitor_view: gives the monitor a private view of the backend's files.
-# It renders what the web server sends, so it sees no more than it reads:
-# /var, /srv and /opt are empty but for ccs-back's storage folder and the
-# values. The wallet's files stay out of its sight, whatever their mode.
+# write_monitor_view: hides the backend's files from the monitor, but for
+# ccs-back's folder and the values.
+# It renders what the web server sends, so it must not see the wallet's files.
 write_monitor_view() {
   printf '%s\n' "[Service]" \
     "TemporaryFileSystem=/var:ro /srv:ro /opt:ro" \
@@ -281,10 +266,8 @@ write_monitor_view() {
 }
 
 # shellcheck disable=SC2016 # the forced command expands on each push
-# write_push_key <backend IP> <push key>: lets the backend's key, from its IP
-# address only, do one thing: replace in/values. The forced command writes a
-# temporary file of at most one byte past checks.py's cap, then renames it
-# into place.
+# write_push_key <backend IP> <push key>: lets the key, from that IP address
+# only, replace in/values and do nothing else.
 write_push_key() {
   local backend_ip="$1"
   local push_key="$2"
@@ -292,6 +275,7 @@ write_push_key() {
 
   # the \" are quotes inside the command="..." option
   command='f=$(mktemp /var/lib/ccs/in/values.XXXXXX)'
+  # one byte past checks.py's cap, so checks.py refuses a bigger push
   command="$command"' && head -c 1000001 > \"$f\"'
   command="$command"' && chmod 644 \"$f\"'
   command="$command"' && mv \"$f\" /var/lib/ccs/in/values'
@@ -299,25 +283,18 @@ write_push_key() {
     "$backend_ip" "$command" "$push_key" >"$AUTHORIZED_KEYS"
 }
 
-# start_web <old-release> <new-release> <tag>: starts the units, and keeps
-# the new release only once it renders.
+# start_web <tag>: starts the units, and stops unless the new release renders.
 start_web() {
-  local old_release="$1"
-  local new_release="$2"
-  local tag="$3"
-  local site=""
+  local tag="$1"
 
-  site=$(readlink /var/lib/ccs/current) || site=""
   systemctl daemon-reload
   systemctl enable --now ccs-fetch.path ccs-fetch.timer
   if ! trial_render; then
-    restore_release "$old_release" "$new_release" "$site"
-    stop "$tag failed to render, or nginx refused its site;" \
-      "the site and the release stay as they were"
+    stop "$tag failed to render, or nginx refused its site"
   fi
   if [ -e "$CERT" ]; then
     systemctl restart nginx
-    # an nginx from before its sandbox takes the pid file link as it stops
+    # an nginx from before its sandbox deletes the pid file link as it stops
     systemd-tmpfiles --create /etc/tmpfiles.d/ccs-web.conf
   else
     echo "Put the certificate in /etc/ssl/ccs/ (fullchain.pem," \
@@ -325,32 +302,70 @@ start_web() {
   fi
 }
 
-# restore_release <old-release> <new-release> <site>: brings back the old
-# release, its units and the site that was live, and deletes the new release.
-# A first install has no old release, so it keeps the new one.
-restore_release() {
-  local old_release="$1"
-  local new_release="$2"
-  local site="$3"
+# place <role> <release-dir> <other-release-dir>: points current at the
+# release, and installs its files in place of the other release's.
+place() {
+  local role="$1"
+  local release="$2"
+  local other="$3"
 
-  if [ -z "$old_release" ] || [ "$old_release" = "$new_release" ]; then
-    return 0
-  fi
-  swap "$old_release" "$LIB/current"
-  install_files "$old_release" web
-  systemctl daemon-reload
-  rm -rf -- "$new_release"
-  # nginx can refuse a release after its render went live; update.sh keeps
-  # the site before it
-  if [ -d "$site" ]; then
-    swap "$site" /var/lib/ccs/current
+  swap "$release" "$LIB/current"
+  install_files "$release" "$role" "$other"
+  if [ "$role" = web ]; then
+    systemd-sysusers
+    systemd-tmpfiles --create /etc/tmpfiles.d/ccs-web.conf
   fi
 }
 
-# trial_render: renders with the current release twice, as systemd joins a
-# start to a run already going, perhaps the old release's; then nginx checks
-# the site, once it has a certificate.
+# start_role <role> <tag>: starts the role on the release in current.
+start_role() {
+  local role="$1"
+  local tag="$2"
+
+  if [ "$role" = backend ]; then
+    start_backend
+  else
+    start_web "$tag"
+  fi
+}
+
+# undo <role> <old-release> <new-release> <made> <saved>: puts back the
+# files in <saved> and the old release, and deletes a release this run made.
+undo() {
+  local role="$1"
+  local old_release="$2"
+  local new_release="$3"
+  local made="$4"
+  local saved="$5"
+  local file=""
+
+  if [ -z "$old_release" ]; then
+    rm -rf -- "$saved"
+    return 0
+  fi
+  log "Going back to release ${old_release##*/}."
+  for file in "$CONFIG" "$AUTHORIZED_KEYS"; do
+    if [ -e "$saved/${file##*/}" ]; then
+      cp -p -- "$saved/${file##*/}" "$file"
+    else
+      rm -f -- "$file"
+    fi
+  done
+  # shellcheck source=/dev/null
+  . "$CONFIG"
+  place "$role" "$old_release" "$new_release"
+  start_role "$role" "site-v${old_release##*/}"
+  if [ "$made" = yes ] && [ "$new_release" != "$old_release" ]; then
+    rm -rf -- "$new_release"
+  fi
+  rm -rf -- "$saved"
+  log "Back on release ${old_release##*/}, its units, settings and site."
+}
+
+# trial_render: renders with the current release, then has nginx check the
+# site once it has a certificate.
 trial_render() {
+  # twice, as systemd joins a start to a run already going
   systemctl start ccs-update.service || return 1
   systemctl start ccs-update.service || return 1
   if [ -e "$CERT" ]; then
@@ -359,8 +374,7 @@ trial_render() {
 }
 
 # announce <role> <tag>: posts the install to the alert channel, so a wrong
-# alert URL shows now, and every install leaves a record there. The backend
-# posts through Tor, so the alert service never learns its address.
+# alert URL shows now.
 announce() {
   local role="$1"
   local tag="$2"
@@ -372,6 +386,7 @@ announce() {
   fi
   message=$(mktemp)
   printf 'ccs install: %s, %s role\n' "$tag" "$role" >"$message"
+  # the backend posts through Tor, so the alert service never learns its address
   if (
     if [ "$role" = backend ]; then
       export ALL_PROXY=socks5h://localhost/run/tor/socks
@@ -381,7 +396,7 @@ announce() {
   ); then
     echo "The alert channel has the install."
   else
-    echo "The install's alert didn't arrive; ALERTS.md lists the usual causes."
+    echo "The install's alert didn't arrive; deploy/docs/ALERTS.md lists the usual causes."
   fi
   rm -f -- "$message"
 }
@@ -406,33 +421,23 @@ print_next_steps() {
   fi
 }
 
-main() {
-  local role="${1:-}"
-  local tag="${2:-}"
-  local version=""
-  local new_release=""
-  local old_release=""
-  local installed_version=""
-  local new_key=no
+# check_machine <role> <new-key> <host-or-key> <second>: checks the keyring,
+# the config and the machine, and installs the packages the role needs.
+check_machine() {
+  local role="$1"
+  local new_key="$2"
 
-  case $role in
-    backend | web) ;;
-    *) usage ;;
-  esac
-  version=$(release_tag "$tag") || usage
   if [ ! -s /etc/ccs/release-signers.gpg ]; then
     stop "put the release signers' keyring in" \
       "/etc/ccs/release-signers.gpg first"
   fi
-
-  # 1. The settings and packages, before the release changes.
+  # first, as the config can name another release host
   load_config
   if [ "$role" = backend ]; then
-    set_backend_config "${3:-}" "${4:-}"
+    check_backend_config "$3" "$4"
   else
-    if [ -n "${3:-}${4:-}" ] || [ ! -e "$AUTHORIZED_KEYS" ]; then
-      new_key=yes
-      check_push_key_args "${3:-}" "${4:-}"
+    if [ "$new_key" = yes ]; then
+      check_push_key_args "$3" "$4"
     fi
     check_tls_key
   fi
@@ -441,40 +446,109 @@ main() {
   if [ "$role" = web ]; then
     check_keys_only
   fi
+}
 
-  # 2. The release: newer than the installed one, or already on disk, which
-  #    was checked when it arrived. The installed version may come again;
-  #    with releases/N deleted, it downloads afresh.
+# fetch_release <tag> <version> <new-release> <old-release>: downloads and
+# checks a release that isn't on disk, unless it is older than the one
+# installed.
+fetch_release() {
+  local installed_version="${4##*/}"
+
+  if [ "$2" -lt "${installed_version:-0}" ]; then
+    stop "$1 is older than the installed release"
+  fi
+  download_release "$1" "$2" "$3"
+}
+
+# save_settings: copies the config and the push key into a new folder, which
+# it prints, so an undo can put them back.
+save_settings() {
+  local saved=""
+  local file=""
+
+  saved=$(mktemp -d) || return 1
+  for file in "$CONFIG" "$AUTHORIZED_KEYS"; do
+    if [ -e "$file" ]; then
+      cp -p -- "$file" "$saved/" || return 1
+    fi
+  done
+  printf '%s\n' "$saved"
+}
+
+# switch <role> <tag> <new-release> <old-release> <new-key> <host-or-key>
+# <second>: places the new release, writes its settings and starts the role.
+switch() {
+  local role="$1"
+
+  place "$role" "$3" "$4"
+  if [ "$role" = backend ] && [ -n "$6$7" ]; then
+    # neither value allows a |, so both are safe inside sed's s|||
+    sed -i "s|^WEB_HOST=.*|WEB_HOST=$WEB_HOST|" "$CONFIG"
+    sed -i "s|^CCS_BACK=.*|CCS_BACK=$CCS_BACK|" "$CONFIG"
+  elif [ "$5" = yes ]; then
+    write_push_key "$6" "$7"
+  fi
+  start_role "$role" "$2"
+}
+
+# finish <role> <tag> <new-release> <old-release>: keeps the release before,
+# to go back to by name, and says what was installed.
+finish() {
+  if [ "$4" != "$3" ]; then
+    keep "$LIB/releases/" "$3" "$4"
+  fi
+  announce "$1" "$2"
+  print_next_steps "$1" "$2"
+}
+
+main() {
+  local role="${1:-}"
+  local tag="${2:-}"
+  local version=""
+  local new_release=""
+  local old_release=""
+  local new_key=no
+  local made=no
+  local saved=""
+
+  case $role in
+    backend | web) ;;
+    *) usage ;;
+  esac
+  version=$(release_tag "$tag") || usage
+  if [ "$role" = web ]; then
+    if [ -n "${3:-}${4:-}" ] || [ ! -e "$AUTHORIZED_KEYS" ]; then
+      new_key=yes
+    fi
+  fi
+  check_machine "$role" "$new_key" "${3:-}" "${4:-}"
+
+  # a release already on disk was checked when it arrived
   new_release="$LIB/releases/$version"
   old_release=$(readlink "$LIB/current") || old_release=""
   if [ ! -d "$new_release" ]; then
-    installed_version="${old_release##*/}"
-    if [ "$version" -lt "${installed_version:-0}" ]; then
-      stop "$tag is older than the installed release"
-    fi
-    download_release "$tag" "$version" "$new_release"
+    fetch_release "$tag" "$version" "$new_release" "$old_release"
+    made=yes
   fi
 
-  # 3. Scripts, render, design and units switch together.
-  swap "$new_release" "$LIB/current"
-  install_files "$new_release" "$role"
-  if [ "$role" = backend ]; then
-    start_backend
-  else
-    systemd-sysusers
-    systemd-tmpfiles --create /etc/tmpfiles.d/ccs-web.conf
-    if [ "$new_key" = yes ]; then
-      write_push_key "${3:-}" "${4:-}"
-    fi
-    start_web "$old_release" "$new_release" "$tag"
-  fi
-
-  # 4. The release before stays, to switch back to by name.
-  if [ "$old_release" != "$new_release" ]; then
-    keep "$LIB/releases/" "$new_release" "$old_release"
-  fi
-  announce "$role" "$tag"
-  print_next_steps "$role" "$tag"
+  saved=$(save_settings)
+  echo "Switching to $tag; the rest of the install writes to $INSTALL_LOG."
+  exec 3>&1 4>&2 >"$INSTALL_LOG" 2>&1
+  # from here, a failure puts the old release back, and no signal stops that
+  trap 'set +e
+    trap "" INT TERM QUIT
+    (set -e; undo "$role" "$old_release" "$new_release" "$made" "$saved")
+    [ "$?" -eq 0 ] || log "The undo stopped. To end it, install" \
+      "site-v${old_release##*/} again."
+    cat -- "$INSTALL_LOG" >&4' EXIT
+  # a hangup stops neither the switch nor the undo
+  trap '' HUP
+  trap 'exit 1' INT TERM QUIT
+  switch "$role" "$tag" "$new_release" "$old_release" "$new_key" \
+    "${3:-}" "${4:-}"
+  trap 'cat -- "$INSTALL_LOG" >&3 || true' EXIT
+  rm -rf -- "$saved"
+  finish "$role" "$tag" "$new_release" "$old_release"
 }
 
 main "$@"
