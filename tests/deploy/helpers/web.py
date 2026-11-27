@@ -1,4 +1,4 @@
-"""A web server's folders and actions, as update.sh sees them."""
+"""A web server's folders and actions, as update.py sees them."""
 
 import json
 import os
@@ -27,7 +27,7 @@ def as_pushed(text: str, updated: int) -> str:
 
 
 def lay_out(ccs: Path) -> None:
-    """Lay out in ccs what fetch.sh leaves: the example proposals and merge requests."""
+    """Lay out in ccs what fetch.py leaves: the example proposals and merge requests."""
     tree = ccs / "fetch/trees" / COMMIT
     merge_requests = ccs / "fetch/mr-0000000000000000"
     shutil.copytree(EXAMPLE / "proposals", tree / "proposals")
@@ -41,7 +41,7 @@ def lay_out(ccs: Path) -> None:
 
 
 class WebServer:
-    """A web server laid out as fetch.sh leaves it, with its releases in lib/."""
+    """A web server laid out as fetch.py leaves it, with its releases in lib/."""
 
     def __init__(self, root: Path):
         self.ccs = root / "ccs"
@@ -73,7 +73,7 @@ class WebServer:
         (self.ccs / "in/values").write_text(edit(text) if edit else text)
 
     def update(self, refusal: str | None = None, **env: str) -> CompletedProcess[str]:
-        script = self.lib / "current/deploy/web/update.sh"
+        script = self.lib / "current/deploy/web/update.py"
         return run(script, refusal=refusal, env={"CCS_DIR": str(self.ccs), **env})
 
     def applied(self) -> int:

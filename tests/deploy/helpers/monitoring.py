@@ -105,7 +105,7 @@ class Monitored:
 
         fetcher.fetch()
         env = {"CCS_DIR": str(fetcher.ccs), "SITE": site_server.url}
-        run(built.release(1) / "deploy/web/update.sh", env=env)
+        run(built.release(1) / "deploy/web/update.py", env=env)
         shutil.copytree((fetcher.ccs / "current").resolve(), built.site)
         site_server.serve(built.site)
         built.monitor()

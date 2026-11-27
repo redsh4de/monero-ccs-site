@@ -3,7 +3,7 @@
 
 Usage: mrs.py <project-api> <out-dir> <cache-dir>
 
-  <project-api>  GitLab's API address for ccs-proposals, GITLAB_API in lib.sh;
+  <project-api>  GitLab's API address for ccs-proposals, GITLAB_API in lib.py;
                  the list comes from the GraphQL API on the same host
   <out-dir>      where open.json goes
   <cache-dir>    the files each merge request adds, kept between runs

@@ -69,15 +69,23 @@ def fail(command: list[str], headline: str, stdout: str, stderr: str) -> None:
     )
 
 
-def lib_sh(
-    snippet: str,
+def lib_py(
+    code: str,
     *args: str | Path,
     refusal: str | None = None,
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    """Run a shell snippet with lib.sh loaded, its arguments as $1, $2 and on."""
-    lib = f"set -eu; set -o pipefail; DEPLOY={DEPLOY}; . {DEPLOY}/lib.sh"
-    return run("sh", "-c", f"{lib}; {snippet}", "sh", *args, refusal=refusal, env=env)
+    """Run Python code with the deploy's modules loaded, its arguments in args."""
+    modules = DEPLOY / "modules.py"
+    body = "".join(f"    {line}\n" for line in code.splitlines())
+    program = (
+        "import sys\nfrom pathlib import Path\n"
+        f"exec(compile(Path('{modules}').read_bytes(), '{modules}', 'exec'),"
+        f" {{'__file__': '{modules}'}})\n"
+        "import alerts, lib\nargs = sys.argv[1:]\n"
+        f"def step():\n{body}\nlib.main(step)\n"
+    )
+    return run("python3", "-I", "-c", program, *args, refusal=refusal, env=env)
 
 
 def stand_in(folder: Path, name: str, script: str) -> str:

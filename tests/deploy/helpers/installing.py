@@ -27,7 +27,7 @@ SYSTEMCTL = f"""#!/bin/sh
 echo "$*" >>{SYSTEMCTL_LOG}
 [ "$1 $2" = "start ccs-update.service" ] || exit 0
 if [ -e "{MERGE}" ]; then rm "{MERGE}"; exit 0; fi
-exec runuser -u ccs-update -- /usr/local/lib/ccs/current/deploy/web/update.sh
+exec runuser -u ccs-update -- /usr/local/lib/ccs/current/deploy/web/update.py
 """
 
 

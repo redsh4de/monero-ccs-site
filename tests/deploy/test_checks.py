@@ -665,7 +665,7 @@ def test_a_malformed_or_wrongly_signed_list_is_refused(
 
 
 def test_no_list_is_refused_silently(address_keyring, tmp_path):
-    """update.sh then treats the list as empty, which closes every donation box."""
+    """update.py then treats the list as empty, which closes every donation box."""
     run(CHECKS, "addresses", address_keyring, tmp_path / "none", refusal="")
 
 

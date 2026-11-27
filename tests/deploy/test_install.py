@@ -39,8 +39,8 @@ def test_a_push_holds_one_byte_more_than_the_values_cap():
 
 def test_fetch_deletes_the_temporary_files_that_a_push_makes():
     made = re.search(r"mktemp /var/lib/ccs/in/values\.(X+)\)", INSTALL)[1]
-    fetch = (DEPLOY / "web/fetch.sh").read_text()
-    assert f"-name 'values.{'?' * len(made)}' " in fetch
+    fetch = (DEPLOY / "web/fetch.py").read_text()
+    assert f'glob("values.{"?" * len(made)}")' in fetch
 
 
 def test_install_names_every_package_of_the_render_image():
@@ -215,7 +215,7 @@ def test_a_release_installed_under_a_strict_umask_is_readable_by_the_services(
     expected = {
         LIB / "releases": "root 755",
         LIB / "releases/1": "root 755",
-        LIB / "releases/1/deploy/web/update.sh": "root 755",
+        LIB / "releases/1/deploy/web/update.py": "root 755",
         Path("/etc/ccs/known_hosts"): "root 644",
     }
     assert {path: ownership(path) for path in expected} == expected
@@ -650,7 +650,7 @@ def test_a_damaged_release_is_fetched_again_and_a_killed_download_cleared(upgrad
     (LIB / "tmp.killed").mkdir()
     shutil.rmtree(LIB / "releases/2")
     upgraded.install("web", "site-v2", first=True)
-    assert os.access(LIB / "releases/2/deploy/web/update.sh", os.X_OK)
+    assert os.access(LIB / "releases/2/deploy/web/update.py", os.X_OK)
     assert not (LIB / "tmp.killed").exists()
 
 

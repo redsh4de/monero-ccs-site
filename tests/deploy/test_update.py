@@ -1,4 +1,4 @@
-"""update.sh: what the web server serves after each push, release and list."""
+"""update.py: what the web server serves after each push, release and list."""
 
 import json
 import os

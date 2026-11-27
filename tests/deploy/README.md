@@ -52,7 +52,7 @@ uses. `.github/workflows/test-release.yml` lists these files.
 ## Add a test
 
 - Put the test in the file for the script that it tests, such as `test_update.py` for
-  `deploy/web/update.sh`.
+  `deploy/web/update.py`.
 - Take the setup from the fixtures in `conftest.py`. For example, `rendered` gives a web
   server that has rendered the site once. A file can also have its own fixtures, such as
   `monitored` in `test_monitor.py`. Do not copy setup into a test file. Setup that several
@@ -64,9 +64,9 @@ uses. `.github/workflows/test-release.yml` lists these files.
   check that the test fails with a clear message:
 
 ```sh
-cp deploy/web/update.sh /tmp/update.sh   # then change the copy
+cp deploy/web/update.py /tmp/update.py   # then change the copy
 podman run --rm --network=none -v "$PWD:/w:ro,z" \
-  -v /tmp/update.sh:/w/deploy/web/update.sh:ro,z -w /w localhost/ccs-deploy-tests \
+  -v /tmp/update.py:/w/deploy/web/update.py:ro,z -w /w localhost/ccs-deploy-tests \
   python3 -B -m pytest -c tests/deploy/pytest.ini tests/deploy/test_update.py
 ```
 
@@ -74,10 +74,10 @@ The shared setup is in `conftest.py` and in `helpers/`:
 
 | File | Holds |
 |---|---|
-| `helpers/harness.py` | The repository's paths; `run()`, which shows a command's output on a failure, and passes an expected failure only when it says what the test names; `replaced()`; and `lib_sh()`, which calls a `lib.sh` function |
+| `helpers/harness.py` | The repository's paths; `run()`, which shows a command's output on a failure, and passes an expected failure only when it says what the test names; `replaced()`; and `lib_py()`, which runs Python with the deploy's modules loaded |
 | `helpers/signing.py` | The test keys, made for each run, signed address lists and signed releases |
-| `helpers/web.py` | A web server's folders and actions, as `update.sh` sees them |
-| `helpers/fetching.py` | `fetch.sh`'s folders, and a proposals repository for it to fetch |
+| `helpers/web.py` | A web server's folders and actions, as `update.py` sees them |
+| `helpers/fetching.py` | `fetch.py`'s folders, and a proposals repository for it to fetch |
 | `helpers/fake_server.py` | A fake GitLab, alert channel and release host, in the test's own process |
 | `helpers/fake_tor.py` | A stand-in for Tor's socket, which sends each request to this machine |
 | `helpers/monitoring.py` | A site for the monitor to check, built once for each test file and copied for each test |

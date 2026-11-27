@@ -1,4 +1,4 @@
-"""fetch.sh and mrs.py: the content the web server fetches from GitLab."""
+"""fetch.py and mrs.py: the content the web server fetches from GitLab."""
 
 import json
 import os
@@ -263,7 +263,7 @@ def test_a_full_disk_still_sends_the_alert_that_is_due(fetched):
     (fetched.ccs / "fetch/last-fetch").unlink()
     (fetched.ccs / "fetch/last-fetch").symlink_to("/dev/full")
     fetched.values(40)
-    fetched.fetch(refusal="I/O error")
+    fetched.fetch(refusal="No space left on device")
     assert fetched.server.alerts() == [f"{STALE} (stale-values)"]
 
 
@@ -288,7 +288,7 @@ def stalling():
 def test_a_gitlab_that_stalls_makes_the_fetch_give_up_in_time(fetched, stalling):
     fetched.values(31)
     env = {**fetched.env, "PROPOSALS_GIT": f"http://127.0.0.1:{stalling}/p.git"}
-    command = ["timeout", "150", DEPLOY / "web/fetch.sh"]
+    command = ["timeout", "150", DEPLOY / "web/fetch.py"]
     failed = run(*command, refusal="fetch: content failed", env=env, timeout=200)
-    assert failed.returncode == 1, "fetch.sh did not give up within 150 s"
+    assert failed.returncode == 1, "fetch.py did not give up within 150 s"
     assert (fetched.alerts / "fetch").exists()

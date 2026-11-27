@@ -316,7 +316,7 @@ def test_an_older_site_release_differing_only_in_backend_signer_files_and_docs_i
 @pytest.mark.parametrize(
     "changed",
     [
-        "deploy/web/update.sh",
+        "deploy/web/update.py",
         "deploy/checks.py",
         "deploy/render/content.py",
         "dist/_astro/*.css",

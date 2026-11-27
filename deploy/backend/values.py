@@ -12,11 +12,10 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from urllib.parse import quote
 
-# no __pycache__ in the release, which the monitor compares
-sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+MODULES = Path(__file__).resolve().parents[1] / "modules.py"
+exec(compile(MODULES.read_bytes(), MODULES, "exec"), {"__file__": str(MODULES)})
 # the web server's own patterns, as it refuses the whole file over one bad line
-from checks import values as web  # noqa: E402
+from guards import values as web  # noqa: E402
 
 URL = re.compile(r"/proposals/(.+)\.html")
 

@@ -1,4 +1,4 @@
-"""fetch.sh's folders, the proposals repository it fetches, and its actions."""
+"""fetch.py's folders, the proposals repository it fetches, and its actions."""
 
 import os
 import shutil
@@ -71,7 +71,7 @@ class Fetcher:
 
     def fetch(self, refusal: str | None = None, **env: str) -> CompletedProcess[str]:
         env = {**self.env, **env}
-        return run(DEPLOY / "web/fetch.sh", refusal=refusal, env=env, timeout=200)
+        return run(DEPLOY / "web/fetch.py", refusal=refusal, env=env, timeout=200)
 
     def links(self) -> tuple[str, str]:
         return os.readlink(self.ccs / "in/repo"), os.readlink(self.ccs / "in/mr")

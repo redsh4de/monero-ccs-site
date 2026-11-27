@@ -1,5 +1,5 @@
 # The hosts the site may link to, one a line. release.sh refuses a release that
-# names any other, and update.sh a page that links to one, so adding one here is a
+# names any other, and update.py a page that links to one, so adding one here is a
 # change both signers read.
 ccs.getmonero.org
 getmonero.org

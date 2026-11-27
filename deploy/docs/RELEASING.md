@@ -91,6 +91,7 @@ goes out once two release signers have attested the same bytes.
 
    ```sh
    scripts="deploy/signer/release.sh deploy/lib.sh deploy/gittree.py deploy/checks.py
+     deploy/modules.py deploy/lib.py deploy/alerts.py
      deploy/guards/__init__.py deploy/guards/common.py deploy/guards/style.py
      deploy/guards/values.py deploy/guards/snapshot.py deploy/guards/build.py
      deploy/guards/lockfile.py deploy/guards/site.py deploy/guards/keys.py

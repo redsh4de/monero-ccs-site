@@ -1,4 +1,4 @@
-"""render.py and status.py, as update.sh and the monitor run them."""
+"""render.py and status.py, as update.py and the monitor run them."""
 
 import hashlib
 import html
@@ -9,7 +9,7 @@ from xml.etree import ElementTree
 
 import pytest
 
-from harness import CHECKS, DEPLOY, EXAMPLE, lib_sh, replaced, run
+from harness import CHECKS, DEPLOY, EXAMPLE, lib_py, replaced, run
 from web import DIST
 
 TEMPLATES = DIST / "templates"
@@ -126,7 +126,7 @@ def opened(inputs, title1, title2):
 
 
 def checked(inputs, out):
-    """Render as update.sh does, status.json included, and check the site."""
+    """Render as update.py does, status.json included, and check the site."""
     render(DEPLOY / "render/render.py", inputs, TEMPLATES, out)
     status = [DEPLOY / "render/status.py", "write", inputs, "1", "0" * 40]
     (out / "status.json").write_text(run("python3", "-B", *status).stdout)
@@ -331,9 +331,10 @@ def test_the_restored_input_renders_the_same_ideas_and_proposal_pages(
     (restored / "proposals").symlink_to(rendered.ccs / "in/repo/proposals")
     shutil.copy(rendered.ccs / "in/repo/mr/merged.tsv", restored / "mr")
     verified = tmp_path / "addresses"
-    lib_sh('verify_list "$1"', verified)
+    lib_py("lib.verify_list(Path(args[0]))", verified)
     values = rendered.ccs / "state/values"
-    lib_sh('render_values "$1" "$2" "$3" >/dev/null', values, restored, verified)
+    code = "lib.render_values(Path(args[0]), Path(args[1]), Path(args[2]))"
+    lib_py(code, values, restored, verified)
     release = rendered.lib / "releases/1"
     out = shutil.copytree(release / "dist", tmp_path / "out")
     shutil.rmtree(out / "templates")
