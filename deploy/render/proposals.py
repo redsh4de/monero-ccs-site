@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Self
 from urllib.parse import quote
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from inputs import Wallet
 from safety import php_escape, redact

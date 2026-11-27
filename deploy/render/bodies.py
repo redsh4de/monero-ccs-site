@@ -38,7 +38,7 @@ def safe_target(url: str) -> bool:
 
 MARKDOWN = MarkdownIt("gfm-like", {"html": True}).use(footnote_plugin)
 # a link or image that fails this stays plain text
-MARKDOWN.validateLink = safe_target
+MARKDOWN.validateLink = safe_target  # type: ignore[method-assign]
 
 
 def allow_tags(raw: str) -> str:
@@ -61,7 +61,7 @@ def image_as_link(image: Token, inside_link: bool) -> list[Token]:
 
 def narrow_inline(token: Token) -> None:
     children, links = [], 0
-    for child in token.children:
+    for child in token.children or []:
         if child.type == "image":
             # a shown image would leak each visitor's IP to its host
             children += image_as_link(child, inside_link=links > 0)
@@ -77,7 +77,7 @@ def narrow_inline(token: Token) -> None:
         children.append(child)
     # Check the text as shown: markup and the allowed tags add no characters.
     shown = "".join(child.content for child in children if child.type != "html_inline")
-    hrefs = " ".join(c.attrs["href"] for c in children if c.type == "link_open")
+    hrefs = " ".join(str(c.attrs["href"]) for c in children if c.type == "link_open")
     if any(unlisted(shown, set(), 0)) or any(unlisted(hrefs, set(), 0)):
         children = [Token("text", "", 0, content=REMOVED)]
     token.children = children
@@ -136,5 +136,5 @@ def render(markdown: str) -> str:
             os._exit(1)
     os.close(write)
     with open(read, "rb") as pipe:
-        page = pipe.read()
-    return page.decode() if os.waitpid(child, 0)[1] == 0 else TOO_LONG
+        data = pipe.read()
+    return data.decode() if os.waitpid(child, 0)[1] == 0 else TOO_LONG

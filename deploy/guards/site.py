@@ -120,8 +120,8 @@ def check_site(site: str, list_path: str, hosts_path: str) -> None:
     allowed = read_hosts(hosts_path)
     rows = lines(read_capped(list_path, LIST_CAP, "address list"), "address list")
     listed = {row.removeprefix("general-fund ").split(" ")[0] for row in rows}
-    spans = Path(f"{Path(site)}.spans")
-    spans = json.loads(spans.read_text()) if spans.exists() else {}
+    spans_file = Path(f"{Path(site)}.spans")
+    spans = json.loads(spans_file.read_text()) if spans_file.exists() else {}
     bodies = {page: range(*span) for page, span in spans.items()}
     for path in sorted(Path(site).rglob("*")):
         name = path.relative_to(site).as_posix()

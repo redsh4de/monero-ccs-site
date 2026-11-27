@@ -13,13 +13,13 @@ curl takes its proxy from ALL_PROXY.
 Exit: 0 written, 1 when GitLab's list cannot be read whole, 2 usage.
 """
 
-import itertools
 import json
 import os
 import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 from urllib.parse import unquote
 
 MAX_ENTRIES = 1000
@@ -40,7 +40,7 @@ QUERY = """query ($path: ID!, $after: String) {
 }"""
 
 
-def get(url: str, cap: int, data: str | None = None) -> object:
+def get(url: str, cap: int, data: str | None = None) -> Any:
     """Return the JSON at a URL, fetched with curl, at most `cap` bytes."""
     command = ["curl", "-fsS", "--max-time", "60", "--max-filesize", str(cap), url]
     command += ["--retry", "3"]
@@ -97,8 +97,9 @@ def new_files(diffs: list) -> list[str]:
 def added_files(api: str, iid: int) -> list[str]:
     """Return up to two paths merge request `iid` adds, or raise ValueError."""
     files: list[str] = []
-    count = 0
-    for page in itertools.count(1):
+    count = page = 0
+    while True:
+        page += 1
         url = f"{api}/merge_requests/{iid}/diffs?per_page={DIFFS_PAGE}&page={page}"
         diffs = get(url, DIFFS_CAP)
         if not isinstance(diffs, list):
@@ -139,10 +140,10 @@ def main(argv: list[str]) -> int:
     cache.mkdir(parents=True, exist_ok=True)
     used, merge_requests = set(), []
     for mr in entries:
-        iid = str(mr.get("iid")) if isinstance(mr, dict) else ""
-        if not (iid.isascii() and iid.isdigit()):
+        digits = str(mr.get("iid")) if isinstance(mr, dict) else ""
+        if not (digits.isascii() and digits.isdigit()):
             continue
-        iid, sha, author = int(iid), mr.get("diffHeadSha"), mr.get("author")
+        iid, sha, author = int(digits), mr.get("diffHeadSha"), mr.get("author")
         adds = []
         if isinstance(sha, str) and SHA.fullmatch(sha):
             path = cache / f"{iid}.{sha}"

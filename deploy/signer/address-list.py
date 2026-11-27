@@ -15,7 +15,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-import zbar
+import zbar  # type: ignore[import-not-found]
 
 MODULES = Path(__file__).resolve().parents[1] / "modules.py"
 exec(compile(MODULES.read_bytes(), MODULES, "exec"), {"__file__": str(MODULES)})
