@@ -1,9 +1,4 @@
-"""Proposals, and ccs-back's rules for them.
-
-ccs-back takes a proposal's stage from its layout, lists it only when its front
-matter is complete, and counts the milestones marked done. This module applies
-the same rules to the files in the public repo.
-"""
+"""Proposals, and ccs-back's rules for them."""
 
 import math
 import re
@@ -23,7 +18,7 @@ REPO = f"{GITLAB}monero-project/ccs-proposals"
 
 @dataclass(frozen=True)
 class Stage:
-    page: str  # Path of the stage's page
+    page: str
     label: str
     summary: str  # Heading of the summary card
     state: str  # As the projects JSON names it
@@ -49,6 +44,9 @@ ORDINAL = re.compile(r"(\d)(st|nd|rd|th)\b")
 FINISHED = re.compile(r"finished|completed|done", re.I)
 # The date formats proposals use, all of which ccs-back's strtotime reads.
 DATE_FORMS = ("%B %d %Y", "%d %B %Y", "%b %d %Y", "%d %b %Y", "%m/%d/%Y", "%B %Y")
+# characters, about four times the longest front matter of any proposal, so
+# its fields and lists stay short however it is written
+FRONT_CAP = 10_000
 
 
 @dataclass(frozen=True)
@@ -157,7 +155,7 @@ class Proposal:
 
     @property
     def description(self) -> str:
-        """Return the line a link preview shows under the title."""
+        """The line a link preview shows under the title."""
         if self.funding:
             state = f"Funding required: {self.raised} of {self.amount} XMR raised"
         elif self.in_progress:
@@ -186,7 +184,7 @@ class Proposal:
         """Percent funded, rounded half up like ccs-back's percentage_funded."""
         if not self.goal:
             return 0
-        # Capped before rounding, so a tiny goal can't overflow.
+        # Capped before rounding, so a tiny goal cannot overflow.
         return int(min(100.0, number(self.raised) * 100 / self.goal) + 0.5)
 
     @property
@@ -203,10 +201,7 @@ class Proposal:
         return self.funding and not self.fully_funded and not self.address
 
     def project(self) -> dict:
-        """Return the row ccs-back's /index.php/projects gives for this proposal.
-
-        As there, text is HTML-escaped and a missing address is null.
-        """
+        """Return the row ccs-back's /index.php/projects gives for this proposal."""
         return {
             "address": self.address or None,
             "author": php_escape(self.author),
@@ -220,18 +215,28 @@ class Proposal:
         }
 
 
+class Loader(yaml.BaseLoader):
+    """BaseLoader, so every value stays a string, and 0xfffc is not read as 65532."""
+
+    def compose_node(self, parent, index):
+        # no alias, so front matter holds no more than it spells out
+        if self.check_event(yaml.AliasEvent):
+            raise yaml.YAMLError("an alias")
+        return super().compose_node(parent, index)
+
+
 def split_front_matter(source: str) -> tuple[dict, str]:
     """Split a proposal into its front matter and body.
 
-    Front matter that doesn't parse counts as none.
+    Front matter that does not parse, or is longer than FRONT_CAP, counts as none.
     """
     lines = source.removeprefix(chr(0xFEFF)).replace("\r\n", "\n").split("\n")
     if lines[0] != "---" or "---" not in lines[1:]:
         return {}, source
     end = lines.index("---", 1)
+    text = "\n".join(lines[1:end])
     try:
-        # BaseLoader keeps every value a string, so 0xfffc doesn't become 65532.
-        front = yaml.load("\n".join(lines[1:end]), Loader=yaml.BaseLoader)
+        front = yaml.load(text, Loader=Loader) if len(text) <= FRONT_CAP else None
     except (yaml.YAMLError, RecursionError):  # Deep nesting raises RecursionError
         front = None
     return front if isinstance(front, dict) else {}, "\n".join(lines[end + 1 :])

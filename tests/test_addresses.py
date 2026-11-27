@@ -5,7 +5,8 @@ import re
 from hypothesis import given
 from hypothesis import strategies as st
 
-import checks
+from guards.common import Reject
+from guards.values import apply_list, check_values, keep_pins
 
 BASE58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 ADDRESS = re.compile(rf"[48][{BASE58}]{{94}}")
@@ -39,8 +40,8 @@ def value_line(draw):
 @given(st.lists(value_line(), max_size=8))
 def test_no_unlisted_address_reaches_a_page(lines):
     pushed = "".join(f"{line}\n" for line in lines) + f"updated {NOW}\n"
-    values = checks.check_values(pushed.encode(), last=0, now=NOW)
-    shown = checks.apply_list(values, {LISTED})
+    values = check_values(pushed.encode(), last=0, now=NOW)
+    shown = apply_list(values, {LISTED})
     assert set(ADDRESS.findall(shown)) <= {LISTED}
 
 
@@ -52,13 +53,12 @@ pair = st.tuples(st.sampled_from(NAMES), st.sampled_from([FIRST, BOTH, LAST, "-"
 
 @given(st.lists(st.lists(pair, max_size=3), max_size=6), st.integers(0, 6))
 def test_a_shown_address_stays_with_its_proposal(pushes, new_list_from):
-    """A push is accepted only when every address shown has one proposal, and
-    every proposal has at most one address that the list still holds."""
+    """No address shows for two proposals, and no proposal shows two listed addresses."""
     pins, shown = {}, set()
     for i, push in enumerate(pushes):
         listed = OLD_LIST if i < new_list_from else NEW_LIST
         lines = [f"proposal {n} raised=0 contributions=0 address={a}" for n, a in push]
-        values = checks.check_values(
+        values = check_values(
             "".join(f"{line}\n" for line in [*lines, f"updated {NOW}"]).encode(),
             last=0,
             now=NOW,
@@ -70,8 +70,8 @@ def test_a_shown_address_stays_with_its_proposal(pushes, new_list_from):
             len({a for m, a in seen if m == n and a in listed}) <= 1 for n in NAMES
         )
         try:
-            pins = checks.keep_pins(values, listed, pins)
-        except checks.Reject:
+            pins = keep_pins(values, listed, pins)
+        except Reject:
             assert not allowed
             continue
         assert allowed

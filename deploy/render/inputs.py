@@ -1,14 +1,11 @@
-"""Reading the render's input folder, whose files render/README.md lists.
-
-This module only parses them; the rules live in proposals.py and content.py.
-"""
+"""Reading the render's input folder, whose files render/README.md lists."""
 
 import json
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
-from safety import is_address, redact
+from safety import clean, is_address, redact, unlisted
 
 
 @dataclass(frozen=True)
@@ -31,34 +28,25 @@ class Inputs:
     qr_codes: dict[str, str]  # Address, to its QR code from the signed list
 
 
-def read(folder: Path) -> Inputs:
-    general_fund, qr_codes = read_addresses(folder / "addresses")
-    return Inputs(
-        proposals={
-            path.stem: read_text(path) for path in proposal_files(folder / "proposals")
-        },
-        wallets=read_wallets(folder / "values"),
-        merged={
-            name: number for number, name in read_pairs(folder / "mr" / "merged.tsv")
-        },
-        merge_requests=read_merge_requests(folder / "mr"),
-        general_fund=general_fund,
-        site_url=read_text(folder / "site").strip(),
-        qr_codes=qr_codes,
-    )
-
-
 def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="replace")
 
 
-def proposal_files(folder: Path) -> list[Path]:
-    """Return the root .md files that can become pages.
+def usable_name(stem: str) -> bool:
+    """Return True if the name prints, fits a file system, and ends no address."""
+    path = f"proposals/{stem}.html"
+    return (
+        # on one line, so every list of files can hold it
+        stem.isprintable()
+        and len(stem.encode()) <= 250
+        # as checks.py site reads the path, so .html cannot complete an address
+        and not any(unlisted(path, set(), 0))
+    )
 
-    Symlinks are skipped, so a link in the repo can't pull a server file into a
-    page, and so are names that aren't valid UTF-8 or are too long to end in
-    .html.
-    """
+
+def proposal_files(folder: Path) -> list[Path]:
+    """Return the root .md files that can become pages."""
+    # no symlinks, so a link in the repo cannot pull a server file into a page
     return sorted(
         path
         for path in folder.glob("*.md")
@@ -66,19 +54,8 @@ def proposal_files(folder: Path) -> list[Path]:
     )
 
 
-def usable_name(stem: str) -> bool:
-    try:
-        return len(stem.encode()) <= 250
-    except UnicodeEncodeError:
-        return False
-
-
 def read_wallets(path: Path) -> dict[str, Wallet]:
-    """Read the values file's proposal lines.
-
-    Each is `proposal <name> raised=<n> contributions=<n> address=<address or ->`.
-    An address that isn't well formed counts as none.
-    """
+    """Read the values file's proposal lines."""
     wallets = {}
     for line in read_text(path).splitlines():
         parts = line.split(" ")
@@ -91,11 +68,7 @@ def read_wallets(path: Path) -> dict[str, Wallet]:
 
 
 def read_addresses(path: Path) -> tuple[str, dict[str, str]]:
-    """Return the General Fund's address, or "", and each address's QR code.
-
-    Each line is `<address> <code>`, and the General Fund's starts with
-    `general-fund `.
-    """
+    """Return the General Fund's address, or "", and each address's QR code."""
     general_fund = ""
     qr_codes = {}
     for line in read_text(path).splitlines():
@@ -117,32 +90,47 @@ def read_pairs(path: Path) -> Iterator[tuple[str, str]]:
 
 
 def read_merge_requests(folder: Path) -> list[dict]:
-    """Return what the render reads of each open merge request, in GitLab's order.
-
-    Anyone can open one, so any address in its text is removed. Anything but a list
-    in open.json counts as none.
-    """
+    """Return what the render reads of each open merge request, in GitLab's order."""
     entries = json.loads(read_text(folder / "open.json"))
     if not isinstance(entries, list):
         return []
     mrs = []
+    # anyone can open a merge request, so its text is redacted
     for mr in entries:
         if not isinstance(mr, dict):
             continue
         adds = mr.get("adds")
+        name = str(adds[0]) if isinstance(adds, list) and len(adds) == 1 else ""
+        name = redact(name)
         mrs.append(
             {
                 "iid": mr.get("iid"),
-                "title": redact(str(mr.get("title") or ""), ignore_spaces=True),
-                "author": redact(str(mr.get("author") or ""), ignore_spaces=True),
-                "web_url": str(mr.get("web_url") or ""),
-                "created_at": str(mr.get("created_at") or ""),
-                "adds": [
-                    redact(str(name), ignore_spaces=True)
-                    for name in (adds if isinstance(adds, list) else [])
-                ],
+                "title": redact(str(mr.get("title") or "")),
+                "author": redact(str(mr.get("author") or "")),
+                "web_url": clean(str(mr.get("web_url") or "")),
+                "created_at": clean(str(mr.get("created_at") or "")),
+                "adds": (
+                    [name] if name and usable_name(name.removesuffix(".md")) else []
+                ),
                 "upvotes": mr.get("upvotes", 0),
                 "downvotes": mr.get("downvotes", 0),
             }
         )
     return mrs
+
+
+def read(folder: Path) -> Inputs:
+    general_fund, qr_codes = read_addresses(folder / "addresses")
+    return Inputs(
+        proposals={
+            path.stem: read_text(path) for path in proposal_files(folder / "proposals")
+        },
+        wallets=read_wallets(folder / "values"),
+        merged={
+            name: number for number, name in read_pairs(folder / "mr" / "merged.tsv")
+        },
+        merge_requests=read_merge_requests(folder / "mr"),
+        general_fund=general_fund,
+        site_url=read_text(folder / "site").strip(),
+        qr_codes=qr_codes,
+    )

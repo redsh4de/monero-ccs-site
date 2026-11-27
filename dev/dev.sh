@@ -1,9 +1,8 @@
 #!/bin/sh
-# Serves the site on http://localhost:4321, and builds and renders it again
-# when a file that it is made from changes. Reload the page to see a change.
+# Serves the site on http://localhost:4321 and rebuilds it on each change.
 #
 # Usage: dev/dev.sh
-#        run from the repo's root.
+#        run from the repo's root, and reload the page to see a change.
 set -eu
 
 stamps=$(mktemp -d)
@@ -15,8 +14,7 @@ podman run --rm -d --name ccs-dev -p 127.0.0.1:4321:4321 -v "$PWD:/w:ro,z" \
   -w /w ccs-render python3 -B dev/serve.py >/dev/null
 echo "Serving dist/ on http://localhost:4321, Ctrl+C stops it"
 
-# a file watcher would miss a file that an editor saves by a rename, so this
-# looks each second for a file newer than the last build's start
+# polls: a file watcher misses a file that an editor saves by a rename
 touch "$stamps/built"
 while true; do
   pnpm build && sh dev/render.sh || echo "The build failed; fix it and save."

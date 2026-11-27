@@ -68,23 +68,6 @@ class Site:
         return (shown | {self.general_fund}) - {""}
 
 
-def build(inputs: Inputs) -> Site:
-    proposals = [
-        Proposal.from_file(
-            slug,
-            source,
-            inputs.wallets.get(quote(slug, safe=""), Wallet()),
-            inputs.merged.get(f"{slug}.md"),
-        )
-        for slug, source in inputs.proposals.items()
-    ]
-    return Site(
-        proposals=sorted(proposals, key=newest_first),
-        ideas=open_ideas(inputs.merge_requests, set(inputs.proposals)),
-        general_fund=inputs.general_fund,
-    )
-
-
 def newest_first(proposal: Proposal) -> tuple[int, int, str]:
     """Sort key: dated proposals newest first, then the rest by name."""
     if proposal.day is None:
@@ -92,12 +75,12 @@ def newest_first(proposal: Proposal) -> tuple[int, int, str]:
     return (0, -proposal.day.toordinal(), proposal.slug)
 
 
-def open_ideas(merge_requests: list[dict], slugs: set[str]) -> list[Idea]:
-    """Return the ideas among the open merge requests, newest first.
+def is_new_proposal(name: str) -> bool:
+    return name.endswith(".md") and len(name) > 3 and "/" not in name
 
-    `slugs` holds the proposals already in the repo. If two merge requests add
-    the same file, the first in GitLab's list wins.
-    """
+
+def open_ideas(merge_requests: list[dict], slugs: set[str]) -> list[Idea]:
+    """Return the ideas among the open merge requests, newest first."""
     ideas, taken = [], set()
     for mr in merge_requests:
         if len(mr["adds"]) != 1:
@@ -125,5 +108,18 @@ def open_ideas(merge_requests: list[dict], slugs: set[str]) -> list[Idea]:
     return sorted(ideas, key=lambda idea: idea.created, reverse=True)
 
 
-def is_new_proposal(name: str) -> bool:
-    return name.endswith(".md") and len(name) > 3 and "/" not in name
+def build(inputs: Inputs) -> Site:
+    proposals = [
+        Proposal.from_file(
+            slug,
+            source,
+            inputs.wallets.get(quote(slug, safe=""), Wallet()),
+            inputs.merged.get(f"{slug}.md"),
+        )
+        for slug, source in inputs.proposals.items()
+    ]
+    return Site(
+        proposals=sorted(proposals, key=newest_first),
+        ideas=open_ideas(inputs.merge_requests, set(inputs.proposals)),
+        general_fund=inputs.general_fund,
+    )

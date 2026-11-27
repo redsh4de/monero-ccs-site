@@ -8,9 +8,6 @@ Usage:
 
 <input-dir> is the render's input folder, which render/README.md describes.
 
-The web server writes status.json after each render. The monitor checks each
-part against its own sources, then rebuilds the same input to render again.
-
 Exit: 0 done, 2 usage; a malformed status.json raises.
 """
 
@@ -18,8 +15,7 @@ import json
 import sys
 from pathlib import Path
 
-# python3 -I leaves this folder off the import path, so the render's own
-# modules are found from here
+# python3 -I leaves this folder off the import path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from inputs import read_merge_requests  # noqa: E402
 
@@ -46,8 +42,7 @@ def main(argv: list[str]) -> int:
             }
             print(canonical(status))
         case ["mrs", input_dir]:
-            # votes change faster than the web server fetches them, so the
-            # monitor compares the rest with GitLab's list
+            # votes change between fetches, so the monitor compares only the rest
             mrs = read_merge_requests(Path(input_dir) / "mr")
             for mr in mrs:
                 del mr["upvotes"], mr["downvotes"]
