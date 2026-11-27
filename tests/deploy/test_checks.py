@@ -1,8 +1,4 @@
-"""checks.py's commands, as the deploy scripts call them.
-
-The fast suite in tests/ covers the logic behind several of them; these tests
-cover what only the command shows: its files, its refusals and its messages.
-"""
+"""checks.py's commands, as the deploy scripts call them."""
 
 import importlib.util
 import io
@@ -19,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts import CHECKS, DEPLOY, REPO, refuses, replaced, run
+from harness import CHECKS, DEPLOY, REPO, replaced, run
 from signing import (
     CODE,
     GENERAL_FUND,
@@ -66,11 +62,11 @@ def test_status_prints_the_release_and_commit_on_one_line(tmp_path):
     ],
 )
 def test_status_refuses_a_malformed_file(tmp_path, data):
-    refuses(CHECKS, "status", status(tmp_path, data), reason="status: ")
+    run(CHECKS, "status", status(tmp_path, data), refusal="status: ")
 
 
 def test_an_unknown_command_exits_2():
-    assert run(CHECKS, "frobnicate", ok=False).returncode == 2
+    assert run(CHECKS, "frobnicate", refusal="Usage:").returncode == 2
 
 
 @pytest.fixture
@@ -85,7 +81,7 @@ def test_a_safety_folder_beside_safety_py_never_runs(deploy, tmp_path):
     (deploy / "render/safety/__init__.py").write_text(
         f'open("{tmp_path}/planted", "w")\n'
     )
-    result = run(deploy / "checks.py", "frobnicate", ok=False)
+    result = run(deploy / "checks.py", "frobnicate", refusal="Usage:")
     assert not (tmp_path / "planted").exists()
     assert result.returncode == 2
 
@@ -96,7 +92,7 @@ def test_a_cached_safety_pyc_never_runs(deploy, tmp_path):
     cache = importlib.util.cache_from_source(deploy / "render/safety.py")
     unchecked = py_compile.PycInvalidationMode.UNCHECKED_HASH
     py_compile.compile(source, cfile=cache, invalidation_mode=unchecked)
-    result = run(deploy / "checks.py", "frobnicate", ok=False)
+    result = run(deploy / "checks.py", "frobnicate", refusal="Usage:")
     assert not (tmp_path / "planted").exists()
     assert result.returncode == 2
 
@@ -134,9 +130,7 @@ def release_folder(keys, tmp_path):
 
 
 def verify(folder, keyring, dest, refusal=None, cwd=None):
-    if refusal:
-        return refuses(CHECKS, "release", folder, keyring, 2, dest, reason=refusal)
-    return run(CHECKS, "release", folder, keyring, 2, dest, cwd=cwd)
+    return run(CHECKS, "release", folder, keyring, 2, dest, refusal=refusal, cwd=cwd)
 
 
 def test_a_release_unpacks_with_nothing_left_over(
@@ -287,11 +281,8 @@ def site(tmp_path):
 
 
 def build(dist, tag_files, refusal=None):
-    command = [CHECKS, "build", dist, DEPLOY / "build-hosts", tag_files]
-    if refusal:
-        refuses(*command, reason=refusal)
-    else:
-        run(*command)
+    command = [CHECKS, "build", dist, DEPLOY / "site-hosts", tag_files]
+    run(*command, refusal=refusal)
 
 
 def plant(dist, where, text):
@@ -324,6 +315,138 @@ def test_a_build_holding_a_forbidden_file_is_refused(where, text, site, tag_file
     build(site, tag_files, refusal="isn't a file type the site serves")
 
 
+def test_a_build_holding_a_pipe_is_refused(site, tag_files):
+    os.mkfifo(site / "x.html")
+    build(site, tag_files, refusal="isn't a plain file")
+
+
+def test_the_real_lockfile_passes():
+    run(CHECKS, "lockfile", REPO / "pnpm-lock.yaml")
+
+
+HASH = "{integrity: sha512-" + "A" * 86 + "==}"
+PACKAGES = "\npackages:\n"
+NOT_PNPMS = "is not YAML as pnpm writes it"
+ELSEWHERE = "does not come from the registry by name and version"
+
+
+def entry(text):
+    """Return the old and new text that add a package entry of these rows."""
+    return PACKAGES, f"{PACKAGES}\n  x@1.0.0:\n{text}\n"
+
+
+@pytest.mark.parametrize(
+    "old, new, refusal",
+    [
+        pytest.param(
+            *entry(
+                f"    deprecated: 'a\n    resolution: {HASH}\n      b'\n"
+                "    resolution:\n      tarball: https://elsewhere.example"
+            ),
+            NOT_PNPMS,
+            id="a tarball beside a hash in a string",
+        ),
+        pytest.param(
+            *entry(
+                f'    resolution: {HASH}\n    "resolutio\\u006e":\n      tarball: x'
+            ),
+            NOT_PNPMS,
+            id="a key in an escape",
+        ),
+        pytest.param(
+            *entry("    ? &k !!binary cmVzb2x1dGlvbg==\n    : {tarball: x}"),
+            NOT_PNPMS,
+            id="a tag after an anchor",
+        ),
+        pytest.param(
+            *entry(f"    resolution: {HASH}\n    resolution:\n      tarball: x"),
+            NOT_PNPMS,
+            id="a field twice",
+        ),
+        pytest.param(
+            *entry(f"    resolution: {HASH}\n    version: x/../other-1.0.0"),
+            ELSEWHERE,
+            id="a version of its own",
+        ),
+        pytest.param(
+            *entry(f"    resolution: {HASH}\n\n  x@latest:\n    resolution: {HASH}"),
+            ELSEWHERE,
+            id="a name without a version",
+        ),
+        pytest.param(
+            *entry(
+                "    resolution:\n      integrity: sha512-AAAA\n"
+                "      tarball: https://elsewhere.example"
+            ),
+            ELSEWHERE,
+            id="a tarball in block style",
+        ),
+        pytest.param(
+            PACKAGES, "\npackages:  # x\n", NOT_PNPMS, id="a section with a comment"
+        ),
+        pytest.param(
+            PACKAGES,
+            "\nother:\n  x: y\n\npackages:\n",
+            ELSEWHERE,
+            id="a section of its own",
+        ),
+        pytest.param(
+            "\nsnapshots:\n",
+            "\nsnapshots:\n\n  x@latest: {}\n",
+            ELSEWHERE,
+            id="a snapshot with no version",
+        ),
+        pytest.param(PACKAGES, "\n'packages':\n", NOT_PNPMS, id="a section in quotes"),
+        pytest.param(PACKAGES, "\n? packages\n:\n", NOT_PNPMS, id="a section as a key"),
+        pytest.param(
+            "    hasBin: true\n",
+            "    hasBin: true\r\n",
+            NOT_PNPMS,
+            id="a carriage return",
+        ),
+        pytest.param(
+            "    packageManagerDependencies:\n",
+            "    dependencies: {x: {version: link:..}}\n    packageManagerDependencies:\n",
+            NOT_PNPMS,
+            id="an importer in one line",
+        ),
+        pytest.param(
+            "\nsnapshots:\n",
+            "\nsnapshots:\n\n  x@1.0.0(a: {tarball: https://elsewhere.example}): {}\n",
+            NOT_PNPMS,
+            id="a field in a snapshot's name",
+        ),
+        pytest.param(
+            "      pnpm:\n        specifier: 11.4.0\n        version: 11.4.0\n",
+            "      pnpm:\n        specifier: 11.4.0\n"
+            "        version: https://elsewhere.example/pnpm.tgz\n",
+            ELSEWHERE,
+            id="an importer's tarball",
+        ),
+    ],
+)
+def test_a_lockfile_that_could_take_a_package_from_elsewhere_is_refused(
+    tmp_path, old, new, refusal
+):
+    lockfile = tmp_path / "pnpm-lock.yaml"
+    lockfile.write_text(replaced((REPO / "pnpm-lock.yaml").read_text(), old, new))
+    run(CHECKS, "lockfile", lockfile, refusal=refusal)
+
+
+def test_a_file_with_more_than_a_plain_name_is_refused(site, tag_files):
+    (site / "x\u202esj.css").write_text("")
+    build(site, tag_files, refusal="a name holds more than")
+
+
+def test_a_refusal_reaches_no_terminal_as_it_is(tmp_path):
+    (tmp_path / "site").mkdir()
+    (tmp_path / "site/index.html").write_text('<a href="\x1b[8mx\u200b">x</a>')
+    (tmp_path / "list").write_text("")
+    command = [CHECKS, "site", tmp_path / "site", tmp_path / "list"]
+    refused = run(*command, DEPLOY / "site-hosts", refusal="links where")
+    assert "\\x1b[8mx\\u200b" in refused.stderr and "\x1b" not in refused.stderr
+
+
 @pytest.mark.parametrize(
     "where, text",
     [
@@ -336,16 +459,32 @@ def test_a_build_holding_a_forbidden_file_is_refused(where, text, site, tag_file
             '<a href="https:&#x2F;&#x2F;evil.example/">x</a>',
             id="behind HTML entities",
         ),
+        pytest.param("page", "http:evil.example", id="one colon"),
+        pytest.param("page", "https:////evil.example", id="more slashes"),
         pytest.param(
-            "css",
-            ".x{background:url(https://evil.example/a.png)}",
-            id="in the stylesheet",
+            "page", '<a href="https://getmonero.org(@evil.example">x</a>', id="a user"
         ),
     ],
 )
 def test_a_build_linking_to_an_unlisted_host_is_refused(where, text, site, tag_files):
     plant(site, where, text)
     build(site, tag_files, refusal="evil.example, not a listed host")
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        pytest.param("\\42", id="a backslash"),
+        pytest.param("&#92;", id="a backslash as an entity"),
+        pytest.param("\N{RIGHT-TO-LEFT OVERRIDE}", id="bidi"),
+    ],
+)
+@pytest.mark.parametrize("where", ["css", "page"])
+def test_a_build_holding_a_character_that_could_hide_something_is_refused(
+    where, text, site, tag_files
+):
+    plant(site, where, f"/* {text} */")
+    build(site, tag_files, refusal="which could hide something")
 
 
 def test_a_listed_host_passes_whatever_its_case_user_or_port(site, tag_files):
@@ -358,16 +497,50 @@ def test_a_listed_host_passes_whatever_its_case_user_or_port(site, tag_files):
     [
         pytest.param("page", f"<p>{A1}</p>", id="in a page"),
         pytest.param(
-            "page", f"<p>{A1[:48]}<span>{A1[48:]}</span></p>", id="split by a tag"
+            "page",
+            "<i hidden>0</i>".join(GENERAL_FUND[i : i + 20] for i in range(0, 95, 20)),
+            id="by hidden 0s",
         ),
+        pytest.param("page", f"{A1[:30]}[##]{A1[30:]}", id="by a comment"),
         pytest.param(
-            "css", f'.x::after{{content:"{A1}"}}', id="in the stylesheet's text"
+            "page",
+            '<b title="&lt;"></b>'.join(
+                GENERAL_FUND[i : i + 19] for i in range(0, 95, 19)
+            ),
+            id="by tags holding an encoded <",
         ),
     ],
 )
 def test_a_build_showing_an_address_is_refused(where, text, site, tag_files):
     plant(site, where, text)
     build(site, tag_files, refusal="holds address-like text")
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        pytest.param('.x::after{content:"4"}', id="a string"),
+        pytest.param(".x{font-family:'4'}", id="in single quotes"),
+        pytest.param(".x{color:attr(data-a)}", id="a function"),
+        pytest.param(".x{mask:URL(data:image/svg+xml,%3Csvg%3E)}", id="in capitals"),
+        pytest.param(".x{counter-set:list-item 4}", id="a counter"),
+        pytest.param("ol{list-style:upper-alpha}", id="a list marker"),
+        pytest.param(".x{mask:url(data:image/svg+xml,%3Csvg%3E)}", id="a picture"),
+        pytest.param(".x{mask:url(data:image/svg+xml,%3Csvg%3E", id="a url left open"),
+        pytest.param(
+            '.x{mask:url(/*)}.y::after{content:"4"}/**/', id="a comment in a url"
+        ),
+        pytest.param("@counter-style a{}", id="a counter style"),
+    ],
+)
+def test_a_stylesheet_that_could_show_text_is_refused(text, site, tag_files):
+    plant(site, "css", text)
+    build(site, tag_files, refusal="could show text of its own")
+
+
+def test_a_template_that_could_finish_a_character_reference_is_refused(site, tag_files):
+    plant(site, "page", "&[##]#x202E;")
+    build(site, tag_files, refusal="holds an & that starts no character reference")
 
 
 @pytest.fixture
@@ -429,7 +602,7 @@ def test_a_list_signed_by_a_revoked_key_is_refused(keys, stale_keys, tmp_path):
     keyring.write_bytes(
         keys.gpg("--export", "addresser") + stale_keys.gpg("--export", "revoked")
     )
-    refuses(CHECKS, "addresses", keyring, path, reason="signature is bad or missing")
+    run(CHECKS, "addresses", keyring, path, refusal="signature is bad or missing")
 
 
 @pytest.fixture
@@ -488,13 +661,12 @@ def test_a_malformed_or_wrongly_signed_list_is_refused(
     path = tmp_path / "addresses.txt"
     path.write_text("".join(f"{line}\n" for line in lines))
     keys.sign(path, signer)
-    refuses(CHECKS, "addresses", address_keyring, path, reason=refusal)
+    run(CHECKS, "addresses", address_keyring, path, refusal=refusal)
 
 
 def test_no_list_is_refused_silently(address_keyring, tmp_path):
     """update.sh then treats the list as empty, which closes every donation box."""
-    missing = run(CHECKS, "addresses", address_keyring, tmp_path / "none", ok=False)
-    assert missing.stderr == ""
+    run(CHECKS, "addresses", address_keyring, tmp_path / "none", refusal="")
 
 
 @pytest.fixture
@@ -523,8 +695,8 @@ def proposal(name, address, raised="0", contributions=0):
     return f"proposal {name} raised={raised} contributions={contributions} address={address}"
 
 
-def values(path, applied, verified_list, ok=True):
-    return run(CHECKS, "values", path, applied, verified_list, ok=ok)
+def values(path, applied, verified_list, refusal=None):
+    return run(CHECKS, "values", path, applied, verified_list, refusal=refusal)
 
 
 def values_then_apply(path, applied, verified_list, tmp_path):
@@ -625,7 +797,7 @@ def test_values_refuses_a_malformed_file(
 ):
     path = tmp_path / "values"
     path.write_bytes(text.encode())
-    refuses(CHECKS, "values", path, applied, verified_list, reason=reason)
+    run(CHECKS, "values", path, applied, verified_list, refusal=reason)
 
 
 def test_updated_200_seconds_ahead_passes(applied, verified_list, tmp_path):
@@ -641,7 +813,7 @@ def test_no_final_newline_passes(applied, verified_list, tmp_path):
 
 def test_not_newer_is_silent(applied, verified_list, tmp_path):
     path = values_file(tmp_path, proposal("x", "-"), f"updated {LAST}")
-    assert values(path, applied, verified_list, ok=False).stderr == ""
+    values(path, applied, verified_list, refusal="")
 
 
 def test_a_repeated_proposal_drops_both_lines(applied, verified_list, tmp_path):
@@ -673,7 +845,8 @@ def test_without_a_list_no_address_shows(applied, tmp_path):
 def test_an_unreadable_list_fails_closed(applied, tmp_path):
     """With no list to check against, nothing is printed, so nothing applies."""
     path = values_file(tmp_path, proposal("x", A1), f"updated {PUSHED}")
-    assert values(path, applied, tmp_path / "no-such-list", ok=False).stdout == ""
+    refused = values(path, applied, tmp_path / "no-such-list", refusal="no-such-list")
+    assert refused.stdout == ""
 
 
 def test_values_leaves_an_unlisted_address_for_apply(applied, verified_list, tmp_path):
@@ -776,7 +949,7 @@ def test_a_push_breaking_a_pin_is_refused_naming_the_proposals(
     lines, pins, message, verified_list, tmp_path
 ):
     path = values_file(tmp_path, *lines, f"updated {PUSHED}")
-    refused = values(path, pinned(tmp_path, *pins), verified_list, ok=False)
+    refused = values(path, pinned(tmp_path, *pins), verified_list, refusal=message)
     assert refused.stderr.strip() == message
 
 
@@ -799,10 +972,10 @@ def test_a_malformed_pin_in_the_applied_values_is_refused(verified_list, tmp_pat
     path = values_file(tmp_path, *GOOD)
     applied = pinned(tmp_path, "example-funding <b>")
     refusal = "applied values: a pin is malformed"
-    refuses(CHECKS, "values", path, applied, verified_list, reason=refusal)
+    run(CHECKS, "values", path, applied, verified_list, refusal=refusal)
 
 
 def test_a_pin_line_in_the_push_is_refused(applied, verified_list, tmp_path):
     path = values_file(tmp_path, f"pin example-funding {A1}", f"updated {PUSHED}")
     refusal = "values: a line doesn't match"
-    refuses(CHECKS, "values", path, applied, verified_list, reason=refusal)
+    run(CHECKS, "values", path, applied, verified_list, refusal=refusal)

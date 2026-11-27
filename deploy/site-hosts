@@ -1,0 +1,10 @@
+# The hosts the site may link to, one a line. release.sh refuses a release that
+# names any other, and update.sh a page that links to one, so adding one here is a
+# change both signers read.
+ccs.getmonero.org
+getmonero.org
+repo.getmonero.org
+translate.getmonero.org
+github.com
+matrix.to
+irc.libera.chat
