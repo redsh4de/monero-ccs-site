@@ -29,8 +29,9 @@ dependency code with your account's rights.
 
 - Sign on a second machine, or as a second user who logs in on their own console. Never
   switch to that user from your desktop's terminal.
-- Give that account rootless Podman, GNU `tar`, `git`, `curl`, `gpg`, `less` and Python
-  3.12 or later. Give it no Node, pnpm, editor or AI agent.
+- Give that account rootless Podman, GNU `tar` and `grep`, `git` 2.41 or later, `curl`,
+  `gpg`, `less` and Python 3.12 or later. Its OpenSSL must be 3.2 or later, whose Keccak
+  checks an address. Give it no Node, pnpm, editor or AI agent.
 - Clone over HTTPS without credentials. The signing account holds no GitHub token and no
   browser session.
 - Put `release-signers.gpg` in its home, built from fingerprints you checked yourself.
@@ -74,27 +75,32 @@ goes out once two release signers have attested the same bytes.
    git push origin site-vN
    ```
 
-2. In the signing account, fetch the tag and the attestations so far, and check out the
-   tag:
+2. In the signing account, fetch the tag, the tag before it and the attestations so far.
+   `release.sh` compares the lockfile with the one before. Do not check out `site-vN`:
+   its scripts run only after two signers have read them.
 
    ```sh
-   git fetch origin main tag site-vN
-   git checkout site-vN
+   git fetch origin main tag site-vN tag site-vK  # K is N-1; for release 1, leave it out
    ```
 
-3. Read what changed in the scripts since the last release you signed, `site-vM`. If you
-   never signed one, read the five scripts whole:
+3. Stay on the last release you signed, `site-vM`, whose scripts you read in its review.
+   They check release N-1, and run its scripts if those differ.
+
+   If you never signed a release, check out `site-vK`, where K is N-1, and read its
+   scripts whole. For release 1, check out `site-v1` itself, and read them whole:
 
    ```sh
-   git diff site-vM site-vN -- deploy/release.sh deploy/lib.sh deploy/checks.py \
-     deploy/render/safety.py deploy/render/qr.py
+   scripts="deploy/signer/release.sh deploy/lib.sh deploy/gittree.py deploy/checks.py
+     deploy/guards/__init__.py deploy/guards/common.py deploy/guards/style.py
+     deploy/guards/values.py deploy/guards/snapshot.py deploy/guards/build.py
+     deploy/guards/lockfile.py deploy/guards/site.py deploy/guards/keys.py
+     deploy/guards/release.py deploy/render/safety.py deploy/render/qr.py"
+   cat -v $scripts | less
    ```
-
-   These scripts run before their own review, so your reading is their only check.
 
 4. Build, with your name for your attestation's folder:
-   `deploy/release.sh site-vN <your name>`. If it says your build differs from another
-   release signer's, do not sign, and tell them.
+   `deploy/signer/release.sh site-vN <your name>`. If it says your build differs from
+   another release signer's, do not sign, and tell them.
 5. Read every change it shows, as in [Read the changes](#read-the-changes). Answer `y`
    only if you expect each change.
 6. Copy `release-site-vN/` to your development account, and add your attestation to the
@@ -107,7 +113,7 @@ goes out once two release signers have attested the same bytes.
 
 7. When `release.sh` says to create the GitHub release, two release signers have
    attested. Publish it from your development account, and tell the operators which
-   machines need it, as in [Upgrade](README.md#upgrade). Every install checks the
+   machines need it, as in [Upgrade](../README.md#upgrade). Every install checks the
    signatures, so that account needs no trust:
 
    ```sh
@@ -118,24 +124,22 @@ goes out once two release signers have attested the same bytes.
 **The second signer builds once the first signer's attestation is on `main`.** Until
 then, `release.sh` cannot see it, and says the release needs two attestations.
 
+**A change to the scripts takes effect one release later.** Release N-1's scripts build
+release N. So a new pnpm pin goes into `release.sh` one release before the new
+`packageManager` goes into `package.json`.
+
 ### Read the changes
 
-**Refuse any change you do not expect.** `release.sh` first lists the packages that the
-lockfile dropped (`-`) and added (`+`) since release N-1. It then shows every change:
-`deploy/` line by line, and `dist/` word by word. Release 1 compares with nothing.
+**Refuse any change you do not expect.** `release.sh` shows every change since release
+N-1: the lockfile, against tag N-1 in your clone, and `deploy/` line by line, then
+`dist/` word by word. Release 1 compares with nothing, so it shows each of them whole.
 
-`release.sh` also refuses some builds on its own. It stops when `dist/` holds:
-
-- a file type the site never serves;
-- a link to a host not in `deploy/build-hosts`;
-- address-like text;
-- a font or image that is not byte for byte a file of the tag.
-
-When the site really links to a new host, add it to `deploy/build-hosts`, where the
+When the site really links to a new host, add it to `deploy/site-hosts`, where the
 change shows in the review.
 
-A font or image shows only as `Bin`. Each one is a file of the tag, so it changes only
-when that file did.
+**A font or image shows only as `Bin`, and either can show a wrong address.** Each one
+is a file of the tag, so it changes only when that file did. Look at each one that
+changed, in your development account.
 
 ---
 
@@ -180,7 +184,7 @@ A Core Team member, the address signer, makes the list once for each wallet.
    getmonero.org. It reads each QR code back before it writes the code:
 
    ```sh
-   deploy/address-list.py subaddresses.txt <General Fund address> >addresses.txt
+   deploy/signer/address-list.py subaddresses.txt <General Fund address> >addresses.txt
    ```
 
 5. Sign the list: `gpg --detach-sign --armor addresses.txt`.
@@ -212,7 +216,7 @@ days before. Then:
 3. One signer rebuilds the keyring that holds it from its signers' current keys:
    `gpg --export <fingerprint>... >release-signers.gpg`, or `address-signers.gpg`.
 4. Each signing account and both operators install the new keyring. Operators follow
-   [New keyrings](README.md#new-keyrings).
+   [New keyrings](../README.md#new-keyrings).
 
 The second command skips subkeys that already expired, so extend the key in time.
 Extending keeps old signatures good, so nothing needs signing again.
