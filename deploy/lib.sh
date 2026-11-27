@@ -1,25 +1,17 @@
 # shellcheck shell=dash
-# Steps the deploy scripts share. Each script sources this file after setting
-# DEPLOY, the release's deploy/ folder, and before raising alerts it sets
-# ALERTS_DIR and NOW.
-#
-# Each script's main calls its steps on lines of their own, where set -e stops
-# the script at the first failure. The functions here also run inside an if or
-# a $(...) || stop, where the shell turns set -e off, so they check every step
-# themselves with || return 1.
-#
-# checks.py decides on every pushed value, signed list and release. GitLab's
-# content is only extracted here, and the render escapes it.
+# Steps the deploy scripts share. Source it once DEPLOY names the release's
+# deploy/ folder, and set ALERTS_DIR and NOW before an alert.
 
-# The settings come from /etc/ccs/config, which systemd passes to each service
-# in its environment. The defaults serve ccs.getmonero.org.
+# set -e is off in an if or before a ||, so each step here ends in || return 1
+
+# defaults for ccs.getmonero.org, which /etc/ccs/config overrides
 CCS_DIR="${CCS_DIR:-/var/lib/ccs}"
 GITLAB_API="${GITLAB_API:-https://repo.getmonero.org/api/v4/projects/monero-project%2Fccs-proposals}"
 PROPOSALS_GIT="${PROPOSALS_GIT:-https://repo.getmonero.org/monero-project/ccs-proposals.git}"
 RELEASES="${RELEASES:-https://github.com/redsh4de/monero-ccs-site/releases}"
 SITE="${SITE:-https://ccs.getmonero.org}"
 
-# log <message>: writes the message to stderr, which the journal keeps.
+# log <message>: writes the message to stderr, for the journal.
 log() {
   printf '%s\n' "$*" >&2
 }
@@ -30,19 +22,9 @@ stop() {
   exit 1
 }
 
-# alert <name> <failing> <hold> <repeat> <text>: the one alert rule.
-#
-# <failing> is 1 when the check fails this run, and 0 when it passes. A
-# failing check alerts once it has failed for <hold> seconds with no pass in
-# between, then again every <repeat> seconds. A check that passes after it
-# alerted sends one "resolved" message, and one that never alerted is
-# forgotten quietly. A check not called in a run changes nothing.
-#
-# Each failing check has one file, ALERTS_DIR/<name>, holding
-# "<since> <sent> <text>": when it started failing, when it last alerted (0
-# for never), and its newest text. This only queues messages; alerts_send
-# posts them. Each message ends with the check's name, so an operator can
-# look it up in ALERTS.md.
+# alert <name> <failing> <hold> <repeat> <text>: records a check that fails
+# (1) or passes (0), and queues its alert or its "resolved" message.
+# A failing check alerts after <hold> seconds, then every <repeat> seconds.
 alert() {
   local name="$1"
   local failing="$2"
@@ -78,8 +60,8 @@ alert() {
   fi
 }
 
-# queue <message> <mark>: queues a message, with the mark ("sent <name>" or
-# "resolved <name>") that alerts_send applies once it is posted.
+# queue <message> <mark>: queues a message, and the mark that alerts_send
+# applies once the message is posted.
 queue() {
   local message="$1"
   local mark="$2"
@@ -88,18 +70,15 @@ queue() {
   printf '%s\n' "$mark" >>"$ALERTS_DIR/.pending" || return 1
 }
 
-# alerts_begin: drops the messages a killed run left queued. This run's
-# checks queue them again if they still apply, because a check's state moves
-# on only once its message is posted.
+# alerts_begin: drops the messages that a killed run left queued.
+# No alert is lost: a check's state changes only when its message is posted.
 alerts_begin() {
   mkdir -p -- "$ALERTS_DIR" || return 1
   rm -f -- "$ALERTS_DIR/.outbox" "$ALERTS_DIR/.pending" || return 1
 }
 
-# alerts_send: logs the queued messages, posts them as one, and only after a
-# good post applies their marks. A failed post, or no alert URL, changes
-# nothing, so the next run sends them again: emptying /etc/ccs/alert_url
-# pauses alerts without losing them.
+# alerts_send: posts the queued messages as one, and applies their marks
+# only after a good post.
 alerts_send() {
   local outbox="$ALERTS_DIR/.outbox"
   local pending="$ALERTS_DIR/.pending"
@@ -113,7 +92,7 @@ alerts_send() {
   messages=$(cat -- "$outbox") || return 1
   log "alert: $messages"
 
-  # the text is read from the file, so a leading @ in a message stays text
+  # from a file, as curl reads a message that starts with @ as a file name
   if request_url alert_url --data-binary "@$outbox"; then
     while read -r action name; do
       mark_posted "$action" "$name" || return 1
@@ -124,11 +103,8 @@ alerts_send() {
   rm -f -- "$outbox" "$pending" || return 1
 }
 
-# request_url <name> [<curl option>...]: requests the URL that /etc/ccs/<name>
-# holds. systemd hands the URL only to the units that use it
-# (LoadCredential=), so no other service, the render among them, ever sees
-# it. Fails when the request fails, or when there is no URL. The URL reaches
-# curl on stdin, so ps never shows it.
+# request_url <name> [<curl option>...]: requests the URL held in the
+# credential <name>, and fails without one.
 request_url() {
   local credential="${CREDENTIALS_DIRECTORY:-/nonexistent}/$1"
   local url=""
@@ -138,11 +114,12 @@ request_url() {
   if [ -z "$url" ]; then
     return 1
   fi
-  printf 'url = %s\n' "$url" | curl -fsS -m 20 -K - "$@" >/dev/null
+  # on stdin, so ps never shows the URL
+  printf 'url = %s\n' "$url" | curl --disable -fsS -m 20 -K - "$@" >/dev/null
 }
 
-# mark_posted <action> <name>: after a good post, records when a check
-# alerted, or forgets a check that resolved.
+# mark_posted <action> <name>: records when a check alerted, or forgets a
+# check that resolved.
 mark_posted() {
   local action="$1"
   local name="$2"
@@ -161,8 +138,8 @@ mark_posted() {
   printf '%s %s %s\n' "$since" "$NOW" "$text" >"$state" || return 1
 }
 
-# release_tag <tag>: prints N for a release named site-vN, where N has no
-# leading zero. Fails for any other name.
+# release_tag <tag>: prints N for a tag site-vN with no leading zero, and
+# fails for any other tag.
 release_tag() {
   local tag="$1"
   local number="${tag#site-v}"
@@ -177,22 +154,21 @@ release_tag() {
   printf '%s\n' "$number"
 }
 
-# get_release <tag> <dir>: downloads a release's three files into <dir>: the
-# archive ccs-<tag>.tar, SHA256SUMS, and the signatures in SHA256SUMS.asc.
+# get_release <tag> <dir>: downloads the release's three files into <dir>.
 get_release() {
   local tag="$1"
   local dir="$2"
   local name=""
 
   for name in SHA256SUMS SHA256SUMS.asc "ccs-$tag.tar"; do
-    curl -fsS -L --max-time 600 --max-filesize 200000000 \
+    curl --disable -fsS -L --max-time 600 --max-filesize 200000000 \
       -o "$dir/$name" "$RELEASES/download/$tag/$name" || return 1
   done
 }
 
-# verify_list <list>: writes the signed address list to <list> once it
-# verifies. A list that doesn't verify counts as empty, so every donation box
-# closes rather than show an address nobody signed.
+# verify_list <list>: writes the signed address list to <list>, or an empty
+# list when it does not verify.
+# An empty list closes every donation box, so no unsigned address shows.
 verify_list() {
   if ! "$DEPLOY/checks.py" addresses /etc/ccs/address-signers.gpg \
     /etc/ccs/addresses.txt >"$1"; then
@@ -201,10 +177,7 @@ verify_list() {
 }
 
 # render_values <values> <input-dir> <list>: writes the render's values,
-# addresses and site into the render's input folder from the verified <list>,
-# with every address not on it as -, and prints a hash of all three.
-# update.sh and the monitor both build the render's input this way, so they
-# agree.
+# addresses and site into <input-dir>, and prints their hash.
 render_values() {
   local values="$1"
   local in_dir="$2"
@@ -219,8 +192,8 @@ render_values() {
     | sha256sum | cut -c1-64
 }
 
-# swap <target> <link>: points the link at the target with one rename, so a
-# reader always finds the old target or the new one, never neither.
+# swap <target> <link>: points the link at the target in one rename, so the
+# link never goes missing.
 swap() {
   local target="$1"
   local link="$2"
@@ -244,44 +217,37 @@ keep() {
   done
 }
 
-# export_tree <git-dir> <commit> <dir>: writes the commit's files to
-# <dir>/proposals, and the merge request behind each file to
-# <dir>/mr/merged.tsv.
+# tree_size <git-dir> <tree> <entries> <bytes>: fails when the tree holds
+# more entries, folders included, or more bytes.
+tree_size() {
+  "$DEPLOY/gittree.py" size "$@" && return 0
+  log "$2 can't be listed, or holds more than $3 entries or $4 bytes"
+  return 1
+}
+
+# git_archive <git-dir> <tree-ish> [<path>...]: writes the files as a tar.
+# Attributes come from an empty tree, so no .gitattributes can change a file.
+git_archive() {
+  local git_dir="$1"
+  local none
+  shift
+
+  none=$(git -C "$git_dir" hash-object -t tree /dev/null) || return 1
+  git -C "$git_dir" --attr-source="$none" archive --worktree-attributes "$@"
+}
+
+# export_tree <git-dir> <commit> <dir>: writes the commit's files, and the
+# merge request behind each file, into <dir>.
+# Its caps, 2000 files and 4 MB, are about 6 and 3 times the proposals of 2026.
 export_tree() {
   local git_dir="$1"
   local commit="$2"
   local dir="$3"
 
+  tree_size "$git_dir" "$commit" 2000 4000000 || return 1
   mkdir -p -- "$dir/proposals" "$dir/mr" || return 1
-  git -C "$git_dir" archive "$commit" \
+  git_archive "$git_dir" "$commit" \
     | tar -x -C "$dir/proposals" --no-same-owner || return 1
-  list_merges "$git_dir" "$commit" >"$dir/mr/merged.tsv" || return 1
-}
-
-# list_merges <git-dir> <commit>: prints "<merge request>\t<file>" for each
-# file that a merge on the commit's first-parent history added, oldest first,
-# so a file added again later maps to its newest merge. git quotes a file
-# name holding a tab, a newline, a quote or a backslash; such a file is left
-# out, and its page links to its history instead.
-#
-# git log frames each commit message between a line holding \002 and one
-# holding \003, so awk can tell the message's lines from the file names.
-list_merges() {
-  local git_dir="$1"
-  local commit="$2"
-
-  git -C "$git_dir" -c core.quotePath=false log --reverse --first-parent \
-    --diff-filter=A --name-only --format='%x02%n%B%n%x03' "$commit" \
-    | LC_ALL=C awk '
-      $0 == "\002" { in_message = 1; merge = ""; next }
-      $0 == "\003" { in_message = 0; next }
-      in_message {
-        if ($0 ~ /^See merge request monero-project\/ccs-proposals![0-9]+$/)
-          merge = substr($0, index($0, "!") + 1)
-        next
-      }
-      merge != "" && $0 != "" && substr($0, 1, 1) != "\"" {
-        print merge "\t" $0
-      }
-    '
+  "$DEPLOY/gittree.py" merges "$git_dir" "$commit" >"$dir/mr/merged.tsv" \
+    || return 1
 }

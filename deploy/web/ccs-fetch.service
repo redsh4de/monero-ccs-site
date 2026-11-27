@@ -15,7 +15,7 @@ ExecStart=/usr/local/lib/ccs/current/deploy/web/fetch.sh
 # the alert URL, handed to this unit alone, never to the render
 LoadCredential=alert_url:/etc/ccs/alert_url
 ReadWritePaths=/var/lib/ccs/in /var/lib/ccs/fetch
-# the alerts' state, in memory, and kept from one run to the next
+# the alerts' state: in memory, and kept between runs
 RuntimeDirectory=ccs-fetch
 RuntimeDirectoryPreserve=yes
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX

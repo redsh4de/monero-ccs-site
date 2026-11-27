@@ -1,11 +1,12 @@
 """lib.sh: the functions the deploy scripts share."""
 
 import os
+import time
 
 import pytest
 
 from fetching import merge, new_repository
-from scripts import lib_sh, run, stand_in
+from harness import bomb, lib_sh, run, stand_in
 
 
 @pytest.fixture
@@ -36,9 +37,80 @@ def test_export_tree_maps_each_file_to_the_merge_request_that_added_it(
     assert not (out / "mr/log").exists()
 
 
+def test_tree_size_refuses_a_tree_one_entry_past_its_cap(merged):
+    """The four files of the tip count against a cap of three."""
+    lib_sh('tree_size "$1" master 4 1000000', merged / ".git")
+    refusal = "holds more than 3 entries"
+    lib_sh('tree_size "$1" master 3 1000000', merged / ".git", refusal=refusal)
+
+
+def test_export_tree_refuses_a_commit_of_endless_folders(merged, tmp_path):
+    commit = bomb(merged, "master")
+    out = tmp_path / "out"
+    refusal = "holds more than 2000 entries"
+    lib_sh('export_tree "$1" "$2" "$3"', merged / ".git", commit, out, refusal=refusal)
+
+
+def test_export_tree_refuses_a_commit_too_big_for_the_render(merged, tmp_path):
+    merge(merged, "big", "big.md", "0" * 4_000_001, "monero-project/ccs-proposals!12")
+    out, refusal = tmp_path / "out", "or 4000000 bytes"
+    lib_sh('export_tree "$1" master "$2"', merged / ".git", out, refusal=refusal)
+
+
+def test_export_tree_writes_each_file_as_the_tree_holds_it(merged, tmp_path):
+    """Not as a .gitattributes in the tree says, which could grow it."""
+    request = "monero-project/ccs-proposals!12"
+    merge(merged, "attributes", ".gitattributes", "*.md export-subst\n", request)
+    merge(merged, "grows", "g.md", "$Format:%B$\n", request)
+    # from the checkout, as the monitor archives one, whose own attributes count
+    lib_sh('export_tree "$1" master "$2"', merged, tmp_path / "out")
+    assert (tmp_path / "out/proposals/g.md").read_text() == "$Format:%B$\n"
+
+
+def test_export_tree_reads_no_file_an_old_commit_added(merged, tmp_path):
+    """A million paths that one merge added and the next took away cost nothing."""
+    git = ["git", "-C", merged]
+    blob = run(*git, "hash-object", "-w", "--stdin", input="x").stdout.strip()
+    entry = f"100644 blob {blob}\tx.md\n"
+    for _ in range(6):
+        tree = run(*git, "mktree", input=entry).stdout.strip()
+        entry = "".join(f"040000 tree {tree}\t{n}\n" for n in range(10))
+    tree = run(*git, "mktree", input=run(*git, "ls-tree", "master").stdout + entry)
+    user = ["-c", "user.name=t", "-c", "user.email=t@example.org"]
+    added = "See merge request monero-project/ccs-proposals!12"
+    bomb = run(
+        *git, *user, "commit-tree", tree.stdout.strip(), "-p", "master", "-m", added
+    )
+    before = run(*git, "rev-parse", "master^{tree}").stdout.strip()
+    taken = run(
+        *git, *user, "commit-tree", before, "-p", bomb.stdout.strip(), "-m", "x"
+    )
+    start = time.monotonic()
+    lib_sh('export_tree "$1" "$2" "$3"', merged, taken.stdout.strip(), tmp_path / "out")
+    assert time.monotonic() - start < 3
+    assert (tmp_path / "out/mr/merged.tsv").read_text() == "7\ta.md\n8\tb c.md\n"
+
+
+def test_export_tree_fails_when_the_history_cannot_be_read(merged, tmp_path):
+    """The tip lists, but its parent is missing, so git log stops."""
+    git = ["git", "-C", merged]
+    tree = run(*git, "rev-parse", "master^{tree}").stdout.strip()
+    who = "t <t@example.org> 0 +0000"
+    body = f"tree {tree}\nparent {'1' * 40}\nauthor {who}\ncommitter {who}\n\nx\n"
+    tip = run(*git, "hash-object", "-t", "commit", "-w", "--stdin", input=body)
+    out = tmp_path / "out"
+    lib_sh(
+        'export_tree "$1" "$2" "$3"',
+        merged,
+        tip.stdout.strip(),
+        out,
+        refusal="git exited",
+    )
+
+
 def test_export_tree_fails_on_an_unknown_commit(merged, tmp_path):
     unknown, out = "0" * 39 + "1", tmp_path / "out"
-    lib_sh('export_tree "$1" "$2" "$3"', merged / ".git", unknown, out, ok=False)
+    lib_sh('export_tree "$1" "$2" "$3"', merged / ".git", unknown, out, refusal=unknown)
 
 
 class Alerts:
@@ -205,4 +277,4 @@ def test_release_tag_reads_the_version():
 
 @pytest.mark.parametrize("tag", ["v12", "site-v", "site-v0", "site-v1x", "site-v-1"])
 def test_release_tag_refuses_a_malformed_tag(tag):
-    assert lib_sh('release_tag "$1"', tag, ok=False).stdout == ""
+    assert lib_sh('release_tag "$1"', tag, refusal="").stdout == ""
