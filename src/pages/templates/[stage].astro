@@ -4,7 +4,7 @@ import Button from "@/components/ui/Button.astro";
 import MaskIcon from "@/components/ui/icons/MaskIcon.astro";
 import Layout from "@/layouts/Layout.astro";
 import StageLayout from "@/layouts/StageLayout.astro";
-import { type StageName, stages } from "@/lib/stages";
+import { type StageName, stages } from "@/data/stages";
 
 export function getStaticPaths() {
   return stages.map((stage) => ({
