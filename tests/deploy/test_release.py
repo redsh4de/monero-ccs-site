@@ -1,4 +1,4 @@
-"""release.sh: two identical builds, attestation, the review, and its refusals."""
+"""release.py: two identical builds, attestation, the review, and its refusals."""
 
 import hashlib
 import os
@@ -49,7 +49,7 @@ PACKAGE = (
 
 @dataclass
 class Build:
-    """One release.sh run of a tag, and the folder it writes, release-<tag>."""
+    """One release.py run of a tag, and the folder it writes, release-<tag>."""
 
     tag: str
     result: subprocess.CompletedProcess[str]
@@ -57,13 +57,13 @@ class Build:
 
     @property
     def review(self) -> str:
-        """Return what release.sh shows in less, from "Changes since" to its question."""
+        """Return what release.py shows in less, from "Changes since" to its question."""
         stdout = self.result.stdout
         return stdout[stdout.index("Changes since ") : stdout.rindex("Sign release-")]
 
     @property
     def said(self) -> str:
-        """Return the end of what release.sh said outside the review, on both streams."""
+        """Return the end of what release.py said outside the review, on both streams."""
         before, _, after = self.result.stdout.partition(self.review)
         return f"{tail(before + after)}\n{tail(self.result.stderr)}"
 
@@ -101,8 +101,8 @@ def release(
     answer: str = "n",
     refusal: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    """Run the worktree's release.sh, and answer its question."""
-    script = worktree / "deploy/signer/release.sh"
+    """Run the worktree's release.py, and answer its question."""
+    script = worktree / "deploy/signer/release.py"
     options = {"cwd": worktree, "env": env, "input": f"{answer}\n", "timeout": 600}
     return run(script, *args, refusal=refusal, **options)
 
@@ -128,7 +128,7 @@ def tree(repo: Path, root: Path) -> str:
 
 
 def attest(root: Path, tag: str, builder: str, sums: str, keys: Keys, signer: str):
-    """Write builder's attestation of sums under root, as release.sh writes one."""
+    """Write builder's attestation of sums under root, as release.py writes one."""
     folder = root / "attestations" / tag / builder
     folder.mkdir(parents=True)
     (folder / "SHA256SUMS").write_text(sums)
@@ -232,7 +232,7 @@ def host(tmp_path_factory):
 
 @pytest.fixture(scope="module")
 def env(tmp_path_factory, repo, host, keyring, homes) -> dict[str, str]:
-    """Return release.sh's environment, with no attestations, as signer-a."""
+    """Return release.py's environment, with no attestations, as signer-a."""
     return {
         "RELEASES": host.url,
         "KEYRING": str(keyring),
@@ -374,8 +374,8 @@ def test_a_planted_css_rule_shows_word_by_word(second):
 
 
 def test_a_brace_or_semicolon_that_moved_shows(tmp_path):
-    script = (REPO / "deploy/signer/release.sh").read_text()
-    words = re.search(r"--word-diff-regex='[^']+'", script)[0].replace("'", "")
+    script = (REPO / "deploy/signer/release.py").read_text()
+    words = re.search(r'"(--word-diff-regex=[^"]+)"', script)[1]
     old, new = tmp_path / "old.css", tmp_path / "new.css"
     old.write_text("a{b:c}d{e:f}")
     new.write_text("a{b:c;d{e:f}}")
@@ -642,9 +642,9 @@ def test_a_tampered_release_before_stops_the_build(
         pytest.param(("site-v1",), id="no builder name"),
     ],
 )
-def test_release_sh_needs_a_tag_and_a_builder_name(tmp_path, repo, env, args):
+def test_release_py_needs_a_tag_and_a_builder_name(tmp_path, repo, env, args):
     worktree = checkout(repo, "site-v1", tmp_path)
-    release(worktree, *args, env=env, refusal="usage: release.sh")
+    release(worktree, *args, env=env, refusal="usage: release.py")
 
 
 def test_a_tar_that_is_not_gnu_tar_stops_it(tmp_path, repo, env):
@@ -668,7 +668,7 @@ def test_release_1_runs_only_from_a_checkout_of_its_tag(tmp_path, repo, env, nam
 
 def test_older_scripts_hand_over_to_the_release_befores(tmp_path, repo, env, published):
     worktree = checkout(repo, "site-v5", tmp_path)
-    script = worktree / "deploy/signer/release.sh"
+    script = worktree / "deploy/signer/release.py"
     script.write_text(replaced(script.read_text(), "the packageManager", "older"))
     refusal = "the packageManager of site-v5"
     refused = release(worktree, "site-v5", "tester", env=env, refusal=refusal)

@@ -305,7 +305,7 @@ def test_an_older_site_release_differing_only_in_backend_signer_files_and_docs_i
     install_newer(
         monitored,
         "deploy/backend/values.py",
-        "deploy/signer/release.sh",
+        "deploy/signer/release.py",
         "deploy/README.md",
     )
     monitored.monitor(release=2)
