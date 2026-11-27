@@ -1,4 +1,4 @@
-"""lib.sh: the functions the deploy scripts share."""
+"""lib.py and alerts.py: what the deploy scripts share."""
 
 import os
 import time
@@ -6,7 +6,7 @@ import time
 import pytest
 
 from fetching import merge, new_repository
-from harness import bomb, lib_sh, run, stand_in
+from harness import bomb, lib_py, run, stand_in
 
 
 @pytest.fixture
@@ -30,31 +30,49 @@ def test_export_tree_maps_each_file_to_the_merge_request_that_added_it(
     merged, tmp_path
 ):
     out = tmp_path / "out"
-    lib_sh('export_tree "$1" master "$2"', merged / ".git", out)
+    lib_py(
+        "lib.export_tree(Path(args[0]), args[1], Path(args[2]))",
+        merged / ".git",
+        "master",
+        out,
+    )
     assert (out / "proposals/a.md").is_file()
     assert (out / "proposals/b c.md").is_file()
     assert (out / "mr/merged.tsv").read_text() == "7\ta.md\n8\tb c.md\n"
     assert not (out / "mr/log").exists()
 
 
-def test_tree_size_refuses_a_tree_one_entry_past_its_cap(merged):
+def test_check_tree_size_refuses_a_tree_one_entry_past_its_cap(merged):
     """The four files of the tip count against a cap of three."""
-    lib_sh('tree_size "$1" master 4 1000000', merged / ".git")
+    lib_py("lib.check_tree_size(Path(args[0]), 'master', 4, 1000000)", merged / ".git")
     refusal = "holds more than 3 entries"
-    lib_sh('tree_size "$1" master 3 1000000', merged / ".git", refusal=refusal)
+    size = "lib.check_tree_size(Path(args[0]), 'master', 3, 1000000)"
+    lib_py(size, merged / ".git", refusal=refusal)
 
 
 def test_export_tree_refuses_a_commit_of_endless_folders(merged, tmp_path):
     commit = bomb(merged, "master")
     out = tmp_path / "out"
     refusal = "holds more than 2000 entries"
-    lib_sh('export_tree "$1" "$2" "$3"', merged / ".git", commit, out, refusal=refusal)
+    lib_py(
+        "lib.export_tree(Path(args[0]), args[1], Path(args[2]))",
+        merged / ".git",
+        commit,
+        out,
+        refusal=refusal,
+    )
 
 
 def test_export_tree_refuses_a_commit_too_big_for_the_render(merged, tmp_path):
     merge(merged, "big", "big.md", "0" * 4_000_001, "monero-project/ccs-proposals!12")
     out, refusal = tmp_path / "out", "or 4000000 bytes"
-    lib_sh('export_tree "$1" master "$2"', merged / ".git", out, refusal=refusal)
+    lib_py(
+        "lib.export_tree(Path(args[0]), args[1], Path(args[2]))",
+        merged / ".git",
+        "master",
+        out,
+        refusal=refusal,
+    )
 
 
 def test_export_tree_writes_each_file_as_the_tree_holds_it(merged, tmp_path):
@@ -63,7 +81,12 @@ def test_export_tree_writes_each_file_as_the_tree_holds_it(merged, tmp_path):
     merge(merged, "attributes", ".gitattributes", "*.md export-subst\n", request)
     merge(merged, "grows", "g.md", "$Format:%B$\n", request)
     # from the checkout, as the monitor archives one, whose own attributes count
-    lib_sh('export_tree "$1" master "$2"', merged, tmp_path / "out")
+    lib_py(
+        "lib.export_tree(Path(args[0]), args[1], Path(args[2]))",
+        merged,
+        "master",
+        tmp_path / "out",
+    )
     assert (tmp_path / "out/proposals/g.md").read_text() == "$Format:%B$\n"
 
 
@@ -86,7 +109,12 @@ def test_export_tree_reads_no_file_an_old_commit_added(merged, tmp_path):
         *git, *user, "commit-tree", before, "-p", bomb.stdout.strip(), "-m", "x"
     )
     start = time.monotonic()
-    lib_sh('export_tree "$1" "$2" "$3"', merged, taken.stdout.strip(), tmp_path / "out")
+    lib_py(
+        "lib.export_tree(Path(args[0]), args[1], Path(args[2]))",
+        merged,
+        taken.stdout.strip(),
+        tmp_path / "out",
+    )
     assert time.monotonic() - start < 3
     assert (tmp_path / "out/mr/merged.tsv").read_text() == "7\ta.md\n8\tb c.md\n"
 
@@ -99,8 +127,8 @@ def test_export_tree_fails_when_the_history_cannot_be_read(merged, tmp_path):
     body = f"tree {tree}\nparent {'1' * 40}\nauthor {who}\ncommitter {who}\n\nx\n"
     tip = run(*git, "hash-object", "-t", "commit", "-w", "--stdin", input=body)
     out = tmp_path / "out"
-    lib_sh(
-        'export_tree "$1" "$2" "$3"',
+    lib_py(
+        "lib.export_tree(Path(args[0]), args[1], Path(args[2]))",
         merged,
         tip.stdout.strip(),
         out,
@@ -110,22 +138,28 @@ def test_export_tree_fails_when_the_history_cannot_be_read(merged, tmp_path):
 
 def test_export_tree_fails_on_an_unknown_commit(merged, tmp_path):
     unknown, out = "0" * 39 + "1", tmp_path / "out"
-    lib_sh('export_tree "$1" "$2" "$3"', merged / ".git", unknown, out, refusal=unknown)
+    lib_py(
+        "lib.export_tree(Path(args[0]), args[1], Path(args[2]))",
+        merged / ".git",
+        unknown,
+        out,
+        refusal=unknown,
+    )
 
 
 class Alerts:
-    """lib.sh's alert rule in a folder of its own, posting to the fake server."""
+    """alerts.py's rule in a folder of its own, posting to the fake server."""
 
     def __init__(self, root, server):
         self.dir, self.server = root / "alerts", server
-        self.env = {
-            "ALERTS_DIR": str(self.dir),
-            "CREDENTIALS_DIRECTORY": str(server.credentials),
-        }
+        self.env = {"CREDENTIALS_DIRECTORY": str(server.credentials)}
 
-    def run(self, now, *alerts):
-        calls = "".join(f"alert {alert}; " for alert in alerts)
-        return lib_sh(f"NOW={now}; alerts_begin; {calls}alerts_send", env=self.env)
+    def run(self, now, *checks, send=True, env=None):
+        """Run alerts.py's checks at the time now, then send what they queued."""
+        code = f"run = alerts.Alerts(Path(args[0]), {now})\n"
+        code += "".join(f"run.check(*{check!r})\n" for check in checks)
+        code += "run.send()" if send else ""
+        return lib_py(code, self.dir, env=self.env if env is None else env)
 
     def state(self, name):
         path = self.dir / name
@@ -138,22 +172,22 @@ def alerts(tmp_path, server):
 
 
 def test_an_alert_waits_for_its_hold(alerts):
-    alerts.run(1000, "a 1 600 9999 'A broke'")
+    alerts.run(1000, ("a", 1, 600, 9999, "A broke"))
     assert alerts.server.alerts() == []
     assert alerts.state("a") == "1000 0 A broke"
-    alerts.run(1600, "a 1 600 9999 'A broke'")
+    alerts.run(1600, ("a", 1, 600, 9999, "A broke"))
     assert alerts.server.alerts() == ["A broke (a)"]
 
 
 def test_an_alert_fires_once_within_its_repeat(alerts):
-    alerts.run(1000, "a 1 0 9999 'A broke'")
-    alerts.run(1600, "a 1 0 9999 'A broke'")
+    alerts.run(1000, ("a", 1, 0, 9999, "A broke"))
+    alerts.run(1600, ("a", 1, 0, 9999, "A broke"))
     assert alerts.server.alerts() == ["A broke (a)"]
 
 
 def test_a_pass_after_an_alert_sends_resolved_and_clears_the_state(alerts):
-    alerts.run(1000, "a 1 0 9999 'A broke'")
-    alerts.run(1100, "a 0 0 9999 'A broke'")
+    alerts.run(1000, ("a", 1, 0, 9999, "A broke"))
+    alerts.run(1100, ("a", 0, 0, 9999, "A broke"))
     assert alerts.server.alerts() == ["A broke (a)", "resolved: A broke (a)"]
     assert alerts.state("a") is None
 
@@ -161,25 +195,25 @@ def test_a_pass_after_an_alert_sends_resolved_and_clears_the_state(alerts):
 def test_a_failed_send_changes_no_state_and_is_retried_as_one_message(alerts):
     refusing = alerts.server.state / "alert.fail"
     refusing.touch()
-    alerts.run(3000, "b 1 0 9999 B", "c 1 0 9999 C")
+    alerts.run(3000, ("b", 1, 0, 9999, "B"), ("c", 1, 0, 9999, "C"))
     assert alerts.state("b") == "3000 0 B"
     refusing.unlink()
-    alerts.run(3100, "b 1 0 9999 B", "c 1 0 9999 C")
+    alerts.run(3100, ("b", 1, 0, 9999, "B"), ("c", 1, 0, 9999, "C"))
     assert alerts.server.alerts() == ["B (b)|C (c)"]
     assert alerts.state("b") == "3000 3100 B"
 
 
 def test_a_recovery_before_the_hold_is_silent(alerts):
-    alerts.run(3200, "d 1 600 9999 D")
-    alerts.run(3300, "d 0 600 9999 D")
+    alerts.run(3200, ("d", 1, 600, 9999, "D"))
+    alerts.run(3300, ("d", 0, 600, 9999, "D"))
     assert alerts.server.alerts() == []
     assert alerts.state("d") is None
 
 
 def test_an_alert_repeats_after_its_repeat_time_with_the_newest_text(alerts):
-    alerts.run(4000, "e 1 0 3600 'release 5 fails'")
-    alerts.run(5000, "e 1 0 3600 'release 5 fails'")
-    alerts.run(7600, "e 1 0 3600 'release 6 fails'")
+    alerts.run(4000, ("e", 1, 0, 3600, "release 5 fails"))
+    alerts.run(5000, ("e", 1, 0, 3600, "release 5 fails"))
+    alerts.run(7600, ("e", 1, 0, 3600, "release 6 fails"))
     assert alerts.server.alerts() == ["release 5 fails (e)", "release 6 fails (e)"]
 
 
@@ -189,34 +223,22 @@ def test_nothing_to_send_posts_nothing(alerts):
 
 
 def test_a_killed_runs_queued_alert_is_not_posted_later(alerts):
-    lib_sh("NOW=100; alerts_begin; alert k 1 0 9999 K", env=alerts.env)
-    alerts.run(200, "k 0 0 9999 K")
+    alerts.run(100, ("k", 1, 0, 9999, "K"), send=False)
+    alerts.run(200, ("k", 0, 0, 9999, "K"))
     assert alerts.server.alerts() == []
     assert alerts.state("k") is None
 
 
-def test_a_pending_mark_for_a_removed_check_is_skipped(alerts):
+def test_a_mark_for_a_removed_check_is_skipped(alerts):
     alerts.dir.mkdir()
-    (alerts.dir / ".pending").write_text("sent gone\n")
-    (alerts.dir / ".outbox").write_text("G\n")
-    lib_sh("NOW=300; alerts_send", env=alerts.env)
+    lib_py("alerts.Alerts(Path(args[0]), 300).mark_posted('sent', 'gone')", alerts.dir)
     assert alerts.state("gone") is None
-
-
-def test_alert_and_alerts_send_leave_the_callers_variables_alone(alerts):
-    names = "file since sent text action name due"
-    mine = " ".join(f"{name}=mine" for name in names.split())
-    shown = " ".join(f"${name}" for name in names.split())
-    snippet = f"{mine}; NOW=400; alerts_begin; alert v 1 0 9999 V; alerts_send"
-    result = lib_sh(f'{snippet}; echo "{shown}"', env=alerts.env)
-    assert result.stdout.splitlines()[-1] == " ".join(["mine"] * 7)
 
 
 def test_the_alert_url_reaches_curl_on_stdin_never_in_its_arguments(alerts, tmp_path):
     script = f'#!/bin/sh\nprintf "%s\\n" "$@" >{tmp_path}/args\ncat >{tmp_path}/stdin\n'
     env = {**alerts.env, "PATH": stand_in(tmp_path / "bin", "curl", script)}
-    queued = "NOW=1; alerts_begin; alert x 1 0 9999 @/etc/hostname; alerts_send"
-    lib_sh(queued, env=env)
+    alerts.run(1, ("x", 1, 0, 9999, "@/etc/hostname"), env=env)
     arguments = (tmp_path / "args").read_text().splitlines()
     assert not any(alerts.server.url in argument for argument in arguments)
     assert f"url = {alerts.server.url}/alert" in (tmp_path / "stdin").read_text()
@@ -237,28 +259,27 @@ def test_a_failed_post_is_logged(url, alerts):
         del env["CREDENTIALS_DIRECTORY"]
     else:
         (alerts.server.credentials / "alert_url").write_text(f"{url}\n")
-    queued = "NOW=1; alerts_begin; alert x 1 0 9999 X; alerts_send"
-    assert "alert not sent" in lib_sh(queued, env=env).stderr
+    assert "alert not sent" in alerts.run(1, ("x", 1, 0, 9999, "X"), env=env).stderr
 
 
 def test_alerts_go_through_the_proxy_all_proxy_names(alerts):
     # an alert channel only the proxy reaches; the fake server logs any post
     (alerts.server.credentials / "alert_url").write_text("http://alert.invalid/\n")
     alerts.env["ALL_PROXY"] = alerts.server.url
-    alerts.run(1000, "a 1 0 9999 'A broke'")
+    alerts.run(1000, ("a", 1, 0, 9999, "A broke"))
     assert alerts.server.alerts() == ["A broke (a)"]
 
 
 def test_a_due_alert_stays_unsent_while_alerts_are_paused(alerts):
     (alerts.server.credentials / "alert_url").write_text("")
-    alerts.run(100, "p 1 0 9999 P")
+    alerts.run(100, ("p", 1, 0, 9999, "P"))
     assert alerts.state("p") == "100 0 P"
 
 
 def test_an_unsigned_list_counts_as_empty(etc_ccs, tmp_path):
     (etc_ccs / "addresses.txt").write_text(f"{'8' + 'A' * 94} {'A' * 232}\n")
     verified = tmp_path / "addresses"
-    lib_sh('verify_list "$1"', verified)
+    lib_py("lib.verify_list(Path(args[0]))", verified)
     assert verified.read_text() == ""
 
 
@@ -267,14 +288,15 @@ def test_render_values_writes_only_the_renders_inputs(tmp_path):
     values.write_text("updated 1\n")
     inputs.mkdir()
     verified.write_text("")
-    lib_sh('render_values "$1" "$2" "$3" >/dev/null', values, inputs, verified)
+    code = "lib.render_values(Path(args[0]), Path(args[1]), Path(args[2]))"
+    lib_py(code, values, inputs, verified)
     assert sorted(os.listdir(inputs)) == ["addresses", "site", "values"]
 
 
 def test_release_tag_reads_the_version():
-    assert lib_sh('release_tag "$1"', "site-v12").stdout == "12\n"
+    assert lib_py("print(lib.release_tag(args[0]))", "site-v12").stdout == "12\n"
 
 
 @pytest.mark.parametrize("tag", ["v12", "site-v", "site-v0", "site-v1x", "site-v-1"])
 def test_release_tag_refuses_a_malformed_tag(tag):
-    assert lib_sh('release_tag "$1"', tag, refusal="").stdout == ""
+    assert lib_py("print(lib.release_tag(args[0]))", tag).stdout == "None\n"

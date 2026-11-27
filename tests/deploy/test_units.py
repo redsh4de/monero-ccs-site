@@ -15,7 +15,7 @@ SYSTEM = Path("/etc/systemd/system")
 
 @pytest.fixture(scope="module")
 def installed():
-    """Place the units, each service's sandbox and a release, as install.sh does."""
+    """Place the units, each service's sandbox and a release, as install.py does."""
     release = Path("/usr/local/lib/ccs/releases/1")
     shutil.copytree(DEPLOY, release / "deploy")
     Path("/usr/local/lib/ccs/current").symlink_to(release)

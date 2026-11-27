@@ -23,7 +23,7 @@ pnpm-debug.log*
 # jetbrains setting folder
 .idea/
 
-# a release build's output (deploy/signer/release.sh)
+# a release build's output (deploy/signer/release.py)
 release-site-v*/
 
 # the render's body cache (pnpm render)

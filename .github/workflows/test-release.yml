@@ -1,6 +1,6 @@
 name: test-release
 
-# release.sh builds the site about eight times here, which takes too long for
+# release.py builds the site about eight times here, which takes too long for
 # every pull request
 on:
   schedule:

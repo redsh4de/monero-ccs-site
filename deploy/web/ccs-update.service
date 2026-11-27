@@ -4,7 +4,7 @@ Description=Render the CCS site and switch to it
 [Service]
 Type=oneshot
 User=ccs-update
-ExecStart=/usr/local/lib/ccs/current/deploy/web/update.sh
+ExecStart=/usr/local/lib/ccs/current/deploy/web/update.py
 PrivateNetwork=yes
 IPAddressDeny=any
 # rsync's own pipes, and nothing else

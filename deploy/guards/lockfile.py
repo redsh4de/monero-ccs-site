@@ -38,8 +38,10 @@ def lock_scalar(text: str, flow: bool = False) -> str:
 
 def lock_value(text: str | None) -> object:
     """Return a row's value: None, a flat flow map or list, or a scalar."""
-    if text is None or text in ("{}", "[]"):
-        return {"{}": {}, "[]": []}.get(text)
+    if text is None:
+        return None
+    if text in ("{}", "[]"):
+        return {} if text == "{}" else []
     items = text[1:-1].split(", ")
     if text[0] + text[-1] == "[]":
         return [lock_scalar(item, True) for item in items]

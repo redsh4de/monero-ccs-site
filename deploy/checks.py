@@ -57,40 +57,9 @@ Exit: 0 accepted, 1 refused (with the reason on stderr), 2 usage.
 import os
 import sys
 from pathlib import Path
-from types import ModuleType
 
-DEPLOY = Path(__file__).resolve().parent
-# each runs from its own source, which the signers read. An import would take a
-# folder or a cached .pyc of the same name first. Each comes before its importers
-RUNS = {
-    "safety": "render/safety.py",
-    "qr": "render/qr.py",
-    "guards": "guards/__init__.py",
-    "guards.common": "guards/common.py",
-    "guards.style": "guards/style.py",
-    "guards.values": "guards/values.py",
-    "guards.snapshot": "guards/snapshot.py",
-    "guards.build": "guards/build.py",
-    "guards.lockfile": "guards/lockfile.py",
-    "guards.site": "guards/site.py",
-    "guards.keys": "guards/keys.py",
-    "guards.release": "guards/release.py",
-}
-
-
-def load(name: str, file: str) -> None:
-    """Run one of RUNS as the module that the others import by its name."""
-    module = sys.modules[name] = ModuleType(name)
-    module.__file__ = str(DEPLOY / file)
-    parent, _, child = name.rpartition(".")
-    if parent:
-        setattr(sys.modules[parent], child, module)
-    code = compile((DEPLOY / file).read_bytes(), module.__file__, "exec")
-    exec(code, vars(module))
-
-
-for name, file in RUNS.items():
-    load(name, file)
+MODULES = Path(__file__).resolve().parent / "modules.py"
+exec(compile(MODULES.read_bytes(), MODULES, "exec"), {"__file__": str(MODULES)})
 from guards import build, keys, lockfile, release, site, snapshot, values  # noqa: E402
 from guards.common import Reject, read_capped  # noqa: E402
 

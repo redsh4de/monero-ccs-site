@@ -17,7 +17,7 @@ Set up the backend first: its install prints the command for the web server.
 .. BACKEND .....................                      .. WEB SERVER ..................
 :                              :                      :                              :
 : +--------------------------+ :     the command      : +--------------------------+ :
-: |  1. install.sh backend   |------------------------->|    2. install.sh web     | :
+: |  1. install.py backend   |------------------------->|    2. install.py web     | :
 : +--------------------------+ :                      : +--------------------------+ :
 :                              :                      :                              :
 : +--------------------------+ :   its fingerprint    : +--------------------------+ :
@@ -38,7 +38,7 @@ ccs.getmonero.org.
 ### On both machines
 
 Each machine needs four files in `/etc/ccs/`, and a release you checked by hand. Its
-`install.sh` runs as root before anything else checks it. The release signers give you
+`install.py` runs as root before anything else checks it. The release signers give you
 `release-signers.gpg`. The address signer gives you `address-signers.gpg`,
 `addresses.txt` and `addresses.txt.asc`, made as in
 [The address list](docs/RELEASING.md#the-address-list).
@@ -84,7 +84,7 @@ Run these steps as root on the backend, in the release's folder.
    `/var/www/ccs-back/storage/app`:
 
    ```sh
-   deploy/install.sh backend site-vN <web server address> <ccs-back folder>
+   deploy/install.py backend site-vN <web server address> <ccs-back folder>
    ```
 
 2. Compare the host key fingerprint that the install printed with
@@ -103,7 +103,7 @@ Run these steps as root on the web server, in the release's folder.
    checks the nginx site and restarts nginx in its sandbox:
 
    ```sh
-   deploy/install.sh web site-vN <backend IP address> '<push key>'
+   deploy/install.py web site-vN <backend IP address> '<push key>'
    ```
 
 3. Put the alert channel's URL in `/etc/ccs/alert_url`. Use one channel for both
@@ -158,7 +158,7 @@ Upgrade the web server first: a site older than the backend raises `old-release`
 each machine, run:
 
 ```sh
-/usr/local/lib/ccs/current/deploy/install.sh web site-vN   # or backend
+/usr/local/lib/ccs/current/deploy/install.py web site-vN   # or backend
 ```
 
 To go back, use the opposite order: the backend first. The previous release stays on
@@ -204,8 +204,8 @@ When a release on disk is damaged:
 
 1. Delete it: `rm -rf /usr/local/lib/ccs/releases/N`.
 2. Check release N by hand, as in steps 4 to 6 of [On both machines](#on-both-machines).
-3. In its folder, run `deploy/install.sh backend site-vN` or
-   `deploy/install.sh web site-vN`.
+3. In its folder, run `deploy/install.py backend site-vN` or
+   `deploy/install.py web site-vN`.
 
 ### Rebuild a machine
 
@@ -224,7 +224,7 @@ else on the machine matters.
 
 1. Restore `/etc/ccs/`.
 2. Set it up again, as in [The backend](#the-backend).
-3. On the web server, run the command that `install.sh backend` prints.
+3. On the web server, run the command that `install.py backend` prints.
 
 ### After a compromise
 
@@ -283,7 +283,7 @@ changes:
 
 1. On the backend, delete what changed: `rm /etc/ccs/push_key*` for a new push key, or
    `rm /etc/ccs/known_hosts` for a new host key.
-2. Run `/usr/local/lib/ccs/current/deploy/install.sh backend site-vN`, with the
+2. Run `/usr/local/lib/ccs/current/deploy/install.py backend site-vN`, with the
    installed release.
 3. Compare the host key fingerprint that it prints with
    `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` on the web server.
@@ -299,5 +299,5 @@ Renew the certificate with an ACME client, through port 80. Port 80 serves
 2. Replace `/etc/ssl/ccs/` with a link to the certificate folder it keeps.
 3. Make the client run `systemctl reload nginx` after each renewal.
 
-**Do not let the ACME client edit the nginx site.** `install.sh` replaces it on each
+**Do not let the ACME client edit the nginx site.** `install.py` replaces it on each
 upgrade.

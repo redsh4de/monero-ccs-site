@@ -32,6 +32,7 @@ def records(argv: list[str | bytes]) -> Iterator[bytes]:
     A reader that stops early closes the pipe, which stops the command.
     """
     with subprocess.Popen(argv, stdout=subprocess.PIPE) as command:
+        assert command.stdout is not None
         rest = b""
         while chunk := command.stdout.read(65536):
             *done, rest = (rest + chunk).split(b"\0")

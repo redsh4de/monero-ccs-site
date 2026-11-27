@@ -15,9 +15,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-import zbar
+import zbar  # type: ignore[import-not-found]
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "render"))
+MODULES = Path(__file__).resolve().parents[1] / "modules.py"
+exec(compile(MODULES.read_bytes(), MODULES, "exec"), {"__file__": str(MODULES)})
 import qr  # noqa: E402
 from safety import is_address  # noqa: E402
 

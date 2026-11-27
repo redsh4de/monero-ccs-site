@@ -36,12 +36,15 @@ class Site:
     def listed(self) -> list[Proposal]:
         return [proposal for proposal in self.proposals if proposal.listed]
 
+    def in_stage(self, name: str) -> list[Proposal]:
+        return [proposal for proposal in self.listed if proposal.stage == name]
+
     @property
     def stage_pages(self) -> dict[str, list[Proposal] | list[Idea]]:
         """Each stage page's path, also its template's name, mapped to its cards."""
-        pages = {"ideas": self.ideas}
+        pages: dict[str, list[Proposal] | list[Idea]] = {"ideas": self.ideas}
         for name, stage in STAGES.items():
-            pages[stage.page] = [p for p in self.listed if p.stage == name]
+            pages[stage.page] = self.in_stage(name)
         return pages
 
     @property

@@ -18,7 +18,7 @@ import re
 import secrets
 import sys
 import xml.etree.ElementTree as ET
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import replace
 from email.utils import format_datetime
 from hashlib import sha256
@@ -28,7 +28,7 @@ from types import ModuleType
 
 import jinja2.sandbox
 from jinja2 import nodes
-import linkify_it
+import linkify_it  # type: ignore[import-untyped]
 import markdown_it
 import mdit_py_plugins
 import mdurl
@@ -64,7 +64,7 @@ def source_hash(*modules: ModuleType) -> bytes:
     # files, not versions: a patched Debian library keeps its version number
     digest = sha256()
     for module in modules:
-        path = Path(module.__file__)
+        path = Path(str(module.__file__))
         package = path.name == "__init__.py"
         files = sorted(path.parent.rglob("*.py")) if package else [path]
         for file in files:
@@ -121,7 +121,7 @@ class Render:
         return Markup(f"{HOLE}{len(self.printed) - 1}.")
 
     def fill(
-        self, template: jinja2.Template, values: dict[str, object]
+        self, template: jinja2.Template, values: Mapping[str, object]
     ) -> tuple[str, list[tuple[object, range]]]:
         """Return the page, and each value it prints with where it lies."""
         self.printed.clear()
@@ -139,8 +139,9 @@ def templates(
 ) -> dict[str, jinja2.Template]:
     """Compile every template up front, so a broken one stops the render early."""
     # sandboxed, as a dependency of the build could change a template
+    loader = jinja2.FileSystemLoader(folder, encoding="utf-8")
     env = jinja2.sandbox.ImmutableSandboxedEnvironment(
-        loader=jinja2.FileSystemLoader(folder, encoding="utf-8"),
+        loader=loader,
         finalize=finalize,
         autoescape=True,
         undefined=jinja2.StrictUndefined,
@@ -153,7 +154,7 @@ def templates(
         comment_end_string="#]",
     )
     for name in names:
-        check_template(env.parse(env.loader.get_source(env, f"{name}.html")[0]), name)
+        check_template(env.parse(loader.get_source(env, f"{name}.html")[0]), name)
     return {name: env.get_template(f"{name}.html") for name in names}
 
 
@@ -308,7 +309,10 @@ def write_qr_codes(addresses: set[str], codes: dict[str, str], out: Path) -> Non
     for address in sorted(addresses):
         path = out / "qr" / f"{address}.png"
         path.parent.mkdir(exist_ok=True)
-        path.write_bytes(qr.png(qr.modules(codes[address])))
+        rows = qr.modules(codes[address])
+        if rows is None:
+            raise ValueError(f"the QR code of {address} does not decode")
+        path.write_bytes(qr.png(rows))
 
 
 def drop_unused(cache: Path, used: set[str]) -> None:
@@ -331,7 +335,7 @@ def main() -> None:
     pages = templates(template_dir, names, run.printable)
     used = write_proposals(run, pages["proposal"], site.proposals, out, cache)
     write_lists(run, pages, site, out)
-    proposals = site.stage_pages["funding-required"]
+    proposals = site.in_stage("funding-required")
     write(out / "feed.xml", feed(proposals, given.site_url, run.listed))
     write_qr_codes(site.addresses_shown, given.qr_codes, out)
     if cache is not None:

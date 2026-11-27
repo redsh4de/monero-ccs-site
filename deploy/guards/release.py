@@ -25,8 +25,9 @@ def signed_digest(folder: str, keyring: str, version: int) -> str:
         raise Reject("release: a release signer's signature is bad")
     if len(who) < 2:
         raise Reject("release: needs good signatures from two release signers")
-    rows = [SUM_LINE.fullmatch(row) for row in lines(sums, "release")]
-    if not rows or not all(rows):
+    texts = lines(sums, "release")
+    rows = [row for row in map(SUM_LINE.fullmatch, texts) if row]
+    if not rows or len(rows) < len(texts):
         raise Reject("release: SHA256SUMS isn't sha256sum's output")
     # the signed name holds the version, so an old release cannot pass as a newer one
     digests = [row[1] for row in rows if row[2] == release_name(version)]

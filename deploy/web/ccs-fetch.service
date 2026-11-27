@@ -11,7 +11,7 @@ Type=oneshot
 User=ccs-fetch
 # git reads its config from HOME, and ProtectHome hides /home
 Environment=HOME=/var/lib/ccs/fetch
-ExecStart=/usr/local/lib/ccs/current/deploy/web/fetch.sh
+ExecStart=/usr/local/lib/ccs/current/deploy/web/fetch.py
 # the alert URL, handed to this unit alone, never to the render
 LoadCredential=alert_url:/etc/ccs/alert_url
 ReadWritePaths=/var/lib/ccs/in /var/lib/ccs/fetch

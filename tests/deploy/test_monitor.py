@@ -1,4 +1,4 @@
-"""monitor.sh: the backend's checks of the live site."""
+"""monitor.py: the backend's checks of the live site."""
 
 import shutil
 import time
@@ -305,7 +305,7 @@ def test_an_older_site_release_differing_only_in_backend_signer_files_and_docs_i
     install_newer(
         monitored,
         "deploy/backend/values.py",
-        "deploy/signer/release.sh",
+        "deploy/signer/release.py",
         "deploy/README.md",
     )
     monitored.monitor(release=2)
@@ -316,7 +316,7 @@ def test_an_older_site_release_differing_only_in_backend_signer_files_and_docs_i
 @pytest.mark.parametrize(
     "changed",
     [
-        "deploy/web/update.sh",
+        "deploy/web/update.py",
         "deploy/checks.py",
         "deploy/render/content.py",
         "dist/_astro/*.css",
@@ -338,7 +338,7 @@ def test_a_run_that_cannot_make_its_folders_alerts_as_a_crash(monitored):
     shutil.rmtree(monitored.state / "releases")
     (monitored.state / "releases").symlink_to("/dev/full")
     monitored.failing_for("monitor", 700)
-    monitored.monitor(refusal="cannot create directory")
+    monitored.monitor(refusal="File exists")
     assert monitored.server.alerts() == ["ccs monitor: the monitor crashed (monitor)"]
 
 
